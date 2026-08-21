@@ -23,11 +23,20 @@ function Hint({ keys, label }: { keys: string[]; label: string }) {
 export default function HudOverlay() {
   const [speed, setSpeed] = useState(0);
   const [muted, setMuted] = useState(false);
+  const [nitro, setNitro] = useState(0);
+  const [crashFlash, setCrashFlash] = useState(false);
   const [hintsVisible, setHintsVisible] = useState(true);
 
   useEffect(() => {
     const offSpeed = bus.on<number>(EV.SPEED, setSpeed);
     const offMute = bus.on<boolean>(EV.MUTE, setMuted);
+    const offNitro = bus.on<number>(EV.NITRO, setNitro);
+    let crashTimer = 0;
+    const offCrash = bus.on(EV.CRASH, () => {
+      setCrashFlash(true);
+      window.clearTimeout(crashTimer);
+      crashTimer = window.setTimeout(() => setCrashFlash(false), 900);
+    });
 
     const fallbackTimer = window.setTimeout(() => setHintsVisible(false), 6500);
     let hideTimer = 0;
@@ -38,9 +47,12 @@ export default function HudOverlay() {
     return () => {
       offSpeed();
       offMute();
+      offNitro();
+      offCrash();
       offFirst();
       window.clearTimeout(fallbackTimer);
       window.clearTimeout(hideTimer);
+      window.clearTimeout(crashTimer);
     };
   }, []);
 
@@ -75,7 +87,25 @@ export default function HudOverlay() {
             AUDIO OFF
           </div>
         )}
+        <div className="border border-line bg-bg/85 px-3 py-2">
+          <div className="font-mono text-[9px] tracking-[0.32em] text-dim">NITRO</div>
+          <div className="mt-1.5 flex gap-[3px]">
+            {Array.from({ length: 10 }, (_, i) => (
+              <span
+                key={i}
+                className={`h-3 w-1.5 ${nitro * 10 > i ? 'bg-toxic' : 'bg-line'}`}
+              />
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* crash flash */}
+      <div
+        className={`absolute inset-0 border-4 border-crimson transition-opacity duration-300 ${
+          crashFlash ? 'opacity-70' : 'opacity-0'
+        }`}
+      />
 
       {/* bottom-center: control hints */}
       <div

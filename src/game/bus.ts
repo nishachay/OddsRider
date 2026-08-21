@@ -30,4 +30,6 @@ export const EV = {
   SPEED: 'hud:speed',
   MUTE: 'hud:mute',
   INPUT_FIRST: 'hud:input-first',
+  NITRO: 'hud:nitro',
+  CRASH: 'hud:crash',
 } as const;

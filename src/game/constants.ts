@@ -18,8 +18,88 @@ export const PALETTE = {
   visor: 0x050506,
 } as const;
 
+// Fixed-step simulation clock (reference-proven stability contract).
+export const STEP_MS = 1000 / 60;
+export const MAX_STEPS_PER_FRAME = 4;
+
+// Bike layout, offsets from chassis spawn centre (ornn-rider derived).
+export const BIKE = {
+  backDx: -56,
+  frontDx: 56,
+  wheelDy: 18,
+  headDx: -6,
+  headDy: -30,
+  wheelR: 20,
+  chassisW: 90,
+  chassisH: 22,
+  headR: 11,
+
+  chassisDensity: 0.0022,
+  chassisFriction: 0.2,
+  chassisFrictionAir: 0.012,
+  chassisRestitution: 0.1,
+
+  wheelDensity: 0.0016,
+  wheelFriction: 1.4,
+  wheelFrictionStatic: 2.0,
+  wheelRestitution: 0.15,
+
+  headDensity: 0.0008,
+  headFriction: 0.4,
+  headRestitution: 0.1,
+
+  suspStiffness: 0.62,
+  suspDamping: 0.2,
+  suspAnchorSpread: 14,
+
+  headStiffness: 0.9,
+  headDamping: 0.1,
+  headAnchorSpread: 10,
+  headAnchorY: -8,
+} as const;
+
+// Drive / lean / integrity tuning, per fixed 60Hz step (proven values).
+export const TUNING = {
+  maxWheelAv: 1.3,
+  wheelAccel: 0.12,
+  brakeDecel: 0.09,
+  reverseTargetAv: -0.28,
+
+  wheelieTorque: 0.018,
+  maxWheelieAv: 0.11,
+
+  flipLean: 0.05,
+  groundLean: 0.006,
+  tippedAngle: 1.75,
+
+  maxFallPerStep: 20,
+  maxHorizPerStep: 48,
+  latMax: 8,
+  vertTravel: 20,
+  vertSnap: 55,
+  compressMax: 8,
+
+  parkSpeed: 0.6,
+
+  jumpVelocity: 6.5,
+  jumpCooldownMs: 350,
+  coyoteSteps: 6,
+
+  nitroDrain: 0.4,
+  nitroTrickle: 0.05,
+  nitroArm: 0.1,
+  nitroForce: 0.0029,
+
+  invertedCrashTilt: 2.4,
+  invertedCrashMs: 900,
+  headCrashTilt: 0.9,
+
+  killDrop: 600,
+} as const;
+
 export const WORLD = {
   spawnX: 320,
+  spawnDy: 60,
   groundTopY: 620,
   groundLength: 200_000,
   groundThickness: 400,
@@ -27,50 +107,4 @@ export const WORLD = {
   markerSpacing: 2_500,
   markerMaxX: 60_000,
   finishX: 60_000,
-};
-
-export const PHYSICS = {
-  gravityY: 2.4,
-
-  wheelRadius: 21,
-  wheelDensity: 0.0015,
-  wheelFriction: 1.05,
-  wheelFrictionStatic: 1.2,
-  wheelRestitution: 0.1,
-
-  chassisWidth: 74,
-  chassisHeight: 22,
-  chassisDensity: 0.0022,
-  chassisChamfer: 10,
-  chassisFriction: 0.4,
-
-  suspStiffness: 0.38,
-  suspDamping: 0.1,
-
-  rearWheelOffset: { x: -27, y: 31 },
-  frontWheelOffset: { x: 29, y: 31 },
-  suspAnchors: [
-    { x: -24, y: 9 },
-    { x: 6, y: 9 },
-  ],
-
-  driveMaxSpeed: 38,
-  driveAccel: 70,
-  coastDecel: 14,
-  reverseMaxSpeed: 9,
-  brakeAccel: 160,
-
-  leanRate: 3.4,
-  leanRateAirMult: 1.7,
-  maxSpinAir: 6.2,
-  maxSpinGrounded: 2.6,
-  uprightSpring: 9,
-  uprightDamp: 2.2,
-
-  jumpVelocity: 12.5,
-  jumpCooldownMs: 350,
-  coyoteMs: 90,
-
-  nitroSpeedMult: 1.35,
-  nitroForce: 0.002,
 };

@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { bus, EV } from '../bus';
-import { PALETTE, WORLD } from '../constants';
+import { PALETTE, WORLD, STEP_MS, MAX_STEPS_PER_FRAME } from '../constants';
 import { Bike } from '../bike/Bike';
-import { BikeController } from '../bike/BikeController';
+import type { DriveInput } from '../bike/Bike';
 import { BikeRenderer } from '../bike/BikeRenderer';
 import { InputManager } from '../input/InputManager';
 
@@ -10,11 +10,14 @@ const MONO = 'JetBrains Mono, monospace';
 
 export class RideScene extends Phaser.Scene {
   private bike!: Bike;
-  private ctrl!: BikeController;
   private bikeRenderer!: BikeRenderer;
   private inputMgr!: InputManager;
+
   private muted = false;
+  private acc = 0;
+  private crashHandled = false;
   private nextSpeedEmitAt = 0;
+  private nextNitroEmitAt = 0;
 
   constructor() {
     super('ride');
@@ -26,14 +29,27 @@ export class RideScene extends Phaser.Scene {
     this.drawGate(WORLD.spawnX - 70, 'START', PALETTE.toxic);
     this.drawGate(WORLD.finishX, 'FINISH', PALETTE.crimson);
 
-    this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - 140);
-    this.ctrl = new BikeController(this, this.bike);
+    this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
-    this.inputMgr = new InputManager(this);
+    this.inputMgr = new InputManager();
 
     const cam = this.cameras.main;
-    cam.setZoom(1);
-    cam.centerOn(this.bike.x, this.bike.y - 130);
+    cam.centerOn(this.bike.x, this.bike.y - 40);
+
+    this.exposeDebug();
+  }
+
+  private exposeDebug(): void {
+    (window as unknown as Record<string, unknown>).__oddsrider = {
+      x: () => this.bike.x,
+      y: () => this.bike.y,
+      angle: () => this.bike.angle,
+      speed: () => this.bike.speed,
+      grounded: () => this.bike.grounded,
+      crashed: () => this.bike.crashed,
+      nitro: () => this.bike.nitro,
+      reset: () => this.doReset(),
+    };
   }
 
   private buildGround(): void {
@@ -64,19 +80,17 @@ export class RideScene extends Phaser.Scene {
     this.matter.add.rectangle(half, y + WORLD.groundThickness / 2, WORLD.groundLength, WORLD.groundThickness, {
       isStatic: true,
       friction: 1,
+      frictionStatic: 1,
+      restitution: 0,
       label: 'ground',
     });
   }
 
   private drawGate(x: number, label: string, color: number): void {
-    const g = this.add.graphics().setDepth(2);
-    const topY = WORLD.groundTopY - 110;
-    g.lineStyle(3, color, 0.9);
-    g.lineBetween(x, WORLD.groundTopY, x, topY);
-    g.fillStyle(color, 0.95);
-    g.fillTriangle(x, topY, x + 34, topY + 10, x, topY + 20);
+    const flag = this.add.image(x, WORLD.groundTopY, 'flag').setOrigin(0.17, 0.98).setDepth(2);
+    if (color === PALETTE.crimson) flag.setTint(PALETTE.crimson);
     this.add
-      .text(x + 6, topY + 30, label, {
+      .text(x + 6, WORLD.groundTopY - 80, label, {
         fontFamily: MONO,
         fontSize: '10px',
         color: '#7c7f86',
@@ -86,44 +100,60 @@ export class RideScene extends Phaser.Scene {
   }
 
   update(time: number, deltaMs: number): void {
-    const dt = Math.min(deltaMs, 33) / 1000;
-
     if (this.inputMgr.takeReset()) this.doReset();
     if (this.inputMgr.takeMute()) {
       this.muted = !this.muted;
       bus.emit(EV.MUTE, this.muted);
     }
 
-    const input = this.inputMgr.readAndConsume();
-    this.ctrl.update(dt, input);
-    this.bikeRenderer.render(this.bike, {
-      leanDir: (input.leanBack ? -1 : 0) + (input.leanForward ? 1 : 0),
-      throttle: input.gas ? 1 : 0,
-      nitro: this.ctrl.nitroActive,
-      brake: input.brake,
-    });
+    // fixed-step accumulator — physics never varies with frame rate
+    const dt = Math.min(deltaMs, 100);
+    this.acc += dt;
+    let steps = 0;
+    const jump = this.inputMgr.consumeJump();
+    while (this.acc >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
+      const input = this.inputMgr.read();
+      const drive: DriveInput = { ...input, jumpQueued: jump && steps === 0 };
+      this.bike.step(drive);
+      this.acc -= STEP_MS;
+      steps++;
+    }
+    if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
 
+    this.bikeRenderer.render(this.bike);
+
+    if (this.bike.crashed && !this.crashHandled) {
+      this.crashHandled = true;
+      bus.emit(EV.CRASH);
+      this.time.delayedCall(900, () => this.doReset());
+    }
+
+    // camera: lerp follow with velocity lookahead
     const cam = this.cameras.main;
-    const b = this.bike.chassis;
-    const lookX = Phaser.Math.Clamp(b.velocity.x * 0.45, -300, 300);
-    const targetX = b.position.x + lookX;
-    const targetY = b.position.y - 130;
-    const desiredScrollX = targetX - cam.width / (2 * cam.zoom);
-    const desiredScrollY = targetY - cam.height / (2 * cam.zoom);
-    cam.scrollX += (desiredScrollX - cam.scrollX) * 0.09;
-    cam.scrollY += (desiredScrollY - cam.scrollY) * 0.06;
-    const zoomTarget = 1 - Math.min(Math.abs(b.velocity.x) / 4200, 0.12);
-    cam.zoom += (zoomTarget - cam.zoom) * 0.04;
+    const p = this.bike.chassis.position;
+    const spd = Math.abs(this.bike.speed);
+    const dir = Math.sign(this.bike.chassis.velocity.x) || 1;
+    const look = dir * Math.min(spd * 0.22, 220);
+    const tx = p.x + look;
+    const ty = p.y - 40;
+    cam.scrollX += (tx - cam.width / (2 * cam.zoom) - cam.scrollX) * 0.08;
+    cam.scrollY += (ty - cam.height / (2 * cam.zoom) - cam.scrollY) * 0.08;
 
     if (time > this.nextSpeedEmitAt) {
       this.nextSpeedEmitAt = time + 100;
-      bus.emit(EV.SPEED, Math.round(Math.abs(b.velocity.x)));
+      bus.emit(EV.SPEED, Math.round(spd));
+    }
+    if (time > this.nextNitroEmitAt) {
+      this.nextNitroEmitAt = time + 120;
+      bus.emit(EV.NITRO, this.bike.nitro);
     }
   }
 
   private doReset(): void {
+    this.crashHandled = false;
     this.bike.reset();
+    this.acc = 0;
     const cam = this.cameras.main;
-    cam.centerOn(this.bike.x, this.bike.y - 130);
+    cam.centerOn(this.bike.x, this.bike.y - 40);
   }
 }
