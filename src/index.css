@@ -1,0 +1,29 @@
+@import "@fontsource-variable/archivo";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/700.css";
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0a0a0b;
+  --color-surface: #101113;
+  --color-line: #232529;
+  --color-ink: #e8e8ea;
+  --color-dim: #7c7f86;
+  --color-toxic: #b6ff00;
+  --color-crimson: #ff3355;
+  --font-display: "Archivo Variable", "Archivo", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  overflow: hidden;
+}

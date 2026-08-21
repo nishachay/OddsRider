@@ -1,0 +1,33 @@
+type Handler<T = unknown> = (payload: T) => void;
+
+class Emitter {
+  private map = new Map<string, Set<Handler<never>>>();
+
+  on<T>(event: string, fn: Handler<T>): () => void {
+    let set = this.map.get(event);
+    if (!set) {
+      set = new Set();
+      this.map.set(event, set);
+    }
+    set.add(fn as Handler<never>);
+    return () => this.off(event, fn);
+  }
+
+  off<T>(event: string, fn: Handler<T>): void {
+    this.map.get(event)?.delete(fn as Handler<never>);
+  }
+
+  emit<T>(event: string, payload?: T): void {
+    const set = this.map.get(event);
+    if (!set) return;
+    for (const fn of set) (fn as Handler<T | undefined>)(payload);
+  }
+}
+
+export const bus = new Emitter();
+
+export const EV = {
+  SPEED: 'hud:speed',
+  MUTE: 'hud:mute',
+  INPUT_FIRST: 'hud:input-first',
+} as const;
