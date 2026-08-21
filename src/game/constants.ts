@@ -108,3 +108,17 @@ export const WORLD = {
   markerMaxX: 60_000,
   finishX: 60_000,
 };
+
+// Sprite geometry, measured from processed art (public/assets/game):
+// bike 300x162, wheel hubs detected at (33,144)/(267,138) -> span 234 maps to physics 112.
+// Chassis centre in sprite coords = hub midpoint (150,141) minus world axle offset (0,+18)/scale.
+export const SPRITE = {
+  bikeScale: 112 / 234,
+  bikeOriginX: 150 / 300,
+  bikeOriginY: 103.4 / 162,
+  wheelScale: 0.5, // 80px texture -> 40px physics diameter
+  seatLocalX: -10,
+  seatLocalY: -26,
+  riderOriginY: 0.55,
+  flagScale: 0.5, // 128px tall texture -> 64px world
+} as const;

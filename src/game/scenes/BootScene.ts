@@ -6,9 +6,11 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image('wheel', 'assets/px/wheel.png');
-    this.load.image('bike', 'assets/px/bike.png');
-    this.load.image('flag', 'assets/px/flag.png');
+    this.load.image('wheel', 'assets/game/wheel.png');
+    this.load.image('bike', 'assets/game/bike.png');
+    this.load.image('rider', 'assets/game/rider.png');
+    this.load.image('ragdoll', 'assets/game/ragdoll.png');
+    this.load.image('flag', 'assets/game/flag.png');
   }
 
   create(): void {

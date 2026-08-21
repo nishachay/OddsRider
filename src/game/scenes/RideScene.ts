@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { bus, EV } from '../bus';
-import { PALETTE, WORLD, STEP_MS, MAX_STEPS_PER_FRAME } from '../constants';
+import { PALETTE, WORLD, STEP_MS, MAX_STEPS_PER_FRAME, SPRITE } from '../constants';
 import { Bike } from '../bike/Bike';
 import type { DriveInput } from '../bike/Bike';
 import { BikeRenderer } from '../bike/BikeRenderer';
@@ -87,13 +87,12 @@ export class RideScene extends Phaser.Scene {
   }
 
   private drawGate(x: number, label: string, color: number): void {
-    const flag = this.add.image(x, WORLD.groundTopY, 'flag').setOrigin(0.17, 0.98).setDepth(2);
-    if (color === PALETTE.crimson) flag.setTint(PALETTE.crimson);
+    this.add.image(x, WORLD.groundTopY, 'flag').setOrigin(0.5, 1).setScale(SPRITE.flagScale).setDepth(2);
     this.add
       .text(x + 6, WORLD.groundTopY - 80, label, {
         fontFamily: MONO,
         fontSize: '10px',
-        color: '#7c7f86',
+        color: color === PALETTE.crimson ? '#ff3355' : '#b6ff00',
       })
       .setOrigin(0, 0)
       .setDepth(2);
@@ -128,9 +127,10 @@ export class RideScene extends Phaser.Scene {
       this.time.delayedCall(900, () => this.doReset());
     }
 
-    // camera: lerp follow with velocity lookahead
+    // camera: lerp follow with velocity lookahead (chase the ragdoll after a crash)
     const cam = this.cameras.main;
-    const p = this.bike.chassis.position;
+    const ragdoll = this.bike.ejected ? this.bike.ragdollBody : null;
+    const p = ragdoll ? ragdoll.position : this.bike.chassis.position;
     const spd = Math.abs(this.bike.speed);
     const dir = Math.sign(this.bike.chassis.velocity.x) || 1;
     const look = dir * Math.min(spd * 0.22, 220);

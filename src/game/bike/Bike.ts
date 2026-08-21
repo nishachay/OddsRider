@@ -38,6 +38,8 @@ export class Bike {
   grounded = false;
   crashed = false;
   nitroActive = false;
+  ejected = false;
+  ragdollBody: Body | null = null;
 
   private parts: (Body | Constraint)[] = [];
   private scene: Phaser.Scene;
@@ -303,6 +305,33 @@ export class Bike {
     }
 
     if (chassis.position.y > this.killY) this.crashed = true;
+
+    if (this.crashed && !this.ejected) this.ejectRider();
+  }
+
+  /** Fling the rider off the bike as a free physics body (crash feedback). */
+  private ejectRider(): void {
+    this.ejected = true;
+    const world = this.scene.matter.world;
+    const B = this.scene.matter.body;
+    const h = this.head.position;
+    const group = world.nextGroup(true);
+    const body = this.scene.matter.bodies.rectangle(h.x, h.y + 6, 14, 30, {
+      label: 'ragdoll',
+      density: 0.0012,
+      friction: 0.6,
+      frictionAir: 0.02,
+      restitution: 0.25,
+      chamfer: { radius: 6 },
+      collisionFilter: { group, category: 0x0001, mask: 0xffffffff },
+    });
+    const cv = this.chassis.velocity;
+    const a = this.chassis.angle;
+    B.setAngle(body, a);
+    B.setVelocity(body, { x: cv.x + Math.cos(a) * 2.75 + 1.5, y: cv.y - 5.5 });
+    B.setAngularVelocity(body, 0.3 + Math.random() * 0.25);
+    world.add(body);
+    this.ragdollBody = body;
   }
 
   /**
@@ -375,6 +404,11 @@ export class Bike {
     place(this.rearWheel, BIKE.backDx, BIKE.wheelDy);
     place(this.frontWheel, BIKE.frontDx, BIKE.wheelDy);
     place(this.head, BIKE.headDx, BIKE.headDy);
+    if (this.ragdollBody) {
+      this.scene.matter.world.remove(this.ragdollBody);
+      this.ragdollBody = null;
+    }
+    this.ejected = false;
     this.contacts = 0;
     this.backContacts = 0;
     this.frontContacts = 0;

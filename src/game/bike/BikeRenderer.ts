@@ -1,23 +1,31 @@
 import Phaser from 'phaser';
-import { PALETTE } from '../constants';
+import { PALETTE, SPRITE } from '../constants';
 import type { Bike } from './Bike';
 
 const P = PALETTE;
-
-// bike.png is 150x70; rear axle (19,47), front axle (131,47) -> chassis centre (75,29).
-const BIKE_ORIGIN_X = 75 / 150;
-const BIKE_ORIGIN_Y = 29 / 70;
 
 export class BikeRenderer {
   private bikeSprite: Phaser.GameObjects.Image;
   private wheelBackSprite: Phaser.GameObjects.Image;
   private wheelFrontSprite: Phaser.GameObjects.Image;
+  private riderSprite: Phaser.GameObjects.Image;
+  private ragdollSprite: Phaser.GameObjects.Image;
   private flame: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
-    this.wheelBackSprite = scene.add.image(0, 0, 'wheel').setDepth(5);
-    this.wheelFrontSprite = scene.add.image(0, 0, 'wheel').setDepth(5);
-    this.bikeSprite = scene.add.image(0, 0, 'bike').setOrigin(BIKE_ORIGIN_X, BIKE_ORIGIN_Y).setDepth(6);
+    this.wheelBackSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(SPRITE.wheelScale);
+    this.wheelFrontSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(SPRITE.wheelScale);
+    this.bikeSprite = scene.add
+      .image(0, 0, 'bike')
+      .setOrigin(SPRITE.bikeOriginX, SPRITE.bikeOriginY)
+      .setScale(SPRITE.bikeScale)
+      .setDepth(6);
+    this.riderSprite = scene.add
+      .image(0, 0, 'rider')
+      .setOrigin(0.5, SPRITE.riderOriginY)
+      .setScale(0.5)
+      .setDepth(7);
+    this.ragdollSprite = scene.add.image(0, 0, 'ragdoll').setOrigin(0.5, 0.5).setScale(0.5).setDepth(7).setVisible(false);
     this.flame = scene.add.graphics().setDepth(9);
   }
 
@@ -30,11 +38,25 @@ export class BikeRenderer {
     const chassis = bike.chassis;
     this.bikeSprite.setPosition(chassis.position.x, chassis.position.y).setRotation(chassis.angle);
 
+    // rider mounted at the seat, rigid to the chassis
+    const a = chassis.angle;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    const rx = chassis.position.x + cos * SPRITE.seatLocalX - sin * SPRITE.seatLocalY;
+    const ry = chassis.position.y + sin * SPRITE.seatLocalX + cos * SPRITE.seatLocalY;
+    this.riderSprite.setPosition(rx, ry).setRotation(a).setVisible(!bike.ejected);
+
+    if (bike.ejected && bike.ragdollBody) {
+      this.ragdollSprite
+        .setPosition(bike.ragdollBody.position.x, bike.ragdollBody.position.y)
+        .setRotation(bike.ragdollBody.angle)
+        .setVisible(true);
+    } else {
+      this.ragdollSprite.setVisible(false);
+    }
+
     this.flame.clear();
     if (bike.nitroActive) {
-      const a = chassis.angle;
-      const cos = Math.cos(a);
-      const sin = Math.sin(a);
       // exhaust tip in chassis-local (-52, 3)
       const ex = chassis.position.x + cos * -52 - sin * 3;
       const ey = chassis.position.y + sin * -52 + cos * 3;
