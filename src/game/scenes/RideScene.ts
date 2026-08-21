@@ -136,8 +136,8 @@ export class RideScene extends Phaser.Scene {
     const look = dir * Math.min(spd * 0.22, 220);
     const tx = p.x + look;
     const ty = p.y - 40;
-    cam.scrollX += (tx - cam.width / (2 * cam.zoom) - cam.scrollX) * 0.08;
-    cam.scrollY += (ty - cam.height / (2 * cam.zoom) - cam.scrollY) * 0.08;
+    cam.scrollX += (tx - cam.width / 2 - cam.scrollX) * 0.08;
+    cam.scrollY += (ty - cam.height / 2 - cam.scrollY) * 0.08;
 
     if (time > this.nextSpeedEmitAt) {
       this.nextSpeedEmitAt = time + 100;

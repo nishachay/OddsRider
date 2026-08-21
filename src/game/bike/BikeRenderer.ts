@@ -1,8 +1,27 @@
 import Phaser from 'phaser';
 import { PALETTE, SPRITE } from '../constants';
 import type { Bike } from './Bike';
+import GUI from 'lil-gui';
 
 const P = PALETTE;
+
+// Mutable copy of SPRITE for live tweaking. Defaulted to high-res baseline guesses.
+export const LIVE_SPRITE = { 
+  ...SPRITE, 
+  bikeScale: SPRITE.bikeScale, 
+  bikeOriginX: SPRITE.bikeOriginX, 
+  bikeOriginY: SPRITE.bikeOriginY,
+  wheelScale: SPRITE.wheelScale,
+  riderScale: SPRITE.riderScale,
+  ragdollScale: SPRITE.ragdollScale,
+  riderOriginY: SPRITE.riderOriginY,
+  riderAngleOffset: 0,
+  seatLocalX: SPRITE.seatLocalX,
+  seatLocalY: SPRITE.seatLocalY
+};
+
+// We will only create the GUI once
+let gui: GUI | null = null;
 
 export class BikeRenderer {
   private bikeSprite: Phaser.GameObjects.Image;
@@ -13,20 +32,67 @@ export class BikeRenderer {
   private flame: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
-    this.wheelBackSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(SPRITE.wheelScale);
-    this.wheelFrontSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(SPRITE.wheelScale);
+    this.wheelBackSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(LIVE_SPRITE.wheelScale);
+    this.wheelFrontSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(LIVE_SPRITE.wheelScale);
     this.bikeSprite = scene.add
       .image(0, 0, 'bike')
-      .setOrigin(SPRITE.bikeOriginX, SPRITE.bikeOriginY)
-      .setScale(SPRITE.bikeScale)
+      .setOrigin(LIVE_SPRITE.bikeOriginX, LIVE_SPRITE.bikeOriginY)
+      .setScale(LIVE_SPRITE.bikeScale)
       .setDepth(6);
     this.riderSprite = scene.add
       .image(0, 0, 'rider')
-      .setOrigin(0.5, SPRITE.riderOriginY)
-      .setScale(0.5)
+      .setOrigin(0.5, LIVE_SPRITE.riderOriginY)
+      .setScale(LIVE_SPRITE.riderScale)
       .setDepth(7);
-    this.ragdollSprite = scene.add.image(0, 0, 'ragdoll').setOrigin(0.5, 0.5).setScale(0.5).setDepth(7).setVisible(false);
+    this.ragdollSprite = scene.add.image(0, 0, 'ragdoll').setOrigin(0.5, 0.5).setScale(LIVE_SPRITE.ragdollScale).setDepth(7).setVisible(false);
     this.flame = scene.add.graphics().setDepth(9);
+
+    if (!gui && typeof window !== 'undefined') {
+      gui = new GUI({ title: 'HD Visual Tuning' });
+      
+      const viewFolder = gui.addFolder('View (Debug)');
+      viewFolder.add({ zoom: 1 }, 'zoom', 0.5, 4, 0.1).onChange((v: number) => {
+        scene.cameras.main.setZoom(v);
+      });
+      viewFolder.add({ whiteBg: false }, 'whiteBg').onChange((v: boolean) => {
+        scene.cameras.main.setBackgroundColor(v ? '#ffffff' : '#0a0a0b');
+      });
+
+      const f = gui.addFolder('Sprites');
+      f.add(LIVE_SPRITE, 'bikeScale', 0.1, 1.5, 0.01).onChange((v: number) => {
+        this.bikeSprite.setScale(v);
+      });
+      f.add(LIVE_SPRITE, 'bikeOriginX', 0.0, 1.0, 0.01).onChange((v: number) => {
+        this.bikeSprite.setOrigin(v, LIVE_SPRITE.bikeOriginY);
+      });
+      f.add(LIVE_SPRITE, 'bikeOriginY', 0.0, 1.0, 0.01).onChange((v: number) => {
+        this.bikeSprite.setOrigin(LIVE_SPRITE.bikeOriginX, v);
+      });
+      f.add(LIVE_SPRITE, 'wheelScale', 0.1, 1.5, 0.01).onChange((v: number) => {
+        this.wheelBackSprite.setScale(v);
+        this.wheelFrontSprite.setScale(v);
+      });
+      f.add(LIVE_SPRITE, 'riderScale', 0.1, 1.5, 0.01).onChange((v: number) => {
+        this.riderSprite.setScale(v);
+        this.ragdollSprite.setScale(v);
+      });
+      f.add(LIVE_SPRITE, 'riderOriginY', 0.0, 1.0, 0.01).onChange((v: number) => {
+        this.riderSprite.setOrigin(0.5, v);
+      });
+      f.add(LIVE_SPRITE, 'riderAngleOffset', -60, 60, 1);
+      f.add(LIVE_SPRITE, 'seatLocalX', -60, 60, 1);
+      f.add(LIVE_SPRITE, 'seatLocalY', -60, 60, 1);
+      
+      const copyBtn = {
+        CopyConfig: () => {
+          const out = JSON.stringify(LIVE_SPRITE, null, 2);
+          navigator.clipboard.writeText(out);
+          console.log("Copied to clipboard:", out);
+          alert("Copied HD config to clipboard!");
+        }
+      };
+      gui.add(copyBtn, 'CopyConfig');
+    }
   }
 
   render(bike: Bike): void {
@@ -42,9 +108,12 @@ export class BikeRenderer {
     const a = chassis.angle;
     const cos = Math.cos(a);
     const sin = Math.sin(a);
-    const rx = chassis.position.x + cos * SPRITE.seatLocalX - sin * SPRITE.seatLocalY;
-    const ry = chassis.position.y + sin * SPRITE.seatLocalX + cos * SPRITE.seatLocalY;
-    this.riderSprite.setPosition(rx, ry).setRotation(a).setVisible(!bike.ejected);
+    const rx = chassis.position.x + cos * LIVE_SPRITE.seatLocalX - sin * LIVE_SPRITE.seatLocalY;
+    const ry = chassis.position.y + sin * LIVE_SPRITE.seatLocalX + cos * LIVE_SPRITE.seatLocalY;
+    
+    // add angular offset (convert degrees to radians)
+    const riderAngle = a + (LIVE_SPRITE.riderAngleOffset * Math.PI / 180);
+    this.riderSprite.setPosition(rx, ry).setRotation(riderAngle).setVisible(!bike.ejected);
 
     if (bike.ejected && bike.ragdollBody) {
       this.ragdollSprite

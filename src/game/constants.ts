@@ -116,9 +116,11 @@ export const SPRITE = {
   bikeScale: 112 / 234,
   bikeOriginX: 150 / 300,
   bikeOriginY: 103.4 / 162,
-  wheelScale: 0.5, // 80px texture -> 40px physics diameter
-  seatLocalX: -10,
-  seatLocalY: -26,
-  riderOriginY: 0.55,
-  flagScale: 0.5, // 128px tall texture -> 64px world
+  wheelScale: 0.65, // 80px texture -> 40px physics diameter
+  seatLocalX: -5,
+  seatLocalY: -18,
+  riderOriginY: 0.7,
+  flagScale: 1.5,
+  riderScale: 1.0,
+  ragdollScale: 1.0, // 128px tall texture -> 64px world
 } as const;
