@@ -114,15 +114,20 @@ export const SPRITE = {
   wheelScale: 0.52,
   rearWheelScale: 0.52,
   frontWheelScale: 0.52,
-  rearWheelOffsetX: -27.5,
-  rearWheelOffsetY: 4.2,
-  frontWheelOffsetX: 28.5,
-  frontWheelOffsetY: 4.5,
-  riderScale: 0.43,
+
+  // WHEEL IS THE BASE (Offsets measured from Rear Wheel Center (0,0))
+  chassisOffsetX: 55.2,
+  chassisOffsetY: -8.5,
+  frontWheelOffsetX: 112.2,
+  frontWheelOffsetY: 0.7,
+  riderOffsetX: 55.2,
+  riderOffsetY: -23.8,
+
+  riderScale: 0.4,
   ragdollScale: 1.0,
   riderOriginY: 0.85,
-  riderAngleOffset: -14.5,
-  seatLocalX: 1.9,
-  seatLocalY: -5.4,
+  riderAngleOffset: -9.5,
+  seatLocalX: 0.0,
+  seatLocalY: -15.3,
   flagScale: 0.5,
 };
