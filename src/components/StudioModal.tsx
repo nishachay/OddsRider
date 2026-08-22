@@ -5,16 +5,26 @@ type ElementKey = "CHASSIS" | "REAR_WHEEL" | "FRONT_WHEEL" | "RIDER" | "FLAG";
 
 export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [selected, setSelected] = useState<ElementKey>("CHASSIS");
-  const [lockGround, setLockGround] = useState(true);
+  const [selected, setSelected] = useState<ElementKey>("REAR_WHEEL");
+  const [isGrouped, setIsGrouped] = useState(false); // Independent mode by default!
   const [syncWheels, setSyncWheels] = useState(true);
   const [riderBehind, setRiderBehind] = useState(false);
   
-  // Config state with unlimited pixel X & Y offsets for Chassis
+  // Independent World Coordinates for every single component
   const [config, setConfig] = useState({
     ...SPRITE,
-    bikeOffsetX: 0,
-    bikeOffsetY: 0,
+    // Independent Positions in Canvas World Space
+    chassisX: 0,
+    chassisY: 0,
+    rearWheelX: -56,
+    rearWheelY: 18,
+    frontWheelX: 56,
+    frontWheelY: 18,
+    riderX: -5,
+    riderY: -18,
+    flagX: -180,
+    flagY: 0,
+    // Angles
     bikeAngle: 0,
     rearWheelAngle: 0,
     frontWheelAngle: 0,
@@ -133,9 +143,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.fillStyle = "#b6ff00";
     ctx.fillText("TRACK GROUND BASELINE (Y: 620)", 10, groundY - 6);
 
-    // Bike Center Position with Pixel Offsets
-    const centerX = canvas.width / 2 + config.bikeOffsetX;
-    const centerY = groundY - 60 + config.bikeOffsetY;
+    const centerX = canvas.width / 2;
+    const centerY = groundY - 60;
 
     const { bike, wheel, rider, flag } = imagesRef.current;
 
@@ -144,8 +153,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       if (!rider) return;
       const rw = rider.width * config.riderScale * 0.5;
       const rh = rider.height * config.riderScale * 0.5;
-      const rx = centerX + config.seatLocalX;
-      const ry = centerY + config.seatLocalY;
+      const rx = centerX + config.riderX;
+      const ry = centerY + config.riderY;
 
       ctx.save();
       ctx.translate(rx, ry);
@@ -164,8 +173,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     if (flag) {
       const fw = flag.width * config.flagScale * 0.5;
       const fh = flag.height * config.flagScale * 0.5;
-      const fx = canvas.width / 2 - 180;
-      const fy = groundY - fh;
+      const fx = centerX + config.flagX;
+      const fy = groundY - fh + config.flagY;
       ctx.save();
       ctx.translate(fx, fy + fh / 2);
       ctx.rotate((config.flagAngle * Math.PI) / 180);
@@ -176,8 +185,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     }
 
     // B. REAR WHEEL
-    const rearX = centerX - 56 + config.rearWheelOffsetX;
-    const rearY = centerY + 18 + config.rearWheelOffsetY;
+    const rearX = centerX + config.rearWheelX;
+    const rearY = centerY + config.rearWheelY;
     if (wheel) {
       const ww = wheel.width * config.rearWheelScale * 0.5;
       const wh = wheel.height * config.rearWheelScale * 0.5;
@@ -188,6 +197,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       ctx.drawImage(wheel, -ww / 2, -wh / 2, ww, wh);
       ctx.restore();
 
+      // Axle Guide Line to Ground
       ctx.strokeStyle = "rgba(182, 255, 0, 0.4)";
       ctx.lineWidth = 1 / zoom;
       ctx.beginPath();
@@ -199,8 +209,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     }
 
     // C. FRONT WHEEL
-    const frontX = centerX + 56 + config.frontWheelOffsetX;
-    const frontY = centerY + 18 + config.frontWheelOffsetY;
+    const frontX = centerX + config.frontWheelX;
+    const frontY = centerY + config.frontWheelY;
     if (wheel) {
       const ww = wheel.width * config.frontWheelScale * 0.5;
       const wh = wheel.height * config.frontWheelScale * 0.5;
@@ -211,6 +221,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       ctx.drawImage(wheel, -ww / 2, -wh / 2, ww, wh);
       ctx.restore();
 
+      // Axle Guide Line to Ground
       ctx.strokeStyle = "rgba(182, 255, 0, 0.4)";
       ctx.lineWidth = 1 / zoom;
       ctx.beginPath();
@@ -221,15 +232,17 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       if (selected === "FRONT_WHEEL") drawSelectionBox(ctx, frontX - ww / 2, frontY - wh / 2, ww, wh, config.frontWheelAngle, zoom);
     }
 
-    // D. CHASSIS BIKE
+    // D. CHASSIS BIKE (INDEPENDENT WORLD POSITION)
+    const chassisWorldX = centerX + config.chassisX;
+    const chassisWorldY = centerY + config.chassisY;
     if (bike) {
       const bw = bike.width * config.bikeScale * 0.5;
       const bh = bike.height * config.bikeScale * 0.5;
-      const bx = centerX - bw * config.bikeOriginX;
-      const by = centerY - bh * config.bikeOriginY;
+      const bx = chassisWorldX - bw * config.bikeOriginX;
+      const by = chassisWorldY - bh * config.bikeOriginY;
 
       ctx.save();
-      ctx.translate(centerX, centerY);
+      ctx.translate(chassisWorldX, chassisWorldY);
       ctx.rotate((config.bikeAngle * Math.PI) / 180);
       ctx.drawImage(bike, -bw * config.bikeOriginX, -bh * config.bikeOriginY, bw, bh);
       ctx.restore();
@@ -237,7 +250,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       if (selected === "CHASSIS") drawSelectionBox(ctx, bx, by, bw, bh, config.bikeAngle, zoom);
     }
 
-    // RENDER RIDER
+    // RENDER RIDER (IN FRONT BY DEFAULT)
     if (!riderBehind) renderRider();
 
     ctx.restore();
@@ -304,7 +317,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     return { x: wx, y: wy };
   };
 
-  // UNLIMITED 1-TO-1 PIXEL MOUSE DRAG ENGINE FOR ALL SIZES
+  // 100% INDEPENDENT PIXEL MOUSE DRAG ENGINE
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -317,30 +330,30 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     }
 
     const groundY = 360;
-    const centerX = canvas.width / 2 + config.bikeOffsetX;
-    const centerY = groundY - 60 + config.bikeOffsetY;
+    const centerX = canvas.width / 2;
+    const centerY = groundY - 60;
     const { bike, wheel, rider } = imagesRef.current;
 
-    // Minimum Pick Radius of 40px so even tiny scaled elements are easy to grab!
+    // Hit Testing each independent object directly
     if (rider) {
       const rw = Math.max(40, rider.width * config.riderScale * 0.5);
       const rh = Math.max(40, rider.height * config.riderScale * 0.5);
-      const rx = centerX + config.seatLocalX;
-      const ry = centerY + config.seatLocalY;
+      const rx = centerX + config.riderX;
+      const ry = centerY + config.riderY;
       if (Math.abs(pos.x - rx) < rw && Math.abs(pos.y - ry) < rh) {
         setSelected("RIDER");
       }
     }
     if (wheel) {
       const ww = Math.max(40, wheel.width * config.rearWheelScale * 0.5);
-      const rearX = centerX - 56 + config.rearWheelOffsetX;
-      const rearY = centerY + 18 + config.rearWheelOffsetY;
+      const rearX = centerX + config.rearWheelX;
+      const rearY = centerY + config.rearWheelY;
       if (Math.hypot(pos.x - rearX, pos.y - rearY) < ww) {
         setSelected("REAR_WHEEL");
       }
 
-      const frontX = centerX + 56 + config.frontWheelOffsetX;
-      const frontY = centerY + 18 + config.frontWheelOffsetY;
+      const frontX = centerX + config.frontWheelX;
+      const frontY = centerY + config.frontWheelY;
       if (Math.hypot(pos.x - frontX, pos.y - frontY) < ww) {
         setSelected("FRONT_WHEEL");
       }
@@ -348,7 +361,9 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     if (bike) {
       const bw = Math.max(50, bike.width * config.bikeScale * 0.5);
       const bh = Math.max(50, bike.height * config.bikeScale * 0.5);
-      if (Math.abs(pos.x - centerX) < bw && Math.abs(pos.y - centerY) < bh) {
+      const bx = centerX + config.chassisX;
+      const by = centerY + config.chassisY;
+      if (Math.abs(pos.x - bx) < bw && Math.abs(pos.y - by) < bh) {
         setSelected("CHASSIS");
       }
     }
@@ -369,21 +384,30 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     const dx = pos.x - startMouseWorldRef.current.x;
     const dy = pos.y - startMouseWorldRef.current.y;
 
-    // UNLIMITED 1-TO-1 PIXEL MOVEMENT IN WORLD SPACE
+    // INDEPENDENT PIXEL MOVEMENT FOR EACH ITEM
     if (selected === "CHASSIS") {
-      updateVal("bikeOffsetX", Math.round(startConfigRef.current.bikeOffsetX + dx));
-      updateVal("bikeOffsetY", Math.round(startConfigRef.current.bikeOffsetY + dy));
+      updateVal("chassisX", Math.round(startConfigRef.current.chassisX + dx));
+      updateVal("chassisY", Math.round(startConfigRef.current.chassisY + dy));
+      if (isGrouped) {
+        updateVal("rearWheelX", Math.round(startConfigRef.current.rearWheelX + dx));
+        updateVal("rearWheelY", Math.round(startConfigRef.current.rearWheelY + dy));
+        updateVal("frontWheelX", Math.round(startConfigRef.current.frontWheelX + dx));
+        updateVal("frontWheelY", Math.round(startConfigRef.current.frontWheelY + dy));
+        updateVal("riderX", Math.round(startConfigRef.current.riderX + dx));
+        updateVal("riderY", Math.round(startConfigRef.current.riderY + dy));
+      }
     } else if (selected === "REAR_WHEEL") {
-      updateVal("rearWheelOffsetX", Math.round(startConfigRef.current.rearWheelOffsetX + dx));
-      updateVal("rearWheelOffsetY", Math.round(startConfigRef.current.rearWheelOffsetY + dy));
+      updateVal("rearWheelX", Math.round(startConfigRef.current.rearWheelX + dx));
+      updateVal("rearWheelY", Math.round(startConfigRef.current.rearWheelY + dy));
     } else if (selected === "FRONT_WHEEL") {
-      updateVal("frontWheelOffsetX", Math.round(startConfigRef.current.frontWheelOffsetX + dx));
-      updateVal("frontWheelOffsetY", Math.round(startConfigRef.current.frontWheelOffsetY + dy));
+      updateVal("frontWheelX", Math.round(startConfigRef.current.frontWheelX + dx));
+      updateVal("frontWheelY", Math.round(startConfigRef.current.frontWheelY + dy));
     } else if (selected === "RIDER") {
-      updateVal("seatLocalX", Math.round(startConfigRef.current.seatLocalX + dx));
-      updateVal("seatLocalY", Math.round(startConfigRef.current.seatLocalY + dy));
+      updateVal("riderX", Math.round(startConfigRef.current.riderX + dx));
+      updateVal("riderY", Math.round(startConfigRef.current.riderY + dy));
     } else if (selected === "FLAG") {
-      updateVal("flagScale", parseFloat(Math.max(0.05, startConfigRef.current.flagScale + dx * 0.005).toFixed(2)));
+      updateVal("flagX", Math.round(startConfigRef.current.flagX + dx));
+      updateVal("flagY", Math.round(startConfigRef.current.flagY + dy));
     }
   };
 
@@ -399,9 +423,30 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   };
 
   const saveAndCommit = async () => {
-    const jsonStr = JSON.stringify(config, null, 2);
+    // Convert Independent World Positions back to relative constants offsets
+    const exportConfig = {
+      bikeScale: config.bikeScale,
+      bikeOriginX: 0.5,
+      bikeOriginY: 0.76,
+      wheelScale: config.rearWheelScale,
+      rearWheelScale: config.rearWheelScale,
+      frontWheelScale: config.frontWheelScale,
+      rearWheelOffsetX: config.rearWheelX - config.chassisX,
+      rearWheelOffsetY: config.rearWheelY - config.chassisY,
+      frontWheelOffsetX: config.frontWheelX - config.chassisX,
+      frontWheelOffsetY: config.frontWheelY - config.chassisY,
+      riderScale: config.riderScale,
+      ragdollScale: config.ragdollScale,
+      riderOriginY: config.riderOriginY,
+      riderAngleOffset: config.riderAngleOffset,
+      seatLocalX: config.riderX - config.chassisX,
+      seatLocalY: config.riderY - config.chassisY,
+      flagScale: config.flagScale
+    };
+
+    const jsonStr = JSON.stringify(exportConfig, null, 2);
     navigator.clipboard.writeText(jsonStr);
-    alert("Saved & Copied Config JSON to Clipboard!");
+    alert("Saved & Calculated Relative Offsets JSON to Clipboard!");
   };
 
   if (!isOpen) return null;
@@ -413,10 +458,10 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
         <div className="flex items-center justify-between border-b border-line bg-bg/95 px-4 py-2.5">
           <div className="flex items-center gap-3">
             <span className="h-2.5 w-2.5 bg-toxic animate-pulse"></span>
-            <span className="text-xs font-bold tracking-widest text-toxic uppercase">UNLIMITED MOUSE CANVAS STUDIO</span>
+            <span className="text-xs font-bold tracking-widest text-toxic uppercase">100% INDEPENDENT PIECE STUDIO</span>
           </div>
 
-          {/* CANVAS CAMERA CONTROLS */}
+          {/* CAMERA CONTROLS */}
           <div className="flex items-center gap-3 border border-line bg-black/50 px-3 py-1 text-xs">
             <span className="text-dim font-bold">ZOOM:</span>
             <button onClick={() => setZoom((z) => parseFloat(Math.max(0.2, z - 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">-</button>
@@ -433,7 +478,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
           {/* LEFT SIDEBAR */}
           <div className="col-span-4 flex flex-col justify-between border-r border-line bg-bg/60 p-4 overflow-y-auto">
             <div className="flex flex-col gap-4">
-              <span className="text-xs font-bold text-dim uppercase">SELECTED ELEMENT:</span>
+              <span className="text-xs font-bold text-dim uppercase">INDEPENDENT PIECE SELECTOR:</span>
               <div className="grid grid-cols-2 gap-2">
                 {(["CHASSIS", "REAR_WHEEL", "FRONT_WHEEL", "RIDER", "FLAG"] as ElementKey[]).map((key) => (
                   <button
@@ -454,36 +499,28 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 ))}
               </div>
 
-              {/* ALIGNMENT LOCKS */}
+              {/* GROUPING TOGGLE */}
               <div className="flex flex-col gap-2 border-t border-line pt-3">
-                <span className="text-xs font-bold text-dim uppercase">ALIGNMENT LOCKS:</span>
+                <span className="text-xs font-bold text-dim uppercase">ASSEMBLY MODE:</span>
                 <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
-                  <span className="text-ink font-bold">LOCK GROUND BASELINE</span>
-                  <input type="checkbox" checked={lockGround} onChange={(e) => setLockGround(e.target.checked)} className="accent-toxic" />
-                </label>
-                <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
-                  <span className="text-ink font-bold">SYNC WHEEL PAIR</span>
-                  <input type="checkbox" checked={syncWheels} onChange={(e) => setSyncWheels(e.target.checked)} className="accent-toxic" />
-                </label>
-                <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
-                  <span className="text-ink font-bold">RIDER BEHIND CHASSIS</span>
-                  <input type="checkbox" checked={riderBehind} onChange={(e) => setRiderBehind(e.target.checked)} className="accent-toxic" />
+                  <span className="text-toxic font-bold">{isGrouped ? "?? GROUPED (MOVE TOGETHER)" : "?? INDEPENDENT (MOVE PIECES SEPARATELY)"}</span>
+                  <input type="checkbox" checked={isGrouped} onChange={(e) => setIsGrouped(e.target.checked)} className="accent-toxic" />
                 </label>
               </div>
 
-              {/* TRANSFORM SLIDERS */}
+              {/* TRANSFORM SLIDERS FOR SELECTED INDEPENDENT ITEM */}
               <div className="flex flex-col gap-3 border-t border-line pt-3">
                 <span className="text-xs font-bold text-toxic uppercase">{selected} CONTROLS:</span>
 
                 {selected === "CHASSIS" && (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">CHASSIS X ({config.bikeOffsetX}px)</span>
-                      <input type="range" min="-400" max="400" value={config.bikeOffsetX} onChange={(e) => updateVal("bikeOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">BIKE X ({config.chassisX}px)</span>
+                      <input type="range" min="-400" max="400" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">CHASSIS Y ({config.bikeOffsetY}px)</span>
-                      <input type="range" min="-400" max="400" value={config.bikeOffsetY} onChange={(e) => updateVal("bikeOffsetY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">BIKE Y ({config.chassisY}px)</span>
+                      <input type="range" min="-400" max="400" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">BIKE SCALE ({Math.round(config.bikeScale * 100)}%)</span>
@@ -492,36 +529,53 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                   </>
                 )}
 
-                {selected === "RIDER" && (
+                {selected === "REAR_WHEEL" && (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">SEAT X ({config.seatLocalX}px)</span>
-                      <input type="range" min="-300" max="300" value={config.seatLocalX} onChange={(e) => updateVal("seatLocalX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">REAR WHEEL X ({config.rearWheelX}px)</span>
+                      <input type="range" min="-400" max="400" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">SEAT Y ({config.seatLocalY}px)</span>
-                      <input type="range" min="-300" max="300" value={config.seatLocalY} onChange={(e) => updateVal("seatLocalY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">REAR WHEEL Y ({config.rearWheelY}px)</span>
+                      <input type="range" min="-400" max="400" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">LEAN ANGLE ({config.riderAngleOffset}deg)</span>
-                      <input type="range" min="-180" max="180" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value))} className="w-32 accent-toxic" />
-                    </div>
-                  </>
-                )}
-
-                {(selected === "REAR_WHEEL" || selected === "FRONT_WHEEL") && (
-                  <>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">WHEEL SIZE ({Math.round(config.rearWheelScale * 100)}%)</span>
                       <input type="range" min="0.05" max="2.5" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
                     </div>
+                  </>
+                )}
+
+                {selected === "FRONT_WHEEL" && (
+                  <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">REAR OFFSET X ({config.rearWheelOffsetX}px)</span>
-                      <input type="range" min="-300" max="300" value={config.rearWheelOffsetX} onChange={(e) => updateVal("rearWheelOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">FRONT WHEEL X ({config.frontWheelX}px)</span>
+                      <input type="range" min="-400" max="400" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">FRONT OFFSET X ({config.frontWheelOffsetX}px)</span>
-                      <input type="range" min="-300" max="300" value={config.frontWheelOffsetX} onChange={(e) => updateVal("frontWheelOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">FRONT WHEEL Y ({config.frontWheelY}px)</span>
+                      <input type="range" min="-400" max="400" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-dim font-bold">WHEEL SIZE ({Math.round(config.frontWheelScale * 100)}%)</span>
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                    </div>
+                  </>
+                )}
+
+                {selected === "RIDER" && (
+                  <>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-dim font-bold">RIDER X ({config.riderX}px)</span>
+                      <input type="range" min="-400" max="400" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-dim font-bold">RIDER Y ({config.riderY}px)</span>
+                      <input type="range" min="-400" max="400" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-dim font-bold">RIDER SIZE ({Math.round(config.riderScale * 100)}%)</span>
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                   </>
                 )}
@@ -533,7 +587,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
               onClick={saveAndCommit}
               className="w-full border border-toxic bg-toxic py-3 text-xs font-bold tracking-widest text-bg transition-all hover:bg-toxic/80 mt-4"
             >
-              [ SAVE & APPLY CONFIG ]
+              [ CALCULATE & SAVE CONFIG ]
             </button>
           </div>
 
@@ -551,8 +605,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
               className="cursor-crosshair border border-line bg-black shadow-2xl"
             />
             <div className="mt-2 text-[10px] text-dim font-mono flex items-center gap-4">
-              <span>* Unlimited 1-to-1 pixel mouse dragging for all sizes</span>
-              <span>* Right-Click Drag: Pan Camera</span>
+              <span>* ?? Independent Mode Active: Place wheels first, then move bike & rider onto wheels</span>
             </div>
           </div>
         </div>
