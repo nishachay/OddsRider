@@ -1,27 +1,8 @@
-import Phaser from 'phaser';
-import { PALETTE, SPRITE } from '../constants';
-import type { Bike } from './Bike';
-import GUI from 'lil-gui';
+import Phaser from "phaser";
+import { PALETTE, SPRITE } from "../constants";
+import type { Bike } from "./Bike";
 
 const P = PALETTE;
-
-// Tightly trimmed HD asset defaults (Zero extra transparent padding)
-export const LIVE_SPRITE = { 
-  ...SPRITE, 
-  bikeScale: 0.10, 
-  bikeOriginX: 0.5, 
-  bikeOriginY: 0.55,
-  wheelScale: 0.038,
-  riderScale: 0.082,
-  ragdollScale: 0.082,
-  riderOriginY: 0.85,
-  riderAngleOffset: 10,
-  seatLocalX: 5,
-  seatLocalY: -10,
-  flagScale: 0.045
-};
-
-let gui: GUI | null = null;
 
 export class BikeRenderer {
   private bikeSprite: Phaser.GameObjects.Image;
@@ -32,94 +13,51 @@ export class BikeRenderer {
   private flame: Phaser.GameObjects.Graphics;
 
   constructor(scene: Phaser.Scene) {
-    this.wheelBackSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(LIVE_SPRITE.wheelScale);
-    this.wheelFrontSprite = scene.add.image(0, 0, 'wheel').setDepth(5).setScale(LIVE_SPRITE.wheelScale);
+    this.wheelBackSprite = scene.add.image(0, 0, "wheel").setDepth(5).setScale(SPRITE.rearWheelScale);
+    this.wheelFrontSprite = scene.add.image(0, 0, "wheel").setDepth(5).setScale(SPRITE.frontWheelScale);
     this.bikeSprite = scene.add
-      .image(0, 0, 'bike')
-      .setOrigin(LIVE_SPRITE.bikeOriginX, LIVE_SPRITE.bikeOriginY)
-      .setScale(LIVE_SPRITE.bikeScale)
+      .image(0, 0, "bike")
+      .setOrigin(SPRITE.bikeOriginX, SPRITE.bikeOriginY)
+      .setScale(SPRITE.bikeScale)
       .setDepth(6);
     this.riderSprite = scene.add
-      .image(0, 0, 'rider')
-      .setOrigin(0.5, LIVE_SPRITE.riderOriginY)
-      .setScale(LIVE_SPRITE.riderScale)
+      .image(0, 0, "rider")
+      .setOrigin(0.5, SPRITE.riderOriginY)
+      .setScale(SPRITE.riderScale)
       .setDepth(7);
-    this.ragdollSprite = scene.add.image(0, 0, 'ragdoll').setOrigin(0.5, 0.5).setScale(LIVE_SPRITE.ragdollScale).setDepth(7).setVisible(false);
+    this.ragdollSprite = scene.add.image(0, 0, "ragdoll").setOrigin(0.5, 0.5).setScale(SPRITE.ragdollScale).setDepth(7).setVisible(false);
     this.flame = scene.add.graphics().setDepth(9);
 
-    if (!gui && typeof window !== 'undefined') {
-      gui = new GUI({ title: 'HD Visual Tuning' });
-      
-      const viewFolder = gui.addFolder('View (Debug)');
-      viewFolder.add({ zoom: 1 }, 'zoom', 0.5, 4, 0.1).onChange((v: number) => {
-        scene.cameras.main.setZoom(v);
-      });
-      viewFolder.add({ whiteBg: false }, 'whiteBg').onChange((v: boolean) => {
-        scene.cameras.main.setBackgroundColor(v ? '#ffffff' : '#0a0a0b');
-      });
-
-      const f = gui.addFolder('Sprites');
-      f.add(LIVE_SPRITE, 'flagScale', 0.01, 0.2, 0.001).onChange((v: number) => {
-        scene.children.list.forEach((child) => {
-          if (child instanceof Phaser.GameObjects.Image && child.texture.key === 'flag') {
-            child.setScale(v);
-          }
-        });
-      });
-      f.add(LIVE_SPRITE, 'bikeScale', 0.01, 1.0, 0.001).onChange((v: number) => {
-        this.bikeSprite.setScale(v);
-      });
-      f.add(LIVE_SPRITE, 'bikeOriginX', 0.0, 1.0, 0.01).onChange((v: number) => {
-        this.bikeSprite.setOrigin(v, LIVE_SPRITE.bikeOriginY);
-      });
-      f.add(LIVE_SPRITE, 'bikeOriginY', 0.0, 1.0, 0.01).onChange((v: number) => {
-        this.bikeSprite.setOrigin(LIVE_SPRITE.bikeOriginX, v);
-      });
-      f.add(LIVE_SPRITE, 'wheelScale', 0.01, 1.0, 0.001).onChange((v: number) => {
-        this.wheelBackSprite.setScale(v);
-        this.wheelFrontSprite.setScale(v);
-      });
-      f.add(LIVE_SPRITE, 'riderScale', 0.01, 1.0, 0.001).onChange((v: number) => {
-        this.riderSprite.setScale(v);
-        this.ragdollSprite.setScale(v);
-      });
-      f.add(LIVE_SPRITE, 'riderOriginY', 0.0, 1.0, 0.01).onChange((v: number) => {
-        this.riderSprite.setOrigin(0.5, v);
-      });
-      f.add(LIVE_SPRITE, 'riderAngleOffset', -60, 60, 1);
-      f.add(LIVE_SPRITE, 'seatLocalX', -60, 60, 1);
-      f.add(LIVE_SPRITE, 'seatLocalY', -60, 60, 1);
-      
-      const copyBtn = {
-        CopyConfig: () => {
-          const out = JSON.stringify(LIVE_SPRITE, null, 2);
-          navigator.clipboard.writeText(out);
-          console.log("Copied to clipboard:", out);
-          alert("Copied HD config to clipboard!");
-        }
-      };
-      gui.add(copyBtn, 'CopyConfig');
-    }
+    scene.children.list.forEach((child) => {
+      if (child instanceof Phaser.GameObjects.Image && child.texture.key === "flag") {
+        child.setScale(SPRITE.flagScale);
+      }
+    });
   }
 
   render(bike: Bike): void {
     const back = bike.rearWheel;
-    this.wheelBackSprite.setPosition(back.position.x, back.position.y).setRotation(back.angle);
+    this.wheelBackSprite
+      .setPosition(back.position.x + SPRITE.rearWheelOffsetX, back.position.y + SPRITE.rearWheelOffsetY)
+      .setRotation(back.angle);
+
     const front = bike.frontWheel;
-    this.wheelFrontSprite.setPosition(front.position.x, front.position.y).setRotation(front.angle);
+    this.wheelFrontSprite
+      .setPosition(front.position.x + SPRITE.frontWheelOffsetX, front.position.y + SPRITE.frontWheelOffsetY)
+      .setRotation(front.angle);
 
     const chassis = bike.chassis;
-    this.bikeSprite.setPosition(chassis.position.x, chassis.position.y).setRotation(chassis.angle);
+    this.bikeSprite
+      .setPosition(chassis.position.x, chassis.position.y)
+      .setRotation(chassis.angle);
 
-    // rider mounted at the seat, rigid to the chassis
     const a = chassis.angle;
     const cos = Math.cos(a);
     const sin = Math.sin(a);
-    const rx = chassis.position.x + cos * LIVE_SPRITE.seatLocalX - sin * LIVE_SPRITE.seatLocalY;
-    const ry = chassis.position.y + sin * LIVE_SPRITE.seatLocalX + cos * LIVE_SPRITE.seatLocalY;
-    
-    // add angular offset (convert degrees to radians)
-    const riderAngle = a + (LIVE_SPRITE.riderAngleOffset * Math.PI / 180);
+    const rx = chassis.position.x + cos * SPRITE.seatLocalX - sin * SPRITE.seatLocalY;
+    const ry = chassis.position.y + sin * SPRITE.seatLocalX + cos * SPRITE.seatLocalY;
+
+    const riderAngle = a + (SPRITE.riderAngleOffset * Math.PI / 180);
     this.riderSprite.setPosition(rx, ry).setRotation(riderAngle).setVisible(!bike.ejected);
 
     if (bike.ejected && bike.ragdollBody) {
@@ -133,7 +71,6 @@ export class BikeRenderer {
 
     this.flame.clear();
     if (bike.nitroActive) {
-      // exhaust tip in chassis-local (-52, 3)
       const ex = chassis.position.x + cos * -52 - sin * 3;
       const ey = chassis.position.y + sin * -52 + cos * 3;
       const len = 14 + Math.random() * 14;

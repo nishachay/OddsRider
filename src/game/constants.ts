@@ -18,11 +18,9 @@ export const PALETTE = {
   visor: 0x050506,
 } as const;
 
-// Fixed-step simulation clock (reference-proven stability contract).
 export const STEP_MS = 1000 / 60;
 export const MAX_STEPS_PER_FRAME = 4;
 
-// Bike layout, offsets from chassis spawn centre (ornn-rider derived).
 export const BIKE = {
   backDx: -56,
   frontDx: 56,
@@ -58,7 +56,6 @@ export const BIKE = {
   headAnchorY: -8,
 } as const;
 
-// Drive / lean / integrity tuning, per fixed 60Hz step (proven values).
 export const TUNING = {
   maxWheelAv: 1.3,
   wheelAccel: 0.12,
@@ -95,6 +92,7 @@ export const TUNING = {
   headCrashTilt: 0.9,
 
   killDrop: 600,
+  winBonus: 1000,
 } as const;
 
 export const WORLD = {
@@ -109,18 +107,22 @@ export const WORLD = {
   finishX: 60_000,
 };
 
-// Sprite geometry, measured from processed art (public/assets/game):
-// bike 300x162, wheel hubs detected at (33,144)/(267,138) -> span 234 maps to physics 112.
-// Chassis centre in sprite coords = hub midpoint (150,141) minus world axle offset (0,+18)/scale.
 export const SPRITE = {
-  bikeScale: 112 / 234,
-  bikeOriginX: 150 / 300,
-  bikeOriginY: 103.4 / 162,
-  wheelScale: 0.65, // 80px texture -> 40px physics diameter
-  seatLocalX: -5,
-  seatLocalY: -18,
-  riderOriginY: 0.7,
-  flagScale: 0.045,
+  bikeScale: 1.0,
+  bikeOriginX: 0.5,
+  bikeOriginY: 0.76,
+  wheelScale: 1.0,
+  rearWheelScale: 1.0,
+  frontWheelScale: 1.0,
+  rearWheelOffsetX: 0,
+  rearWheelOffsetY: 0,
+  frontWheelOffsetX: 0,
+  frontWheelOffsetY: 0,
   riderScale: 1.0,
-  ragdollScale: 1.0, // 128px tall texture -> 64px world
-} as const;
+  ragdollScale: 1.0,
+  riderOriginY: 0.85,
+  riderAngleOffset: 10,
+  seatLocalX: 5,
+  seatLocalY: -10,
+  flagScale: 1.0,
+};
