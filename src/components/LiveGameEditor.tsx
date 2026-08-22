@@ -16,12 +16,12 @@ export default function LiveGameEditor({ isOpen, onClose }: LiveGameEditorProps)
     bikeScale: SPRITE.bikeScale,
     rearWheelScale: SPRITE.rearWheelScale,
     frontWheelScale: SPRITE.frontWheelScale,
-    rearWheelOffsetX: SPRITE.rearWheelOffsetX,
-    rearWheelOffsetY: SPRITE.rearWheelOffsetY,
+    chassisOffsetX: SPRITE.chassisOffsetX,
+    chassisOffsetY: SPRITE.chassisOffsetY,
     frontWheelOffsetX: SPRITE.frontWheelOffsetX,
     frontWheelOffsetY: SPRITE.frontWheelOffsetY,
-    seatLocalX: SPRITE.seatLocalX,
-    seatLocalY: SPRITE.seatLocalY,
+    riderOffsetX: SPRITE.riderOffsetX,
+    riderOffsetY: SPRITE.riderOffsetY,
     riderScale: SPRITE.riderScale,
     riderAngleOffset: SPRITE.riderAngleOffset,
     flagScale: SPRITE.flagScale,
@@ -61,15 +61,15 @@ export default function LiveGameEditor({ isOpen, onClose }: LiveGameEditorProps)
       </div>
 
       <div className="mt-3 flex flex-col gap-2">
-        {selected === "REAR_WHEEL" && (
+        {selected === "CHASSIS" && (
           <>
             <div className="flex items-center justify-between text-xs">
               <span>OFFSET X:</span>
-              <input type="number" step="0.1" value={params.rearWheelOffsetX} onChange={(e) => updateParam("rearWheelOffsetX", parseFloat(e.target.value) || 0)} className="w-20 bg-black text-toxic border border-line px-1" />
+              <input type="number" step="0.1" value={params.chassisOffsetX} onChange={(e) => updateParam("chassisOffsetX", parseFloat(e.target.value) || 0)} className="w-20 bg-black text-toxic border border-line px-1" />
             </div>
             <div className="flex items-center justify-between text-xs">
               <span>OFFSET Y:</span>
-              <input type="number" step="0.1" value={params.rearWheelOffsetY} onChange={(e) => updateParam("rearWheelOffsetY", parseFloat(e.target.value) || 0)} className="w-20 bg-black text-toxic border border-line px-1" />
+              <input type="number" step="0.1" value={params.chassisOffsetY} onChange={(e) => updateParam("chassisOffsetY", parseFloat(e.target.value) || 0)} className="w-20 bg-black text-toxic border border-line px-1" />
             </div>
           </>
         )}
