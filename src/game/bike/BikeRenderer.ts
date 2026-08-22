@@ -1,9 +1,8 @@
 import Phaser from "phaser";
-import { PALETTE, SPRITE } from "../constants";
+import { SPRITE } from "../constants";
 import { bus, EV } from "../bus";
 import type { Bike } from "./Bike";
-
-const P = PALETTE;
+import { CyberEffects } from "./CyberEffects";
 
 export class BikeRenderer {
   private bikeSprite: Phaser.GameObjects.Image;
@@ -11,9 +10,11 @@ export class BikeRenderer {
   private wheelFrontSprite: Phaser.GameObjects.Image;
   private riderSprite: Phaser.GameObjects.Image;
   private ragdollSprite: Phaser.GameObjects.Image;
-  private flame: Phaser.GameObjects.Graphics;
+  public cyberEffects: CyberEffects;
 
   constructor(scene: Phaser.Scene) {
+    this.cyberEffects = new CyberEffects(scene);
+
     this.wheelBackSprite = scene.add.image(0, 0, "wheel").setDepth(5).setScale(SPRITE.rearWheelScale);
     this.wheelFrontSprite = scene.add.image(0, 0, "wheel").setDepth(5).setScale(SPRITE.frontWheelScale);
     this.bikeSprite = scene.add
@@ -27,7 +28,6 @@ export class BikeRenderer {
       .setScale(SPRITE.riderScale)
       .setDepth(7);
     this.ragdollSprite = scene.add.image(0, 0, "ragdoll").setOrigin(0.5, 0.5).setScale(SPRITE.ragdollScale).setDepth(7).setVisible(false);
-    this.flame = scene.add.graphics().setDepth(9);
 
     // LIVE 100% REAL-TIME SYNC FROM STUDIO TO PHASER GAME SCENE
     bus.on(EV.STUDIO_UPDATE, () => {
@@ -48,6 +48,9 @@ export class BikeRenderer {
     const rearWheel = bike.rearWheel;
     const frontWheel = bike.frontWheel;
     const chassis = bike.chassis;
+
+    // Render sharp cyber visual FX
+    this.cyberEffects.render(bike);
 
     // 1. REAR WHEEL (Anchored directly to track contact physics body)
     this.wheelBackSprite
@@ -83,28 +86,6 @@ export class BikeRenderer {
         .setVisible(true);
     } else {
       this.ragdollSprite.setVisible(false);
-    }
-
-    // SHARP CYBER LASER NITRO FLAME (Anti-AI-Slop, 1px vector geometric style)
-    this.flame.clear();
-    if (bike.nitroActive && !bike.crashed) {
-      const ex = chassis.position.x + cos * -52 - sin * 3;
-      const ey = chassis.position.y + sin * -52 + cos * 3;
-      const len = 16 + Math.random() * 12;
-      const g = this.flame;
-      g.save();
-      g.translateCanvas(ex, ey);
-      g.rotateCanvas(a);
-      g.fillStyle(P.toxic, 0.9);
-      g.beginPath();
-      g.moveTo(0, -2);
-      g.lineTo(-len, 0);
-      g.lineTo(0, 2);
-      g.closePath();
-      g.fillPath();
-      g.fillStyle(0xffffff, 0.95);
-      g.fillRect(0, -1, 4, 2);
-      g.restore();
     }
   }
 }
