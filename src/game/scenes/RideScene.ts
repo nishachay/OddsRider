@@ -125,7 +125,6 @@ export class RideScene extends Phaser.Scene {
       this.crashHandled = true;
       bus.emit(EV.CRASH);
       this.cameras.main.shake(300, 0.012);
-      this.bikeRenderer.cyberEffects.triggerCrashGrid(this.bike.x, this.bike.y);
       this.time.delayedCall(900, () => this.doReset());
     }
 

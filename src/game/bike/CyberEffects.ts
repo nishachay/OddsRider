@@ -87,32 +87,4 @@ export class CyberEffects {
       this.sparkEmitter.emitParticle(1);
     }
   }
-
-  triggerCrashGrid(x: number, y: number): void {
-    // Sharp 1px Cyber Terminal Crash Grid Shockwave
-    const g = this.scene.add.graphics().setDepth(15);
-    let radius = 10;
-    let alpha = 1.0;
-
-    const timer = this.scene.time.addEvent({
-      delay: 16,
-      repeat: 20,
-      callback: () => {
-        g.clear();
-        radius += 12;
-        alpha -= 0.048;
-        if (alpha <= 0) {
-          g.destroy();
-          timer.destroy();
-          return;
-        }
-
-        // Sharp 1px Crimson & Toxic Cyber Diamond Grid
-        g.lineStyle(1, P.crimson, alpha);
-        g.strokeRect(x - radius, y - radius, radius * 2, radius * 2);
-        g.lineStyle(1, P.toxic, alpha * 0.7);
-        g.strokeCircle(x, y, radius * 0.65);
-      },
-    });
-  }
 }
