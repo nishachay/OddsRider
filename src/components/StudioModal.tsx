@@ -11,18 +11,17 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   const [syncWheels, setSyncWheels] = useState(true);
   const [riderBehind, setRiderBehind] = useState(false);
   
-  // Independent World Coordinates for every single component
+  // Independent World Coordinates for every single component (Pure Chassis Composite)
   const [config, setConfig] = useState({
     ...SPRITE,
-    // Independent Positions in Canvas World Space
     chassisX: 0,
     chassisY: 0,
-    rearWheelX: -56,
-    rearWheelY: 18,
-    frontWheelX: 56,
-    frontWheelY: 18,
-    riderX: -5,
-    riderY: -18,
+    rearWheelX: SPRITE.rearWheelOffsetX,
+    rearWheelY: SPRITE.rearWheelOffsetY,
+    frontWheelX: SPRITE.frontWheelOffsetX,
+    frontWheelY: SPRITE.frontWheelOffsetY,
+    riderX: SPRITE.seatLocalX,
+    riderY: SPRITE.seatLocalY,
     flagX: -180,
     flagY: 0,
     // Angles
@@ -365,12 +364,13 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
         next.wheelScale = val;
       }
 
-      // 100% REAL-TIME LIVE SYNC TO PHASER GAME ENGINE
+      // 100% REAL-TIME LIVE SYNC TO PHASER GAME ENGINE (CHASSIS COMPOSITE)
       (SPRITE as any).bikeScale = next.bikeScale;
       (SPRITE as any).rearWheelScale = next.rearWheelScale;
       (SPRITE as any).frontWheelScale = next.frontWheelScale;
       (SPRITE as any).riderScale = next.riderScale;
       (SPRITE as any).flagScale = next.flagScale;
+
       (SPRITE as any).rearWheelOffsetX = parseFloat((next.rearWheelX - next.chassisX).toFixed(1));
       (SPRITE as any).rearWheelOffsetY = parseFloat((next.rearWheelY - next.chassisY).toFixed(1));
       (SPRITE as any).frontWheelOffsetX = parseFloat((next.frontWheelX - next.chassisX).toFixed(1));
@@ -516,7 +516,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   };
 
   const saveAndCommit = async () => {
-    // Convert Independent World Positions back to relative constants offsets
+    // Convert Independent World Positions back to relative constants offsets (WHEEL IS THE BASE)
     const exportConfig = {
       bikeScale: config.bikeScale,
       bikeOriginX: 0.5,
@@ -524,16 +524,16 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       wheelScale: config.rearWheelScale,
       rearWheelScale: config.rearWheelScale,
       frontWheelScale: config.frontWheelScale,
-      rearWheelOffsetX: parseFloat((config.rearWheelX - config.chassisX).toFixed(1)),
-      rearWheelOffsetY: parseFloat((config.rearWheelY - config.chassisY).toFixed(1)),
-      frontWheelOffsetX: parseFloat((config.frontWheelX - config.chassisX).toFixed(1)),
-      frontWheelOffsetY: parseFloat((config.frontWheelY - config.chassisY).toFixed(1)),
+      chassisOffsetX: parseFloat((config.chassisX - config.rearWheelX).toFixed(1)),
+      chassisOffsetY: parseFloat((config.chassisY - config.rearWheelY).toFixed(1)),
+      frontWheelOffsetX: parseFloat((config.frontWheelX - config.rearWheelX).toFixed(1)),
+      frontWheelOffsetY: parseFloat((config.frontWheelY - config.rearWheelY).toFixed(1)),
+      riderOffsetX: parseFloat((config.riderX - config.rearWheelX).toFixed(1)),
+      riderOffsetY: parseFloat((config.riderY - config.rearWheelY).toFixed(1)),
       riderScale: config.riderScale,
       ragdollScale: config.ragdollScale,
       riderOriginY: config.riderOriginY,
       riderAngleOffset: config.riderAngleOffset,
-      seatLocalX: config.riderX - config.chassisX,
-      seatLocalY: config.riderY - config.chassisY,
       flagScale: config.flagScale
     };
 

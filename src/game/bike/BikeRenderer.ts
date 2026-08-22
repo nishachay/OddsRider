@@ -50,28 +50,31 @@ export class BikeRenderer {
     const cos = Math.cos(a);
     const sin = Math.sin(a);
 
+    const cx = chassis.position.x;
+    const cy = chassis.position.y;
+
     // 1. CHASSIS BIKE SPRITE
     this.bikeSprite
-      .setPosition(chassis.position.x, chassis.position.y)
+      .setPosition(cx, cy)
       .setRotation(a);
 
-    // 2. REAR WHEEL SPRITE (Grouped Composite Relative to Chassis)
-    const rwx = chassis.position.x + cos * SPRITE.rearWheelOffsetX - sin * SPRITE.rearWheelOffsetY;
-    const rwy = chassis.position.y + sin * SPRITE.rearWheelOffsetX + cos * SPRITE.rearWheelOffsetY;
+    // 2. REAR WHEEL SPRITE (Composite relative to Chassis Center)
+    const rwx = cx + cos * SPRITE.rearWheelOffsetX - sin * SPRITE.rearWheelOffsetY;
+    const rwy = cy + sin * SPRITE.rearWheelOffsetX + cos * SPRITE.rearWheelOffsetY;
     this.wheelBackSprite
       .setPosition(rwx, rwy)
       .setRotation(bike.rearWheel.angle);
 
-    // 3. FRONT WHEEL SPRITE (Grouped Composite Relative to Chassis)
-    const fwx = chassis.position.x + cos * SPRITE.frontWheelOffsetX - sin * SPRITE.frontWheelOffsetY;
-    const fwy = chassis.position.y + sin * SPRITE.frontWheelOffsetX + cos * SPRITE.frontWheelOffsetY;
+    // 3. FRONT WHEEL SPRITE (Composite relative to Chassis Center)
+    const fwx = cx + cos * SPRITE.frontWheelOffsetX - sin * SPRITE.frontWheelOffsetY;
+    const fwy = cy + sin * SPRITE.frontWheelOffsetX + cos * SPRITE.frontWheelOffsetY;
     this.wheelFrontSprite
       .setPosition(fwx, fwy)
       .setRotation(bike.frontWheel.angle);
 
-    // 4. RIDER SPRITE (Grouped Composite Relative to Chassis)
-    const rx = chassis.position.x + cos * SPRITE.seatLocalX - sin * SPRITE.seatLocalY;
-    const ry = chassis.position.y + sin * SPRITE.seatLocalX + cos * SPRITE.seatLocalY;
+    // 4. RIDER SPRITE (Composite relative to Chassis Center)
+    const rx = cx + cos * SPRITE.seatLocalX - sin * SPRITE.seatLocalY;
+    const ry = cy + sin * SPRITE.seatLocalX + cos * SPRITE.seatLocalY;
     const riderAngle = a + (SPRITE.riderAngleOffset * Math.PI / 180);
     this.riderSprite.setPosition(rx, ry).setRotation(riderAngle).setVisible(!bike.ejected);
 
