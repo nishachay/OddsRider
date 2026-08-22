@@ -499,12 +499,20 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 ))}
               </div>
 
-              {/* GROUPING TOGGLE */}
+              {/* ASSEMBLY MODE & TOGGLES */}
               <div className="flex flex-col gap-2 border-t border-line pt-3">
-                <span className="text-xs font-bold text-dim uppercase">ASSEMBLY MODE:</span>
+                <span className="text-xs font-bold text-dim uppercase">ASSEMBLY MODE & CONTROLS:</span>
                 <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
-                  <span className="text-toxic font-bold">{isGrouped ? "?? GROUPED (MOVE TOGETHER)" : "?? INDEPENDENT (MOVE PIECES SEPARATELY)"}</span>
+                  <span className="text-toxic font-bold">{isGrouped ? "🔒 GROUPED (MOVE TOGETHER)" : "🔓 INDEPENDENT (MOVE PIECES SEPARATELY)"}</span>
                   <input type="checkbox" checked={isGrouped} onChange={(e) => setIsGrouped(e.target.checked)} className="accent-toxic" />
+                </label>
+                <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
+                  <span className="text-ink font-bold">SYNC WHEEL SIZES</span>
+                  <input type="checkbox" checked={syncWheels} onChange={(e) => setSyncWheels(e.target.checked)} className="accent-toxic" />
+                </label>
+                <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
+                  <span className="text-ink font-bold">RIDER BEHIND CHASSIS</span>
+                  <input type="checkbox" checked={riderBehind} onChange={(e) => setRiderBehind(e.target.checked)} className="accent-toxic" />
                 </label>
               </div>
 
