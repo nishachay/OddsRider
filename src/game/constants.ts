@@ -22,9 +22,9 @@ export const STEP_MS = 1000 / 60;
 export const MAX_STEPS_PER_FRAME = 4;
 
 export const BIKE = {
-  backDx: -27.5,
-  frontDx: 28.5,
-  wheelDy: 4.2,
+  backDx: -56,
+  frontDx: 56,
+  wheelDy: 18,
   headDx: -6,
   headDy: -30,
   wheelR: 20,
@@ -114,10 +114,10 @@ export const SPRITE = {
   wheelScale: 0.52,
   rearWheelScale: 0.52,
   frontWheelScale: 0.52,
-  rearWheelOffsetX: 0.0,
-  rearWheelOffsetY: -6.0,
-  frontWheelOffsetX: 0.0,
-  frontWheelOffsetY: -6.0,
+  rearWheelOffsetX: -27.5,
+  rearWheelOffsetY: 4.2,
+  frontWheelOffsetX: 28.5,
+  frontWheelOffsetY: 4.5,
   riderScale: 0.43,
   ragdollScale: 1.0,
   riderOriginY: 0.85,
