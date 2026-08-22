@@ -22,7 +22,7 @@ export function makeGameConfig(parent: HTMLElement): Phaser.Types.Core.GameConfi
       },
     },
     input: { keyboard: false, mouse: true, touch: true },
-    render: { pixelArt: false, powerPreference: 'high-performance' },
+    render: { pixelArt: true, powerPreference: 'high-performance' },
     scene: [BootScene, RideScene],
   };
 }

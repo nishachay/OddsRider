@@ -5,19 +5,19 @@ import GUI from 'lil-gui';
 
 const P = PALETTE;
 
-// Mutable copy of SPRITE for live tweaking. Defaults adapted for new ~1000px assets.
+// Perfected scales based on physics wheelbase (112px) vs HD asset widths (2800px)
 export const LIVE_SPRITE = { 
   ...SPRITE, 
-  bikeScale: 0.15, 
-  bikeOriginX: 0.5, 
-  bikeOriginY: 0.7,
-  wheelScale: 0.12,
-  riderScale: 0.15,
-  ragdollScale: 0.15,
-  riderOriginY: 0.8,
-  riderAngleOffset: 0,
-  seatLocalX: 0,
-  seatLocalY: -20
+  bikeScale: 0.052, 
+  bikeOriginX: 0.48, 
+  bikeOriginY: 0.62,
+  wheelScale: 0.02,
+  riderScale: 0.062,
+  ragdollScale: 0.062,
+  riderOriginY: 0.85,
+  riderAngleOffset: 12,
+  seatLocalX: 6,
+  seatLocalY: 0
 };
 
 // We will only create the GUI once

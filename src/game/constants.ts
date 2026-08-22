@@ -120,7 +120,7 @@ export const SPRITE = {
   seatLocalX: -5,
   seatLocalY: -18,
   riderOriginY: 0.7,
-  flagScale: 1.5,
+  flagScale: 0.12,
   riderScale: 1.0,
   ragdollScale: 1.0, // 128px tall texture -> 64px world
 } as const;
