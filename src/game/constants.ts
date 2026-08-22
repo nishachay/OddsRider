@@ -107,6 +107,8 @@ export const WORLD = {
   finishX: 60_000,
 };
 
+// Mathematically normalized 1:1 geometry derived from trimmed PNG assets:
+// bike: 220x119, wheel: 50x50, rider: 90x120, flag: 24x150
 export const SPRITE = {
   bikeScale: 1.0,
   bikeOriginX: 0.5,
@@ -122,7 +124,7 @@ export const SPRITE = {
   ragdollScale: 1.0,
   riderOriginY: 0.85,
   riderAngleOffset: 10,
-  seatLocalX: 5,
-  seatLocalY: -10,
+  seatLocalX: -5,
+  seatLocalY: -18,
   flagScale: 1.0,
 };
