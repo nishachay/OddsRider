@@ -59,17 +59,20 @@ export class BikeRenderer {
       .setPosition(frontWheel.position.x, frontWheel.position.y)
       .setRotation(frontWheel.angle);
 
-    // 3. CHASSIS BIKE (Suspended between the wheels)
-    this.bikeSprite
-      .setPosition(chassis.position.x, chassis.position.y)
-      .setRotation(chassis.angle);
-
-    // 4. RIDER (Positioned on Chassis Seat)
     const a = chassis.angle;
     const cos = Math.cos(a);
     const sin = Math.sin(a);
-    const rx = chassis.position.x + cos * SPRITE.seatLocalX - sin * SPRITE.seatLocalY;
-    const ry = chassis.position.y + sin * SPRITE.seatLocalX + cos * SPRITE.seatLocalY;
+
+    // 3. CHASSIS BIKE (Positioned relative to Rear Wheel Base)
+    const cx = rearWheel.position.x + cos * SPRITE.chassisOffsetX - sin * SPRITE.chassisOffsetY;
+    const cy = rearWheel.position.y + sin * SPRITE.chassisOffsetX + cos * SPRITE.chassisOffsetY;
+    this.bikeSprite
+      .setPosition(cx, cy)
+      .setRotation(a);
+
+    // 4. RIDER (Positioned relative to Rear Wheel Base)
+    const rx = rearWheel.position.x + cos * SPRITE.riderOffsetX - sin * SPRITE.riderOffsetY;
+    const ry = rearWheel.position.y + sin * SPRITE.riderOffsetX + cos * SPRITE.riderOffsetY;
     const riderAngle = a + (SPRITE.riderAngleOffset * Math.PI / 180);
     this.riderSprite.setPosition(rx, ry).setRotation(riderAngle).setVisible(!bike.ejected);
 
