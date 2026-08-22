@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { bus, EV } from '../game/bus';
 import StudioModal from './StudioModal';
-import LiveGameEditor from './LiveGameEditor';
 
 function Key({ label }: { label: string }) {
   return (
@@ -29,7 +28,6 @@ export default function HudOverlay() {
   const [crashFlash, setCrashFlash] = useState(false);
   const [hintsVisible, setHintsVisible] = useState(true);
   const [studioOpen, setStudioOpen] = useState(false);
-  const [liveEditorOpen, setLiveEditorOpen] = useState(false);
 
   useEffect(() => {
     const offSpeed = bus.on<number>(EV.SPEED, setSpeed);

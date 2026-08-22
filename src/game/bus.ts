@@ -32,4 +32,5 @@ export const EV = {
   INPUT_FIRST: 'hud:input-first',
   NITRO: 'hud:nitro',
   CRASH: 'hud:crash',
+  STUDIO_UPDATE: 'studio:update',
 } as const;

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { PALETTE, SPRITE } from "../constants";
+import { bus, EV } from "../bus";
 import type { Bike } from "./Bike";
 
 const P = PALETTE;
@@ -27,6 +28,14 @@ export class BikeRenderer {
       .setDepth(7);
     this.ragdollSprite = scene.add.image(0, 0, "ragdoll").setOrigin(0.5, 0.5).setScale(SPRITE.ragdollScale).setDepth(7).setVisible(false);
     this.flame = scene.add.graphics().setDepth(9);
+
+    // LIVE 100% REAL-TIME SYNC FROM STUDIO TO PHASER GAME SCENE
+    bus.on(EV.STUDIO_UPDATE, () => {
+      this.bikeSprite.setScale(SPRITE.bikeScale);
+      this.wheelBackSprite.setScale(SPRITE.rearWheelScale);
+      this.wheelFrontSprite.setScale(SPRITE.frontWheelScale);
+      this.riderSprite.setScale(SPRITE.riderScale);
+    });
 
     scene.children.list.forEach((child) => {
       if (child instanceof Phaser.GameObjects.Image && child.texture.key === "flag") {

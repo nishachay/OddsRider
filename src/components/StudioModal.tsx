@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SPRITE } from "../game/constants";
+import { bus, EV } from "../game/bus";
 
 type ElementKey = "CHASSIS" | "REAR_WHEEL" | "FRONT_WHEEL" | "RIDER" | "FLAG";
 
@@ -363,6 +364,23 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
         next.frontWheelScale = val;
         next.wheelScale = val;
       }
+
+      // 100% REAL-TIME LIVE SYNC TO PHASER GAME ENGINE
+      (SPRITE as any).bikeScale = next.bikeScale;
+      (SPRITE as any).rearWheelScale = next.rearWheelScale;
+      (SPRITE as any).frontWheelScale = next.frontWheelScale;
+      (SPRITE as any).riderScale = next.riderScale;
+      (SPRITE as any).flagScale = next.flagScale;
+      (SPRITE as any).rearWheelOffsetX = parseFloat((next.rearWheelX - next.chassisX).toFixed(1));
+      (SPRITE as any).rearWheelOffsetY = parseFloat((next.rearWheelY - next.chassisY).toFixed(1));
+      (SPRITE as any).frontWheelOffsetX = parseFloat((next.frontWheelX - next.chassisX).toFixed(1));
+      (SPRITE as any).frontWheelOffsetY = parseFloat((next.frontWheelY - next.chassisY).toFixed(1));
+      (SPRITE as any).seatLocalX = parseFloat((next.riderX - next.chassisX).toFixed(1));
+      (SPRITE as any).seatLocalY = parseFloat((next.riderY - next.chassisY).toFixed(1));
+      (SPRITE as any).riderAngleOffset = next.riderAngleOffset;
+
+      bus.emit(EV.STUDIO_UPDATE);
+
       return next;
     });
   };
