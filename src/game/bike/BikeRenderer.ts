@@ -5,22 +5,22 @@ import GUI from 'lil-gui';
 
 const P = PALETTE;
 
-// Perfected scales based on physics wheelbase (112px) vs HD asset widths (2800px)
+// Tightly trimmed HD asset defaults (Zero extra transparent padding)
 export const LIVE_SPRITE = { 
   ...SPRITE, 
-  bikeScale: 0.052, 
-  bikeOriginX: 0.48, 
-  bikeOriginY: 0.62,
-  wheelScale: 0.02,
-  riderScale: 0.062,
-  ragdollScale: 0.062,
+  bikeScale: 0.10, 
+  bikeOriginX: 0.5, 
+  bikeOriginY: 0.55,
+  wheelScale: 0.038,
+  riderScale: 0.082,
+  ragdollScale: 0.082,
   riderOriginY: 0.85,
-  riderAngleOffset: 12,
-  seatLocalX: 6,
-  seatLocalY: 0
+  riderAngleOffset: 10,
+  seatLocalX: 5,
+  seatLocalY: -10,
+  flagScale: 0.045
 };
 
-// We will only create the GUI once
 let gui: GUI | null = null;
 
 export class BikeRenderer {
@@ -59,6 +59,13 @@ export class BikeRenderer {
       });
 
       const f = gui.addFolder('Sprites');
+      f.add(LIVE_SPRITE, 'flagScale', 0.01, 0.2, 0.001).onChange((v: number) => {
+        scene.children.list.forEach((child) => {
+          if (child instanceof Phaser.GameObjects.Image && child.texture.key === 'flag') {
+            child.setScale(v);
+          }
+        });
+      });
       f.add(LIVE_SPRITE, 'bikeScale', 0.01, 1.0, 0.001).onChange((v: number) => {
         this.bikeSprite.setScale(v);
       });
