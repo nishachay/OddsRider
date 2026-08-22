@@ -117,11 +117,11 @@ export const SPRITE = {
 
   // WHEEL IS THE BASE (Wheel hubs locked into axle sockets & baseline)
   chassisOffsetX: 55.2,
-  chassisOffsetY: 5.0,
+  chassisOffsetY: 10.0,
   frontWheelOffsetX: 112.2,
   frontWheelOffsetY: 0.7,
   riderOffsetX: 55.2,
-  riderOffsetY: -10.3,
+  riderOffsetY: -5.3,
 
   riderScale: 0.4,
   ragdollScale: 1.0,
