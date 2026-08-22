@@ -124,6 +124,8 @@ export class RideScene extends Phaser.Scene {
     if (this.bike.crashed && !this.crashHandled) {
       this.crashHandled = true;
       bus.emit(EV.CRASH);
+      this.cameras.main.shake(400, 0.015);
+      this.bikeRenderer.particles.explodeCrash(this.bike.x, this.bike.y);
       this.time.delayedCall(900, () => this.doReset());
     }
 
