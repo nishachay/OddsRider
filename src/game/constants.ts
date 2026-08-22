@@ -27,7 +27,7 @@ export const BIKE = {
   wheelDy: 18,
   headDx: -6,
   headDy: -30,
-  wheelR: 26,
+  wheelR: 25,
   chassisW: 90,
   chassisH: 22,
   headR: 11,
