@@ -6,12 +6,11 @@ type ElementKey = "CHASSIS" | "REAR_WHEEL" | "FRONT_WHEEL" | "RIDER" | "FLAG";
 export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selected, setSelected] = useState<ElementKey>("CHASSIS");
-  const [lockAspect, setLockAspect] = useState(true);
   const [lockGround, setLockGround] = useState(true);
   const [syncWheels, setSyncWheels] = useState(true);
   const [riderBehind, setRiderBehind] = useState(false);
   
-  // Base config state
+  // Config state
   const [config, setConfig] = useState({
     ...SPRITE,
     bikeAngle: 0,
@@ -20,7 +19,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     flagAngle: 0
   });
 
-  // Canvas Viewport Zoom & Pan State (Photoshop/Figma Style)
+  // Canvas Viewport Zoom & Pan State
   const [zoom, setZoom] = useState(1.0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
@@ -32,7 +31,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
   // Mouse interaction state
   const isDraggingRef = useRef(false);
-  const isRotatingRef = useRef(false);
   const startMouseRef = useRef({ x: 0, y: 0 });
   const startConfigRef = useRef({ ...config });
 
@@ -64,14 +62,13 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     });
   }, [isOpen]);
 
-  // Main Canvas Rendering Loop with Full 360 Rotation, Zoom, Pan, & Layering
+  // Main Canvas Rendering Loop
   useEffect(() => {
     if (!isOpen || !imagesLoaded || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear canvas
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -79,13 +76,13 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.fillStyle = "#0a0a0b";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // APPLY CAMERA TRANSFORM (ZOOM & PAN)
+    // CAMERA TRANSFORM (ZOOM & PAN)
     ctx.save();
     ctx.translate(canvas.width / 2 + pan.x, canvas.height / 2 + pan.y);
     ctx.scale(zoom, zoom);
     ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-    // 2. ENHANCED PRECISION GRID & RULERS
+    // 2. PRECISION GRID & RULERS
     ctx.strokeStyle = "#16181d";
     ctx.lineWidth = 1 / zoom;
     for (let x = -800; x <= canvas.width + 800; x += 20) {
@@ -101,7 +98,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       ctx.stroke();
     }
 
-    // Major 100px Grid Lines with Pixel Labels
+    // Major 100px Grid Lines
     ctx.strokeStyle = "#242730";
     ctx.lineWidth = 1.5 / zoom;
     ctx.fillStyle = "#6e727e";
@@ -134,7 +131,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.fillStyle = "#b6ff00";
     ctx.fillText("TRACK GROUND BASELINE (Y: 620)", 10, groundY - 6);
 
-    // Assembly Center Reference
     const centerX = canvas.width / 2;
     const centerY = groundY - 60;
 
@@ -246,7 +242,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.restore();
   }, [isOpen, imagesLoaded, config, selected, zoom, pan, riderBehind]);
 
-  // Figma-Style Bounding Box with Rotation Handle
+  // Figma Bounding Handles
   const drawSelectionBox = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -280,19 +276,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       ctx.strokeRect(c.x - handleSize / 2, c.y - handleSize / 2, handleSize, handleSize);
     });
 
-    // Top Rotation Handle
-    const ry = -h / 2 - 24 / currentZoom;
-    ctx.beginPath();
-    ctx.moveTo(0, -h / 2 - 4);
-    ctx.lineTo(0, ry);
-    ctx.stroke();
-
-    ctx.fillStyle = "#b6ff00";
-    ctx.beginPath();
-    ctx.arc(0, ry, 5 / currentZoom, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
     ctx.restore();
   };
 
@@ -311,7 +294,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   // Nudge Function
   const nudge = (dx: number, dy: number, dAngle = 0) => {
     if (selected === "CHASSIS") {
-      updateVal("bikeScale", parseFloat(Math.max(0.1, config.bikeScale + dx * 0.01).toFixed(2)));
+      updateVal("bikeOriginY", parseFloat((config.bikeOriginY + dy * 0.01).toFixed(3)));
       updateVal("bikeAngle", config.bikeAngle + dAngle);
     } else if (selected === "REAR_WHEEL") {
       updateVal("rearWheelOffsetX", config.rearWheelOffsetX + dx);
@@ -331,7 +314,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     }
   };
 
-  // Mouse Handlers
+  // Mouse Handlers - DIRECT MOUSE POSITIONING FOR BIKE, RIDER & WHEELS
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -367,6 +350,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     const dy = (my - startMouseRef.current.y) / zoom;
 
     if (selected === "CHASSIS") {
+      // Dragging chassis adjusts Origin Y (height) and Scale
+      updateVal("bikeOriginY", parseFloat(Math.max(0.1, Math.min(1.5, startConfigRef.current.bikeOriginY + dy * 0.002)).toFixed(3)));
       updateVal("bikeScale", parseFloat(Math.max(0.1, startConfigRef.current.bikeScale + dx * 0.005).toFixed(2)));
     } else if (selected === "REAR_WHEEL") {
       updateVal("rearWheelOffsetX", Math.round(startConfigRef.current.rearWheelOffsetX + dx));
@@ -404,52 +389,25 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   return (
     <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-black/85 font-mono backdrop-blur-md">
       <div className="flex h-[92vh] w-[96vw] max-w-7xl flex-col border border-toxic bg-bg shadow-2xl">
-        {/* HEADER BAR WITH CANVAS ZOOM & PAN CONTROLS */}
+        {/* HEADER BAR */}
         <div className="flex items-center justify-between border-b border-line bg-bg/95 px-4 py-2.5">
           <div className="flex items-center gap-3">
             <span className="h-2.5 w-2.5 bg-toxic animate-pulse"></span>
-            <span className="text-xs font-bold tracking-widest text-toxic uppercase">ULTIMATE FIGMA STUDIO</span>
+            <span className="text-xs font-bold tracking-widest text-toxic uppercase">FIGMA ASSEMBLY CANVAS STUDIO</span>
           </div>
 
           {/* CANVAS CAMERA CONTROLS */}
           <div className="flex items-center gap-3 border border-line bg-black/50 px-3 py-1 text-xs">
             <span className="text-dim font-bold">ZOOM:</span>
-            <button
-              onClick={() => setZoom((z) => parseFloat(Math.max(0.3, z - 0.2).toFixed(2)))}
-              className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic"
-            >
-              -
-            </button>
+            <button onClick={() => setZoom((z) => parseFloat(Math.max(0.3, z - 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">-</button>
             <span className="w-12 text-center font-bold text-toxic tabular-nums">{Math.round(zoom * 100)}%</span>
-            <button
-              onClick={() => setZoom((z) => parseFloat(Math.min(5.0, z + 0.2).toFixed(2)))}
-              className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic"
-            >
-              +
-            </button>
+            <button onClick={() => setZoom((z) => parseFloat(Math.min(5.0, z + 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">+</button>
             <span className="text-dim font-bold ml-2">PAN Y:</span>
-            <input
-              type="range"
-              min="-300"
-              max="300"
-              value={pan.y}
-              onChange={(e) => setPan((p) => ({ ...p, y: parseInt(e.target.value) }))}
-              className="w-20 accent-toxic"
-            />
-            <button
-              onClick={() => { setZoom(1.0); setPan({ x: 0, y: 0 }); }}
-              className="ml-2 border border-line bg-bg px-2 py-0.5 text-[10px] font-bold text-dim hover:text-ink"
-            >
-              RESET VIEW
-            </button>
+            <input type="range" min="-300" max="300" value={pan.y} onChange={(e) => setPan((p) => ({ ...p, y: parseInt(e.target.value) }))} className="w-20 accent-toxic" />
+            <button onClick={() => { setZoom(1.0); setPan({ x: 0, y: 0 }); }} className="ml-2 border border-line bg-bg px-2 py-0.5 text-[10px] font-bold text-dim hover:text-ink">RESET VIEW</button>
           </div>
 
-          <button
-            onClick={onClose}
-            className="border border-line bg-bg px-3 py-1 text-xs font-bold text-dim transition-all hover:border-crimson hover:text-crimson"
-          >
-            [ CLOSE STUDIO ]
-          </button>
+          <button onClick={onClose} className="border border-line bg-bg px-3 py-1 text-xs font-bold text-dim transition-all hover:border-crimson hover:text-crimson">[ CLOSE STUDIO ]</button>
         </div>
 
         {/* WORKSPACE CONTENT */}
@@ -457,7 +415,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
           {/* LEFT SIDEBAR: SELECTOR & CONTROLS */}
           <div className="col-span-4 flex flex-col justify-between border-r border-line bg-bg/60 p-4 overflow-y-auto">
             <div className="flex flex-col gap-4">
-              <span className="text-xs font-bold text-dim uppercase">SELECT ELEMENT:</span>
+              <span className="text-xs font-bold text-dim uppercase">SELECT ELEMENT TO MOVE:</span>
               <div className="grid grid-cols-2 gap-2">
                 {(["CHASSIS", "REAR_WHEEL", "FRONT_WHEEL", "RIDER", "FLAG"] as ElementKey[]).map((key) => (
                   <button
@@ -469,11 +427,11 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                         : "border-line bg-bg text-ink hover:border-dim hover:text-toxic"
                     }`}
                   >
-                    {key === "CHASSIS" && "[ CHASSIS ]"}
-                    {key === "REAR_WHEEL" && "[ REAR WHEEL ]"}
-                    {key === "FRONT_WHEEL" && "[ FRONT WHEEL ]"}
-                    {key === "RIDER" && "[ RIDER ]"}
-                    {key === "FLAG" && "[ FLAG ]"}
+                    {key === "CHASSIS" && "[ ??? CHASSIS ]"}
+                    {key === "REAR_WHEEL" && "[ ?? REAR WHEEL ]"}
+                    {key === "FRONT_WHEEL" && "[ ?? FRONT WHEEL ]"}
+                    {key === "RIDER" && "[ ?? RIDER ]"}
+                    {key === "FLAG" && "[ ?? FLAG ]"}
                   </button>
                 ))}
               </div>
@@ -517,16 +475,16 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
               {/* TRANSFORM SLIDERS */}
               <div className="flex flex-col gap-3 border-t border-line pt-3">
-                <span className="text-xs font-bold text-toxic uppercase">{selected} ROTATION & SCALE:</span>
+                <span className="text-xs font-bold text-toxic uppercase">{selected} CONTROLS:</span>
 
                 {selected === "CHASSIS" && (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">ROTATION ({config.bikeAngle}deg)</span>
-                      <input type="range" min="-180" max="180" value={config.bikeAngle} onChange={(e) => updateVal("bikeAngle", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">HEIGHT (Origin Y: {config.bikeOriginY})</span>
+                      <input type="range" min="0.1" max="1.2" step="0.005" value={config.bikeOriginY} onChange={(e) => updateVal("bikeOriginY", parseFloat(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">SCALE ({Math.round(config.bikeScale * 100)}%)</span>
+                      <span className="text-dim font-bold">BIKE SCALE ({Math.round(config.bikeScale * 100)}%)</span>
                       <input type="range" min="0.1" max="2.0" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                   </>
@@ -535,14 +493,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 {selected === "RIDER" && (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">LEAN ANGLE ({config.riderAngleOffset}deg)</span>
-                      <input type="range" min="-180" max="180" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value))} className="w-32 accent-toxic" />
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">RIDER SIZE ({Math.round(config.riderScale * 100)}%)</span>
-                      <input type="range" min="0.1" max="2.0" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">SEAT X ({config.seatLocalX}px)</span>
                       <input type="range" min="-200" max="200" value={config.seatLocalX} onChange={(e) => updateVal("seatLocalX", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
@@ -550,13 +500,17 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                       <span className="text-dim font-bold">SEAT Y ({config.seatLocalY}px)</span>
                       <input type="range" min="-200" max="200" value={config.seatLocalY} onChange={(e) => updateVal("seatLocalY", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-dim font-bold">LEAN ANGLE ({config.riderAngleOffset}deg)</span>
+                      <input type="range" min="-180" max="180" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    </div>
                   </>
                 )}
 
                 {(selected === "REAR_WHEEL" || selected === "FRONT_WHEEL") && (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">SIZE ({Math.round(config.rearWheelScale * 100)}%)</span>
+                      <span className="text-dim font-bold">WHEEL SIZE ({Math.round(config.rearWheelScale * 100)}%)</span>
                       <input type="range" min="0.1" max="2.0" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
@@ -595,9 +549,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
               className="cursor-crosshair border border-line bg-black shadow-2xl"
             />
             <div className="mt-2 text-[10px] text-dim font-mono flex items-center gap-4">
-              <span>* Mouse Wheel: Zoom</span>
-              <span>* Right-Click Drag: Pan Camera</span>
-              <span>* Left Drag: Move Sprites</span>
+              <span>* Select element from left sidebar, then drag directly with mouse</span>
+              <span>* Use Nudge pad for 1px adjustments</span>
             </div>
           </div>
         </div>
