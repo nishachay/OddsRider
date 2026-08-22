@@ -31,7 +31,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
   // Mouse interaction state
   const isDraggingRef = useRef(false);
-  const startMouseRef = useRef({ x: 0, y: 0 });
+  const startMouseWorldRef = useRef({ x: 0, y: 0 });
   const startConfigRef = useRef({ ...config });
 
   // Preload game images
@@ -82,7 +82,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.scale(zoom, zoom);
     ctx.translate(-canvas.width / 2, -canvas.height / 2);
 
-    // 2. PRECISION GRID & RULERS
+    // 2. PRECISION GRID
     ctx.strokeStyle = "#16181d";
     ctx.lineWidth = 1 / zoom;
     for (let x = -800; x <= canvas.width + 800; x += 20) {
@@ -136,7 +136,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
     const { bike, wheel, rider, flag } = imagesRef.current;
 
-    // RENDER RIDER (BEHIND CHASSIS IF TOGGLED)
+    // RENDER RIDER
     const renderRider = () => {
       if (!rider) return;
       const rw = rider.width * config.riderScale * 0.5;
@@ -185,7 +185,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       ctx.drawImage(wheel, -ww / 2, -wh / 2, ww, wh);
       ctx.restore();
 
-      // Axle Guide Line
       ctx.strokeStyle = "rgba(182, 255, 0, 0.4)";
       ctx.lineWidth = 1 / zoom;
       ctx.beginPath();
@@ -209,7 +208,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       ctx.drawImage(wheel, -ww / 2, -wh / 2, ww, wh);
       ctx.restore();
 
-      // Axle Guide Line
       ctx.strokeStyle = "rgba(182, 255, 0, 0.4)";
       ctx.lineWidth = 1 / zoom;
       ctx.beginPath();
@@ -236,7 +234,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       if (selected === "CHASSIS") drawSelectionBox(ctx, bx, by, bw, bh, config.bikeAngle, zoom);
     }
 
-    // RENDER RIDER (IN FRONT OF CHASSIS BY DEFAULT)
+    // RENDER RIDER
     if (!riderBehind) renderRider();
 
     ctx.restore();
@@ -260,7 +258,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.lineWidth = 2 / currentZoom;
     ctx.strokeRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
 
-    // Corner Handles
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#b6ff00";
     ctx.lineWidth = 1 / currentZoom;
@@ -291,68 +288,88 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     });
   };
 
-  // Nudge Function
-  const nudge = (dx: number, dy: number, dAngle = 0) => {
-    if (selected === "CHASSIS") {
-      updateVal("bikeOriginY", parseFloat((config.bikeOriginY + dy * 0.01).toFixed(3)));
-      updateVal("bikeAngle", config.bikeAngle + dAngle);
-    } else if (selected === "REAR_WHEEL") {
-      updateVal("rearWheelOffsetX", config.rearWheelOffsetX + dx);
-      updateVal("rearWheelOffsetY", config.rearWheelOffsetY + dy);
-      updateVal("rearWheelAngle", config.rearWheelAngle + dAngle);
-    } else if (selected === "FRONT_WHEEL") {
-      updateVal("frontWheelOffsetX", config.frontWheelOffsetX + dx);
-      updateVal("frontWheelOffsetY", config.frontWheelOffsetY + dy);
-      updateVal("frontWheelAngle", config.frontWheelAngle + dAngle);
-    } else if (selected === "RIDER") {
-      updateVal("seatLocalX", config.seatLocalX + dx);
-      updateVal("seatLocalY", config.seatLocalY + dy);
-      updateVal("riderAngleOffset", config.riderAngleOffset + dAngle);
-    } else if (selected === "FLAG") {
-      updateVal("flagScale", parseFloat(Math.max(0.1, config.flagScale + dx * 0.01).toFixed(2)));
-      updateVal("flagAngle", config.flagAngle + dAngle);
-    }
+  // Convert Screen Mouse Coordinates to Canvas World Coordinates
+  const getCanvasWorldPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+
+    const wx = (clientX - (canvas.width / 2 + pan.x)) / zoom + canvas.width / 2;
+    const wy = (clientY - (canvas.height / 2 + pan.y)) / zoom + canvas.height / 2;
+    return { x: wx, y: wy };
   };
 
-  // Mouse Handlers - DIRECT MOUSE POSITIONING FOR BIKE, RIDER & WHEELS
+  // 100% FREE MOUSE CLICK & PICK & DRAG ENGINE
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
+    const pos = getCanvasWorldPos(e);
 
     if (e.button === 1 || e.button === 2) {
       isPanningRef.current = true;
-      startPanRef.current = { x: mx - pan.x, y: my - pan.y };
+      startPanRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
       return;
     }
 
+    const groundY = 360;
+    const centerX = canvas.width / 2;
+    const centerY = groundY - 60;
+    const { bike, wheel, rider } = imagesRef.current;
+
+    // Hit Testing to Auto-Select Clicked Element Directly on Canvas
+    if (rider) {
+      const rw = rider.width * config.riderScale * 0.5;
+      const rh = rider.height * config.riderScale * 0.5;
+      const rx = centerX + config.seatLocalX;
+      const ry = centerY + config.seatLocalY;
+      if (Math.abs(pos.x - rx) < rw / 2 && Math.abs(pos.y - ry) < rh / 2) {
+        setSelected("RIDER");
+      }
+    }
+    if (wheel) {
+      const ww = wheel.width * config.rearWheelScale * 0.5;
+      const rearX = centerX - 56 + config.rearWheelOffsetX;
+      const rearY = centerY + 18 + config.rearWheelOffsetY;
+      if (Math.hypot(pos.x - rearX, pos.y - rearY) < ww / 2) {
+        setSelected("REAR_WHEEL");
+      }
+
+      const frontX = centerX + 56 + config.frontWheelOffsetX;
+      const frontY = centerY + 18 + config.frontWheelOffsetY;
+      if (Math.hypot(pos.x - frontX, pos.y - frontY) < ww / 2) {
+        setSelected("FRONT_WHEEL");
+      }
+    }
+    if (bike) {
+      const bw = bike.width * config.bikeScale * 0.5;
+      const bh = bike.height * config.bikeScale * 0.5;
+      if (Math.abs(pos.x - centerX) < bw / 2 && Math.abs(pos.y - centerY) < bh / 2) {
+        setSelected("CHASSIS");
+      }
+    }
+
     isDraggingRef.current = true;
-    startMouseRef.current = { x: mx, y: my };
+    startMouseWorldRef.current = pos;
     startConfigRef.current = { ...config };
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-
     if (isPanningRef.current) {
-      setPan({ x: mx - startPanRef.current.x, y: my - startPanRef.current.y });
+      setPan({ x: e.clientX - startPanRef.current.x, y: e.clientY - startPanRef.current.y });
       return;
     }
 
     if (!isDraggingRef.current) return;
-    const dx = (mx - startMouseRef.current.x) / zoom;
-    const dy = (my - startMouseRef.current.y) / zoom;
+    const pos = getCanvasWorldPos(e);
+    const dx = pos.x - startMouseWorldRef.current.x;
+    const dy = pos.y - startMouseWorldRef.current.y;
 
+    // 1-TO-1 FREE MOUSE POSITION MOVEMENT
     if (selected === "CHASSIS") {
-      // Dragging chassis adjusts Origin Y (height) and Scale
-      updateVal("bikeOriginY", parseFloat(Math.max(0.1, Math.min(1.5, startConfigRef.current.bikeOriginY + dy * 0.002)).toFixed(3)));
-      updateVal("bikeScale", parseFloat(Math.max(0.1, startConfigRef.current.bikeScale + dx * 0.005).toFixed(2)));
+      updateVal("bikeOriginY", parseFloat(Math.max(0.1, startConfigRef.current.bikeOriginY + dy * 0.003).toFixed(3)));
+      updateVal("bikeScale", parseFloat(Math.max(0.1, startConfigRef.current.bikeScale + dx * 0.003).toFixed(2)));
     } else if (selected === "REAR_WHEEL") {
       updateVal("rearWheelOffsetX", Math.round(startConfigRef.current.rearWheelOffsetX + dx));
       updateVal("rearWheelOffsetY", Math.round(startConfigRef.current.rearWheelOffsetY + dy));
@@ -393,7 +410,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
         <div className="flex items-center justify-between border-b border-line bg-bg/95 px-4 py-2.5">
           <div className="flex items-center gap-3">
             <span className="h-2.5 w-2.5 bg-toxic animate-pulse"></span>
-            <span className="text-xs font-bold tracking-widest text-toxic uppercase">FIGMA ASSEMBLY CANVAS STUDIO</span>
+            <span className="text-xs font-bold tracking-widest text-toxic uppercase">FREE MOUSE CANVAS STUDIO</span>
           </div>
 
           {/* CANVAS CAMERA CONTROLS */}
@@ -402,8 +419,6 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
             <button onClick={() => setZoom((z) => parseFloat(Math.max(0.3, z - 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">-</button>
             <span className="w-12 text-center font-bold text-toxic tabular-nums">{Math.round(zoom * 100)}%</span>
             <button onClick={() => setZoom((z) => parseFloat(Math.min(5.0, z + 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">+</button>
-            <span className="text-dim font-bold ml-2">PAN Y:</span>
-            <input type="range" min="-300" max="300" value={pan.y} onChange={(e) => setPan((p) => ({ ...p, y: parseInt(e.target.value) }))} className="w-20 accent-toxic" />
             <button onClick={() => { setZoom(1.0); setPan({ x: 0, y: 0 }); }} className="ml-2 border border-line bg-bg px-2 py-0.5 text-[10px] font-bold text-dim hover:text-ink">RESET VIEW</button>
           </div>
 
@@ -412,10 +427,10 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
         {/* WORKSPACE CONTENT */}
         <div className="grid flex-1 grid-cols-12 overflow-hidden">
-          {/* LEFT SIDEBAR: SELECTOR & CONTROLS */}
+          {/* LEFT SIDEBAR */}
           <div className="col-span-4 flex flex-col justify-between border-r border-line bg-bg/60 p-4 overflow-y-auto">
             <div className="flex flex-col gap-4">
-              <span className="text-xs font-bold text-dim uppercase">SELECT ELEMENT TO MOVE:</span>
+              <span className="text-xs font-bold text-dim uppercase">SELECTED ELEMENT:</span>
               <div className="grid grid-cols-2 gap-2">
                 {(["CHASSIS", "REAR_WHEEL", "FRONT_WHEEL", "RIDER", "FLAG"] as ElementKey[]).map((key) => (
                   <button
@@ -436,37 +451,17 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 ))}
               </div>
 
-              {/* PRECISION NUDGE & ROTATE PAD */}
+              {/* ALIGNMENT LOCKS */}
               <div className="flex flex-col gap-2 border-t border-line pt-3">
-                <span className="text-xs font-bold text-dim uppercase">1PX PRECISION NUDGE & ROTATE:</span>
-                <div className="flex items-center justify-center gap-2">
-                  <button onClick={() => nudge(-1, 0)} className="border border-line bg-bg px-3 py-1 text-xs font-bold text-ink hover:border-toxic hover:text-toxic">? 1px</button>
-                  <div className="flex flex-col gap-1">
-                    <button onClick={() => nudge(0, -1)} className="border border-line bg-bg px-3 py-1 text-xs font-bold text-ink hover:border-toxic hover:text-toxic">? 1px</button>
-                    <button onClick={() => nudge(0, 1)} className="border border-line bg-bg px-3 py-1 text-xs font-bold text-ink hover:border-toxic hover:text-toxic">? 1px</button>
-                  </div>
-                  <button onClick={() => nudge(1, 0)} className="border border-line bg-bg px-3 py-1 text-xs font-bold text-ink hover:border-toxic hover:text-toxic">1px ?</button>
-                </div>
-                <div className="flex items-center justify-center gap-2 mt-1">
-                  <button onClick={() => nudge(0, 0, -1)} className="border border-line bg-bg px-2 py-1 text-[10px] font-bold text-dim hover:text-toxic">? -1deg</button>
-                  <button onClick={() => nudge(0, 0, 1)} className="border border-line bg-bg px-2 py-1 text-[10px] font-bold text-dim hover:text-toxic">? +1deg</button>
-                </div>
-              </div>
-
-              {/* ALIGNMENT LOCKS & LAYERING */}
-              <div className="flex flex-col gap-2 border-t border-line pt-3">
-                <span className="text-xs font-bold text-dim uppercase">ALIGNMENT & LAYERING:</span>
-                
+                <span className="text-xs font-bold text-dim uppercase">ALIGNMENT LOCKS:</span>
                 <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
                   <span className="text-ink font-bold">LOCK GROUND BASELINE</span>
                   <input type="checkbox" checked={lockGround} onChange={(e) => setLockGround(e.target.checked)} className="accent-toxic" />
                 </label>
-
                 <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
                   <span className="text-ink font-bold">SYNC WHEEL PAIR</span>
                   <input type="checkbox" checked={syncWheels} onChange={(e) => setSyncWheels(e.target.checked)} className="accent-toxic" />
                 </label>
-
                 <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
                   <span className="text-ink font-bold">RIDER BEHIND CHASSIS</span>
                   <input type="checkbox" checked={riderBehind} onChange={(e) => setRiderBehind(e.target.checked)} className="accent-toxic" />
@@ -535,7 +530,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
             </button>
           </div>
 
-          {/* RIGHT SIDEBAR: CANVAS WORKSPACE */}
+          {/* RIGHT CANVAS WORKSPACE */}
           <div className="col-span-8 flex flex-col items-center justify-center bg-black/95 p-4 relative overflow-hidden">
             <canvas
               ref={canvasRef}
@@ -549,8 +544,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
               className="cursor-crosshair border border-line bg-black shadow-2xl"
             />
             <div className="mt-2 text-[10px] text-dim font-mono flex items-center gap-4">
-              <span>* Select element from left sidebar, then drag directly with mouse</span>
-              <span>* Use Nudge pad for 1px adjustments</span>
+              <span>* Click on any item directly on the canvas to pick up and drag freely</span>
+              <span>* Right-Click Drag: Pan Camera</span>
             </div>
           </div>
         </div>
