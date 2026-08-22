@@ -46,7 +46,34 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   const startMouseWorldRef = useRef({ x: 0, y: 0 });
   const startConfigRef = useRef({ ...config });
 
-  // Preload game images
+  // KEYBOARD ARROW KEYS 1PX / 10PX NUDGE LISTENER
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing inside a text input box
+      if (document.activeElement?.tagName === "INPUT") return;
+
+      const step = e.shiftKey ? 10 : 1;
+
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        nudge(0, -step);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        nudge(0, step);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        nudge(-step, 0);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        nudge(step, 0);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, selected, config]);
   useEffect(() => {
     if (!isOpen) return;
     const assets = {
@@ -516,74 +543,91 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 </label>
               </div>
 
-              {/* TRANSFORM SLIDERS FOR SELECTED INDEPENDENT ITEM */}
+              {/* TRANSFORM SLIDERS & NUMERIC INPUTS */}
               <div className="flex flex-col gap-3 border-t border-line pt-3">
-                <span className="text-xs font-bold text-toxic uppercase">{selected} CONTROLS:</span>
+                <span className="text-xs font-bold text-toxic uppercase">{selected} NUMERIC VALUE INPUTS:</span>
 
                 {selected === "CHASSIS" && (
                   <>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">BIKE X ({config.chassisX}px)</span>
-                      <input type="range" min="-400" max="400" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">BIKE X:</span>
+                      <input type="number" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">BIKE Y ({config.chassisY}px)</span>
-                      <input type="range" min="-400" max="400" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">BIKE Y:</span>
+                      <input type="number" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">BIKE SCALE ({Math.round(config.bikeScale * 100)}%)</span>
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">SCALE:</span>
+                      <input type="number" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
                     </div>
                   </>
                 )}
 
                 {selected === "REAR_WHEEL" && (
                   <>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">REAR WHEEL X ({config.rearWheelX}px)</span>
-                      <input type="range" min="-400" max="400" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">REAR X:</span>
+                      <input type="number" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">REAR WHEEL Y ({config.rearWheelY}px)</span>
-                      <input type="range" min="-400" max="400" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">REAR Y:</span>
+                      <input type="number" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">WHEEL SIZE ({Math.round(config.rearWheelScale * 100)}%)</span>
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">SCALE:</span>
+                      <input type="number" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
                     </div>
                   </>
                 )}
 
                 {selected === "FRONT_WHEEL" && (
                   <>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">FRONT WHEEL X ({config.frontWheelX}px)</span>
-                      <input type="range" min="-400" max="400" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">FRONT X:</span>
+                      <input type="number" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">FRONT WHEEL Y ({config.frontWheelY}px)</span>
-                      <input type="range" min="-400" max="400" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">FRONT Y:</span>
+                      <input type="number" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">WHEEL SIZE ({Math.round(config.frontWheelScale * 100)}%)</span>
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">SCALE:</span>
+                      <input type="number" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
                     </div>
                   </>
                 )}
 
                 {selected === "RIDER" && (
                   <>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">RIDER X ({config.riderX}px)</span>
-                      <input type="range" min="-400" max="400" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">RIDER X:</span>
+                      <input type="number" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">RIDER Y ({config.riderY}px)</span>
-                      <input type="range" min="-400" max="400" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">RIDER Y:</span>
+                      <input type="number" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-400" max="400" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">RIDER SIZE ({Math.round(config.riderScale * 100)}%)</span>
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">SCALE:</span>
+                      <input type="number" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">ANGLE:</span>
+                      <input type="number" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
+                      <input type="range" min="-180" max="180" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value))} className="w-24 accent-toxic" />
                     </div>
                   </>
                 )}
