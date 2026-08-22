@@ -204,7 +204,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.fillText("TRACK GROUND BASELINE (Y: 620)", 10, groundY - 6);
 
     const centerX = canvas.width / 2;
-    const centerY = groundY - 60;
+    const centerY = groundY - 38;
 
     const { bike, wheel, rider, flag } = imagesRef.current;
 
@@ -416,7 +416,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
     const groundY = 360;
     const centerX = canvas.width / 2;
-    const centerY = groundY - 60;
+    const centerY = groundY - 38;
     const { bike, wheel, rider } = imagesRef.current;
 
     let newlySelected: ElementKey = selected;
