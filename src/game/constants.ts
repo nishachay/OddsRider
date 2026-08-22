@@ -115,13 +115,13 @@ export const SPRITE = {
   rearWheelScale: 0.52,
   frontWheelScale: 0.52,
 
-  // WHEEL IS THE BASE (Offsets measured from Rear Wheel Center (0,0))
+  // WHEEL IS THE BASE (Wheel hubs locked into axle sockets & baseline)
   chassisOffsetX: 55.2,
-  chassisOffsetY: -8.5,
+  chassisOffsetY: 5.0,
   frontWheelOffsetX: 112.2,
   frontWheelOffsetY: 0.7,
   riderOffsetX: 55.2,
-  riderOffsetY: -23.8,
+  riderOffsetY: -10.3,
 
   riderScale: 0.4,
   ragdollScale: 1.0,

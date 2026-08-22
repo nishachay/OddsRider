@@ -16,12 +16,12 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ...SPRITE,
     chassisX: 0,
     chassisY: 0,
-    rearWheelX: SPRITE.rearWheelOffsetX,
-    rearWheelY: SPRITE.rearWheelOffsetY,
+    rearWheelX: 0,
+    rearWheelY: 0,
     frontWheelX: SPRITE.frontWheelOffsetX,
     frontWheelY: SPRITE.frontWheelOffsetY,
-    riderX: SPRITE.seatLocalX,
-    riderY: SPRITE.seatLocalY,
+    riderX: SPRITE.riderOffsetX,
+    riderY: SPRITE.riderOffsetY,
     flagX: -180,
     flagY: 0,
     // Angles
@@ -481,13 +481,14 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     if (selected === "CHASSIS") {
       updateVal("chassisX", fix(startConfigRef.current.chassisX + dx));
       updateVal("chassisY", fix(startConfigRef.current.chassisY + dy));
+      // Always keep Rider locked to Chassis seat during movement
+      updateVal("riderX", fix(startConfigRef.current.riderX + dx));
+      updateVal("riderY", fix(startConfigRef.current.riderY + dy));
       if (isGrouped) {
         updateVal("rearWheelX", fix(startConfigRef.current.rearWheelX + dx));
         updateVal("rearWheelY", fix(startConfigRef.current.rearWheelY + dy));
         updateVal("frontWheelX", fix(startConfigRef.current.frontWheelX + dx));
         updateVal("frontWheelY", fix(startConfigRef.current.frontWheelY + dy));
-        updateVal("riderX", fix(startConfigRef.current.riderX + dx));
-        updateVal("riderY", fix(startConfigRef.current.riderY + dy));
       }
     } else if (selected === "REAR_WHEEL") {
       updateVal("rearWheelX", fix(startConfigRef.current.rearWheelX + dx));
