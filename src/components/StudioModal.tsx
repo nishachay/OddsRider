@@ -210,8 +210,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     // RENDER RIDER
     const renderRider = () => {
       if (!rider) return;
-      const rw = rider.width * config.riderScale * 0.5;
-      const rh = rider.height * config.riderScale * 0.5;
+      const rw = rider.width * config.riderScale;
+      const rh = rider.height * config.riderScale;
       const rx = centerX + config.riderX;
       const ry = centerY + config.riderY;
 
@@ -230,8 +230,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
     // A. FLAG
     if (flag) {
-      const fw = flag.width * config.flagScale * 0.5;
-      const fh = flag.height * config.flagScale * 0.5;
+      const fw = flag.width * config.flagScale;
+      const fh = flag.height * config.flagScale;
       const fx = centerX + config.flagX;
       const fy = groundY - fh + config.flagY;
       ctx.save();
@@ -247,8 +247,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     const rearX = centerX + config.rearWheelX;
     const rearY = centerY + config.rearWheelY;
     if (wheel) {
-      const ww = wheel.width * config.rearWheelScale * 0.5;
-      const wh = wheel.height * config.rearWheelScale * 0.5;
+      const ww = wheel.width * config.rearWheelScale;
+      const wh = wheel.height * config.rearWheelScale;
 
       ctx.save();
       ctx.translate(rearX, rearY);
@@ -271,8 +271,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     const frontX = centerX + config.frontWheelX;
     const frontY = centerY + config.frontWheelY;
     if (wheel) {
-      const ww = wheel.width * config.frontWheelScale * 0.5;
-      const wh = wheel.height * config.frontWheelScale * 0.5;
+      const ww = wheel.width * config.frontWheelScale;
+      const wh = wheel.height * config.frontWheelScale;
 
       ctx.save();
       ctx.translate(frontX, frontY);
@@ -295,8 +295,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     const chassisWorldX = centerX + config.chassisX;
     const chassisWorldY = centerY + config.chassisY;
     if (bike) {
-      const bw = bike.width * config.bikeScale * 0.5;
-      const bh = bike.height * config.bikeScale * 0.5;
+      const bw = bike.width * config.bikeScale;
+      const bh = bike.height * config.bikeScale;
       const bx = chassisWorldX - bw * config.bikeOriginX;
       const by = chassisWorldY - bh * config.bikeOriginY;
 
@@ -405,8 +405,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
 
     // Hit Testing each independent object directly
     if (rider) {
-      const rw = Math.max(40, rider.width * config.riderScale * 0.5);
-      const rh = Math.max(40, rider.height * config.riderScale * 0.5);
+      const rw = Math.max(40, rider.width * config.riderScale);
+      const rh = Math.max(40, rider.height * config.riderScale);
       const rx = centerX + config.riderX;
       const ry = centerY + config.riderY;
       if (Math.abs(pos.x - rx) < rw && Math.abs(pos.y - ry) < rh) {
@@ -414,7 +414,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       }
     }
     if (wheel) {
-      const ww = Math.max(40, wheel.width * config.rearWheelScale * 0.5);
+      const ww = Math.max(40, wheel.width * config.rearWheelScale);
       const rearX = centerX + config.rearWheelX;
       const rearY = centerY + config.rearWheelY;
       if (Math.hypot(pos.x - rearX, pos.y - rearY) < ww) {
@@ -428,8 +428,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       }
     }
     if (bike) {
-      const bw = Math.max(50, bike.width * config.bikeScale * 0.5);
-      const bh = Math.max(50, bike.height * config.bikeScale * 0.5);
+      const bw = Math.max(50, bike.width * config.bikeScale);
+      const bh = Math.max(50, bike.height * config.bikeScale);
       const bx = centerX + config.chassisX;
       const by = centerY + config.chassisY;
       if (Math.abs(pos.x - bx) < bw && Math.abs(pos.y - by) < bh) {
