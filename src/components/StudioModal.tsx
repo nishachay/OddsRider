@@ -397,6 +397,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     const centerY = groundY - 60;
     const { bike, wheel, rider } = imagesRef.current;
 
+    let newlySelected: ElementKey = selected;
+
     // Hit Testing each independent object directly
     if (rider) {
       const rw = Math.max(40, rider.width * config.riderScale * 0.5);
@@ -404,7 +406,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       const rx = centerX + config.riderX;
       const ry = centerY + config.riderY;
       if (Math.abs(pos.x - rx) < rw && Math.abs(pos.y - ry) < rh) {
-        setSelected("RIDER");
+        newlySelected = "RIDER";
       }
     }
     if (wheel) {
@@ -412,13 +414,13 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       const rearX = centerX + config.rearWheelX;
       const rearY = centerY + config.rearWheelY;
       if (Math.hypot(pos.x - rearX, pos.y - rearY) < ww) {
-        setSelected("REAR_WHEEL");
+        newlySelected = "REAR_WHEEL";
       }
 
       const frontX = centerX + config.frontWheelX;
       const frontY = centerY + config.frontWheelY;
       if (Math.hypot(pos.x - frontX, pos.y - frontY) < ww) {
-        setSelected("FRONT_WHEEL");
+        newlySelected = "FRONT_WHEEL";
       }
     }
     if (bike) {
@@ -427,11 +429,13 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       const bx = centerX + config.chassisX;
       const by = centerY + config.chassisY;
       if (Math.abs(pos.x - bx) < bw && Math.abs(pos.y - by) < bh) {
-        setSelected("CHASSIS");
+        newlySelected = "CHASSIS";
       }
     }
 
-    if (!lockedMap[selected]) {
+    setSelected(newlySelected);
+
+    if (!lockedMap[newlySelected]) {
       isDraggingRef.current = true;
       startMouseWorldRef.current = pos;
       startConfigRef.current = { ...config };
