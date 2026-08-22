@@ -10,9 +10,11 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   const [syncWheels, setSyncWheels] = useState(true);
   const [riderBehind, setRiderBehind] = useState(false);
   
-  // Config state
+  // Config state with unlimited pixel X & Y offsets for Chassis
   const [config, setConfig] = useState({
     ...SPRITE,
+    bikeOffsetX: 0,
+    bikeOffsetY: 0,
     bikeAngle: 0,
     rearWheelAngle: 0,
     frontWheelAngle: 0,
@@ -85,16 +87,16 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     // 2. PRECISION GRID
     ctx.strokeStyle = "#16181d";
     ctx.lineWidth = 1 / zoom;
-    for (let x = -800; x <= canvas.width + 800; x += 20) {
+    for (let x = -1000; x <= canvas.width + 1000; x += 20) {
       ctx.beginPath();
-      ctx.moveTo(x, -800);
-      ctx.lineTo(x, canvas.height + 800);
+      ctx.moveTo(x, -1000);
+      ctx.lineTo(x, canvas.height + 1000);
       ctx.stroke();
     }
-    for (let y = -800; y <= canvas.height + 800; y += 20) {
+    for (let y = -1000; y <= canvas.height + 1000; y += 20) {
       ctx.beginPath();
-      ctx.moveTo(-800, y);
-      ctx.lineTo(canvas.width + 800, y);
+      ctx.moveTo(-1000, y);
+      ctx.lineTo(canvas.width + 1000, y);
       ctx.stroke();
     }
 
@@ -104,17 +106,17 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.fillStyle = "#6e727e";
     ctx.font = `${Math.round(10 / Math.max(0.6, zoom))}px monospace`;
 
-    for (let x = -800; x <= canvas.width + 800; x += 100) {
+    for (let x = -1000; x <= canvas.width + 1000; x += 100) {
       ctx.beginPath();
-      ctx.moveTo(x, -800);
-      ctx.lineTo(x, canvas.height + 800);
+      ctx.moveTo(x, -1000);
+      ctx.lineTo(x, canvas.height + 1000);
       ctx.stroke();
       ctx.fillText(`${x}px`, x + 4, 14);
     }
-    for (let y = -800; y <= canvas.height + 800; y += 100) {
+    for (let y = -1000; y <= canvas.height + 1000; y += 100) {
       ctx.beginPath();
-      ctx.moveTo(-800, y);
-      ctx.lineTo(canvas.width + 800, y);
+      ctx.moveTo(-1000, y);
+      ctx.lineTo(canvas.width + 1000, y);
       ctx.stroke();
       ctx.fillText(`${y}px`, 4, y - 4);
     }
@@ -124,15 +126,16 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.strokeStyle = "#b6ff00";
     ctx.lineWidth = 2 / zoom;
     ctx.beginPath();
-    ctx.moveTo(-800, groundY);
-    ctx.lineTo(canvas.width + 800, groundY);
+    ctx.moveTo(-1000, groundY);
+    ctx.lineTo(canvas.width + 1000, groundY);
     ctx.stroke();
 
     ctx.fillStyle = "#b6ff00";
     ctx.fillText("TRACK GROUND BASELINE (Y: 620)", 10, groundY - 6);
 
-    const centerX = canvas.width / 2;
-    const centerY = groundY - 60;
+    // Bike Center Position with Pixel Offsets
+    const centerX = canvas.width / 2 + config.bikeOffsetX;
+    const centerY = groundY - 60 + config.bikeOffsetY;
 
     const { bike, wheel, rider, flag } = imagesRef.current;
 
@@ -161,7 +164,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     if (flag) {
       const fw = flag.width * config.flagScale * 0.5;
       const fh = flag.height * config.flagScale * 0.5;
-      const fx = centerX - 180;
+      const fx = canvas.width / 2 - 180;
       const fy = groundY - fh;
       ctx.save();
       ctx.translate(fx, fy + fh / 2);
@@ -301,7 +304,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     return { x: wx, y: wy };
   };
 
-  // 100% FREE MOUSE CLICK & PICK & DRAG ENGINE
+  // UNLIMITED 1-TO-1 PIXEL MOUSE DRAG ENGINE FOR ALL SIZES
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -314,38 +317,38 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     }
 
     const groundY = 360;
-    const centerX = canvas.width / 2;
-    const centerY = groundY - 60;
+    const centerX = canvas.width / 2 + config.bikeOffsetX;
+    const centerY = groundY - 60 + config.bikeOffsetY;
     const { bike, wheel, rider } = imagesRef.current;
 
-    // Hit Testing to Auto-Select Clicked Element Directly on Canvas
+    // Minimum Pick Radius of 40px so even tiny scaled elements are easy to grab!
     if (rider) {
-      const rw = rider.width * config.riderScale * 0.5;
-      const rh = rider.height * config.riderScale * 0.5;
+      const rw = Math.max(40, rider.width * config.riderScale * 0.5);
+      const rh = Math.max(40, rider.height * config.riderScale * 0.5);
       const rx = centerX + config.seatLocalX;
       const ry = centerY + config.seatLocalY;
-      if (Math.abs(pos.x - rx) < rw / 2 && Math.abs(pos.y - ry) < rh / 2) {
+      if (Math.abs(pos.x - rx) < rw && Math.abs(pos.y - ry) < rh) {
         setSelected("RIDER");
       }
     }
     if (wheel) {
-      const ww = wheel.width * config.rearWheelScale * 0.5;
+      const ww = Math.max(40, wheel.width * config.rearWheelScale * 0.5);
       const rearX = centerX - 56 + config.rearWheelOffsetX;
       const rearY = centerY + 18 + config.rearWheelOffsetY;
-      if (Math.hypot(pos.x - rearX, pos.y - rearY) < ww / 2) {
+      if (Math.hypot(pos.x - rearX, pos.y - rearY) < ww) {
         setSelected("REAR_WHEEL");
       }
 
       const frontX = centerX + 56 + config.frontWheelOffsetX;
       const frontY = centerY + 18 + config.frontWheelOffsetY;
-      if (Math.hypot(pos.x - frontX, pos.y - frontY) < ww / 2) {
+      if (Math.hypot(pos.x - frontX, pos.y - frontY) < ww) {
         setSelected("FRONT_WHEEL");
       }
     }
     if (bike) {
-      const bw = bike.width * config.bikeScale * 0.5;
-      const bh = bike.height * config.bikeScale * 0.5;
-      if (Math.abs(pos.x - centerX) < bw / 2 && Math.abs(pos.y - centerY) < bh / 2) {
+      const bw = Math.max(50, bike.width * config.bikeScale * 0.5);
+      const bh = Math.max(50, bike.height * config.bikeScale * 0.5);
+      if (Math.abs(pos.x - centerX) < bw && Math.abs(pos.y - centerY) < bh) {
         setSelected("CHASSIS");
       }
     }
@@ -366,10 +369,10 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     const dx = pos.x - startMouseWorldRef.current.x;
     const dy = pos.y - startMouseWorldRef.current.y;
 
-    // 1-TO-1 FREE MOUSE POSITION MOVEMENT
+    // UNLIMITED 1-TO-1 PIXEL MOVEMENT IN WORLD SPACE
     if (selected === "CHASSIS") {
-      updateVal("bikeOriginY", parseFloat(Math.max(0.1, startConfigRef.current.bikeOriginY + dy * 0.003).toFixed(3)));
-      updateVal("bikeScale", parseFloat(Math.max(0.1, startConfigRef.current.bikeScale + dx * 0.003).toFixed(2)));
+      updateVal("bikeOffsetX", Math.round(startConfigRef.current.bikeOffsetX + dx));
+      updateVal("bikeOffsetY", Math.round(startConfigRef.current.bikeOffsetY + dy));
     } else if (selected === "REAR_WHEEL") {
       updateVal("rearWheelOffsetX", Math.round(startConfigRef.current.rearWheelOffsetX + dx));
       updateVal("rearWheelOffsetY", Math.round(startConfigRef.current.rearWheelOffsetY + dy));
@@ -380,7 +383,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       updateVal("seatLocalX", Math.round(startConfigRef.current.seatLocalX + dx));
       updateVal("seatLocalY", Math.round(startConfigRef.current.seatLocalY + dy));
     } else if (selected === "FLAG") {
-      updateVal("flagScale", parseFloat(Math.max(0.1, startConfigRef.current.flagScale + dx * 0.005).toFixed(2)));
+      updateVal("flagScale", parseFloat(Math.max(0.05, startConfigRef.current.flagScale + dx * 0.005).toFixed(2)));
     }
   };
 
@@ -392,7 +395,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const factor = e.deltaY > 0 ? 0.9 : 1.1;
-    setZoom((z) => parseFloat(Math.max(0.3, Math.min(5.0, z * factor)).toFixed(2)));
+    setZoom((z) => parseFloat(Math.max(0.2, Math.min(6.0, z * factor)).toFixed(2)));
   };
 
   const saveAndCommit = async () => {
@@ -410,15 +413,15 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
         <div className="flex items-center justify-between border-b border-line bg-bg/95 px-4 py-2.5">
           <div className="flex items-center gap-3">
             <span className="h-2.5 w-2.5 bg-toxic animate-pulse"></span>
-            <span className="text-xs font-bold tracking-widest text-toxic uppercase">FREE MOUSE CANVAS STUDIO</span>
+            <span className="text-xs font-bold tracking-widest text-toxic uppercase">UNLIMITED MOUSE CANVAS STUDIO</span>
           </div>
 
           {/* CANVAS CAMERA CONTROLS */}
           <div className="flex items-center gap-3 border border-line bg-black/50 px-3 py-1 text-xs">
             <span className="text-dim font-bold">ZOOM:</span>
-            <button onClick={() => setZoom((z) => parseFloat(Math.max(0.3, z - 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">-</button>
+            <button onClick={() => setZoom((z) => parseFloat(Math.max(0.2, z - 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">-</button>
             <span className="w-12 text-center font-bold text-toxic tabular-nums">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom((z) => parseFloat(Math.min(5.0, z + 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">+</button>
+            <button onClick={() => setZoom((z) => parseFloat(Math.min(6.0, z + 0.2).toFixed(2)))} className="border border-line bg-bg px-2 py-0.5 font-bold text-ink hover:border-toxic hover:text-toxic">+</button>
             <button onClick={() => { setZoom(1.0); setPan({ x: 0, y: 0 }); }} className="ml-2 border border-line bg-bg px-2 py-0.5 text-[10px] font-bold text-dim hover:text-ink">RESET VIEW</button>
           </div>
 
@@ -475,12 +478,16 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 {selected === "CHASSIS" && (
                   <>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-dim font-bold">HEIGHT (Origin Y: {config.bikeOriginY})</span>
-                      <input type="range" min="0.1" max="1.2" step="0.005" value={config.bikeOriginY} onChange={(e) => updateVal("bikeOriginY", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                      <span className="text-dim font-bold">CHASSIS X ({config.bikeOffsetX}px)</span>
+                      <input type="range" min="-400" max="400" value={config.bikeOffsetX} onChange={(e) => updateVal("bikeOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-dim font-bold">CHASSIS Y ({config.bikeOffsetY}px)</span>
+                      <input type="range" min="-400" max="400" value={config.bikeOffsetY} onChange={(e) => updateVal("bikeOffsetY", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">BIKE SCALE ({Math.round(config.bikeScale * 100)}%)</span>
-                      <input type="range" min="0.1" max="2.0" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                   </>
                 )}
@@ -489,11 +496,11 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                   <>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">SEAT X ({config.seatLocalX}px)</span>
-                      <input type="range" min="-200" max="200" value={config.seatLocalX} onChange={(e) => updateVal("seatLocalX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <input type="range" min="-300" max="300" value={config.seatLocalX} onChange={(e) => updateVal("seatLocalX", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">SEAT Y ({config.seatLocalY}px)</span>
-                      <input type="range" min="-200" max="200" value={config.seatLocalY} onChange={(e) => updateVal("seatLocalY", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <input type="range" min="-300" max="300" value={config.seatLocalY} onChange={(e) => updateVal("seatLocalY", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">LEAN ANGLE ({config.riderAngleOffset}deg)</span>
@@ -506,15 +513,15 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                   <>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">WHEEL SIZE ({Math.round(config.rearWheelScale * 100)}%)</span>
-                      <input type="range" min="0.1" max="2.0" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
+                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">REAR OFFSET X ({config.rearWheelOffsetX}px)</span>
-                      <input type="range" min="-150" max="150" value={config.rearWheelOffsetX} onChange={(e) => updateVal("rearWheelOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <input type="range" min="-300" max="300" value={config.rearWheelOffsetX} onChange={(e) => updateVal("rearWheelOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-dim font-bold">FRONT OFFSET X ({config.frontWheelOffsetX}px)</span>
-                      <input type="range" min="-150" max="150" value={config.frontWheelOffsetX} onChange={(e) => updateVal("frontWheelOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
+                      <input type="range" min="-300" max="300" value={config.frontWheelOffsetX} onChange={(e) => updateVal("frontWheelOffsetX", parseInt(e.target.value))} className="w-32 accent-toxic" />
                     </div>
                   </>
                 )}
@@ -544,7 +551,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
               className="cursor-crosshair border border-line bg-black shadow-2xl"
             />
             <div className="mt-2 text-[10px] text-dim font-mono flex items-center gap-4">
-              <span>* Click on any item directly on the canvas to pick up and drag freely</span>
+              <span>* Unlimited 1-to-1 pixel mouse dragging for all sizes</span>
               <span>* Right-Click Drag: Pan Camera</span>
             </div>
           </div>
