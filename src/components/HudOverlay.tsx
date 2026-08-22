@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { bus, EV } from '../game/bus';
+import StudioModal from './StudioModal';
 
 function Key({ label }: { label: string }) {
   return (
@@ -26,6 +27,7 @@ export default function HudOverlay() {
   const [nitro, setNitro] = useState(0);
   const [crashFlash, setCrashFlash] = useState(false);
   const [hintsVisible, setHintsVisible] = useState(true);
+  const [studioOpen, setStudioOpen] = useState(false);
 
   useEffect(() => {
     const offSpeed = bus.on<number>(EV.SPEED, setSpeed);
@@ -99,6 +101,19 @@ export default function HudOverlay() {
           </div>
         </div>
       </div>
+
+      {/* top-right: Studio Modal trigger */}
+      <div className="pointer-events-auto absolute top-4 right-4">
+        <button
+          onClick={() => setStudioOpen(true)}
+          className="border border-toxic bg-bg/90 px-3 py-2 font-mono text-xs font-bold tracking-widest text-toxic shadow-lg transition-all hover:bg-toxic hover:text-bg"
+        >
+          [ OPEN STUDIO EDITOR ]
+        </button>
+      </div>
+
+      {/* Studio Modal Component */}
+      <StudioModal isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
 
       {/* crash flash */}
       <div
