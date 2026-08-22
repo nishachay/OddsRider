@@ -5,19 +5,19 @@ import GUI from 'lil-gui';
 
 const P = PALETTE;
 
-// Mutable copy of SPRITE for live tweaking. Defaulted to high-res baseline guesses.
+// Mutable copy of SPRITE for live tweaking. Defaults adapted for new ~1000px assets.
 export const LIVE_SPRITE = { 
   ...SPRITE, 
-  bikeScale: SPRITE.bikeScale, 
-  bikeOriginX: SPRITE.bikeOriginX, 
-  bikeOriginY: SPRITE.bikeOriginY,
-  wheelScale: SPRITE.wheelScale,
-  riderScale: SPRITE.riderScale,
-  ragdollScale: SPRITE.ragdollScale,
-  riderOriginY: SPRITE.riderOriginY,
+  bikeScale: 0.15, 
+  bikeOriginX: 0.5, 
+  bikeOriginY: 0.7,
+  wheelScale: 0.12,
+  riderScale: 0.15,
+  ragdollScale: 0.15,
+  riderOriginY: 0.8,
   riderAngleOffset: 0,
-  seatLocalX: SPRITE.seatLocalX,
-  seatLocalY: SPRITE.seatLocalY
+  seatLocalX: 0,
+  seatLocalY: -20
 };
 
 // We will only create the GUI once
@@ -59,7 +59,7 @@ export class BikeRenderer {
       });
 
       const f = gui.addFolder('Sprites');
-      f.add(LIVE_SPRITE, 'bikeScale', 0.1, 1.5, 0.01).onChange((v: number) => {
+      f.add(LIVE_SPRITE, 'bikeScale', 0.01, 1.0, 0.001).onChange((v: number) => {
         this.bikeSprite.setScale(v);
       });
       f.add(LIVE_SPRITE, 'bikeOriginX', 0.0, 1.0, 0.01).onChange((v: number) => {
@@ -68,11 +68,11 @@ export class BikeRenderer {
       f.add(LIVE_SPRITE, 'bikeOriginY', 0.0, 1.0, 0.01).onChange((v: number) => {
         this.bikeSprite.setOrigin(LIVE_SPRITE.bikeOriginX, v);
       });
-      f.add(LIVE_SPRITE, 'wheelScale', 0.1, 1.5, 0.01).onChange((v: number) => {
+      f.add(LIVE_SPRITE, 'wheelScale', 0.01, 1.0, 0.001).onChange((v: number) => {
         this.wheelBackSprite.setScale(v);
         this.wheelFrontSprite.setScale(v);
       });
-      f.add(LIVE_SPRITE, 'riderScale', 0.1, 1.5, 0.01).onChange((v: number) => {
+      f.add(LIVE_SPRITE, 'riderScale', 0.01, 1.0, 0.001).onChange((v: number) => {
         this.riderSprite.setScale(v);
         this.ragdollSprite.setScale(v);
       });
