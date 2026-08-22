@@ -46,12 +46,40 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   const startMouseWorldRef = useRef({ x: 0, y: 0 });
   const startConfigRef = useRef({ ...config });
 
+  // Asset Lock State (Freezes asset from accidental edits)
+  const [lockedMap, setLockedMap] = useState<{ [key in ElementKey]: boolean }>({
+    CHASSIS: false,
+    REAR_WHEEL: false,
+    FRONT_WHEEL: false,
+    RIDER: false,
+    FLAG: false
+  });
+
+  // Nudge Function
+  const nudge = (dx: number, dy: number, dAngle = 0) => {
+    if (lockedMap[selected]) return; // Blocked if asset is locked!
+
+    setConfig((prev) => {
+      if (selected === "CHASSIS") {
+        return { ...prev, chassisX: prev.chassisX + dx, chassisY: prev.chassisY + dy, bikeAngle: prev.bikeAngle + dAngle };
+      } else if (selected === "REAR_WHEEL") {
+        return { ...prev, rearWheelX: prev.rearWheelX + dx, rearWheelY: prev.rearWheelY + dy, rearWheelAngle: prev.rearWheelAngle + dAngle };
+      } else if (selected === "FRONT_WHEEL") {
+        return { ...prev, frontWheelX: prev.frontWheelX + dx, frontWheelY: prev.frontWheelY + dy, frontWheelAngle: prev.frontWheelAngle + dAngle };
+      } else if (selected === "RIDER") {
+        return { ...prev, riderX: prev.riderX + dx, riderY: prev.riderY + dy, riderAngleOffset: prev.riderAngleOffset + dAngle };
+      } else if (selected === "FLAG") {
+        return { ...prev, flagX: prev.flagX + dx, flagY: prev.flagY + dy, flagAngle: prev.flagAngle + dAngle };
+      }
+      return prev;
+    });
+  };
+
   // KEYBOARD ARROW KEYS 1PX / 10PX NUDGE LISTENER
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if user is typing inside a text input box
       if (document.activeElement?.tagName === "INPUT") return;
 
       const step = e.shiftKey ? 10 : 1;
@@ -283,7 +311,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     ctx.restore();
   }, [isOpen, imagesLoaded, config, selected, zoom, pan, riderBehind]);
 
-  // Figma Bounding Handles
+  // Figma Bounding Handles (Red when Locked, Neon Green when Unlocked)
   const drawSelectionBox = (
     ctx: CanvasRenderingContext2D,
     x: number,
@@ -291,18 +319,20 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
     w: number,
     h: number,
     angle: number,
-    currentZoom: number
+    currentZoom: number,
+    isLocked?: boolean
   ) => {
     ctx.save();
     ctx.translate(x + w / 2, y + h / 2);
     ctx.rotate((angle * Math.PI) / 180);
 
-    ctx.strokeStyle = "#b6ff00";
+    const strokeColor = isLocked ? "#ff3355" : "#b6ff00";
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 2 / currentZoom;
     ctx.strokeRect(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8);
 
     ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#b6ff00";
+    ctx.strokeStyle = strokeColor;
     ctx.lineWidth = 1 / currentZoom;
     const corners = [
       { x: -w / 2 - 4, y: -h / 2 - 4 },
@@ -320,6 +350,8 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
   };
 
   const updateVal = (key: keyof typeof config, val: number) => {
+    if (lockedMap[selected]) return; // Blocked if asset is locked!
+
     setConfig((prev) => {
       const next = { ...prev, [key]: val };
       if (syncWheels && (key === "rearWheelScale" || key === "frontWheelScale" || key === "wheelScale")) {
@@ -329,6 +361,10 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       }
       return next;
     });
+  };
+
+  const toggleLock = (key: ElementKey) => {
+    setLockedMap((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Convert Screen Mouse Coordinates to Canvas World Coordinates
@@ -395,9 +431,11 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       }
     }
 
-    isDraggingRef.current = true;
-    startMouseWorldRef.current = pos;
-    startConfigRef.current = { ...config };
+    if (!lockedMap[selected]) {
+      isDraggingRef.current = true;
+      startMouseWorldRef.current = pos;
+      startConfigRef.current = { ...config };
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -406,7 +444,7 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
       return;
     }
 
-    if (!isDraggingRef.current) return;
+    if (!isDraggingRef.current || lockedMap[selected]) return;
     const pos = getCanvasWorldPos(e);
     const dx = pos.x - startMouseWorldRef.current.x;
     const dy = pos.y - startMouseWorldRef.current.y;
@@ -505,25 +543,44 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
           {/* LEFT SIDEBAR */}
           <div className="col-span-4 flex flex-col justify-between border-r border-line bg-bg/60 p-4 overflow-y-auto">
             <div className="flex flex-col gap-4">
-              <span className="text-xs font-bold text-dim uppercase">INDEPENDENT PIECE SELECTOR:</span>
+              <span className="text-xs font-bold text-dim uppercase">SELECT & LOCK ELEMENT:</span>
               <div className="grid grid-cols-2 gap-2">
                 {(["CHASSIS", "REAR_WHEEL", "FRONT_WHEEL", "RIDER", "FLAG"] as ElementKey[]).map((key) => (
                   <button
                     key={key}
                     onClick={() => setSelected(key)}
-                    className={`border p-2 text-xs font-bold transition-all ${
+                    className={`border p-2 text-xs font-bold transition-all flex items-center justify-between ${
                       selected === key
                         ? "border-toxic bg-toxic text-bg"
                         : "border-line bg-bg text-ink hover:border-dim hover:text-toxic"
                     }`}
                   >
-                    {key === "CHASSIS" && "[ ??? CHASSIS ]"}
-                    {key === "REAR_WHEEL" && "[ ?? REAR WHEEL ]"}
-                    {key === "FRONT_WHEEL" && "[ ?? FRONT WHEEL ]"}
-                    {key === "RIDER" && "[ ?? RIDER ]"}
-                    {key === "FLAG" && "[ ?? FLAG ]"}
+                    <span>
+                      {key === "CHASSIS" && "[ 🏍️ CHASSIS ]"}
+                      {key === "REAR_WHEEL" && "[ 🛞 REAR ]"}
+                      {key === "FRONT_WHEEL" && "[ 🛞 FRONT ]"}
+                      {key === "RIDER" && "[ 👤 RIDER ]"}
+                      {key === "FLAG" && "[ 🚩 FLAG ]"}
+                    </span>
+                    {lockedMap[key] && <span className="text-crimson font-bold">🔒</span>}
                   </button>
                 ))}
+              </div>
+
+              {/* ASSET LOCK TOGGLE CARD */}
+              <div className="flex flex-col gap-2 border-t border-line pt-3">
+                <span className="text-xs font-bold text-dim uppercase">SELECTED ASSET LOCK:</span>
+                <label className="flex items-center justify-between border border-line bg-bg p-2 cursor-pointer text-xs">
+                  <span className={`font-bold ${lockedMap[selected] ? "text-crimson" : "text-toxic"}`}>
+                    {lockedMap[selected] ? "🔒 ASSET LOCKED (FROZEN)" : "🔓 ASSET UNLOCKED (EDITABLE)"}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={lockedMap[selected]}
+                    onChange={() => toggleLock(selected)}
+                    className="accent-crimson"
+                  />
+                </label>
               </div>
 
               {/* ASSEMBLY MODE & TOGGLES */}
@@ -543,26 +600,31 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                 </label>
               </div>
 
-              {/* TRANSFORM SLIDERS & NUMERIC INPUTS */}
+              {/* TRANSFORM SLIDERS & NUMERIC INPUTS WITH ROTATION */}
               <div className="flex flex-col gap-3 border-t border-line pt-3">
-                <span className="text-xs font-bold text-toxic uppercase">{selected} NUMERIC VALUE INPUTS:</span>
+                <span className="text-xs font-bold text-toxic uppercase">{selected} CONTROLS & ROTATION:</span>
 
                 {selected === "CHASSIS" && (
                   <>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">BIKE X:</span>
-                      <input type="number" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.CHASSIS} type="number" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.CHASSIS} type="range" min="-400" max="400" value={config.chassisX} onChange={(e) => updateVal("chassisX", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">BIKE Y:</span>
-                      <input type="number" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.CHASSIS} type="number" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.CHASSIS} type="range" min="-400" max="400" value={config.chassisY} onChange={(e) => updateVal("chassisY", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">ANGLE:</span>
+                      <input disabled={lockedMap.CHASSIS} type="number" value={config.bikeAngle} onChange={(e) => updateVal("bikeAngle", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.CHASSIS} type="range" min="-180" max="180" value={config.bikeAngle} onChange={(e) => updateVal("bikeAngle", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">SCALE:</span>
-                      <input type="number" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.CHASSIS} type="number" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.CHASSIS} type="range" min="0.05" max="2.5" step="0.01" value={config.bikeScale} onChange={(e) => updateVal("bikeScale", parseFloat(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                   </>
                 )}
@@ -571,18 +633,23 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                   <>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">REAR X:</span>
-                      <input type="number" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.REAR_WHEEL} type="number" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.REAR_WHEEL} type="range" min="-400" max="400" value={config.rearWheelX} onChange={(e) => updateVal("rearWheelX", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">REAR Y:</span>
-                      <input type="number" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.REAR_WHEEL} type="number" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.REAR_WHEEL} type="range" min="-400" max="400" value={config.rearWheelY} onChange={(e) => updateVal("rearWheelY", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">ANGLE:</span>
+                      <input disabled={lockedMap.REAR_WHEEL} type="number" value={config.rearWheelAngle} onChange={(e) => updateVal("rearWheelAngle", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.REAR_WHEEL} type="range" min="-180" max="180" value={config.rearWheelAngle} onChange={(e) => updateVal("rearWheelAngle", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">SCALE:</span>
-                      <input type="number" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.REAR_WHEEL} type="number" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.REAR_WHEEL} type="range" min="0.05" max="2.5" step="0.01" value={config.rearWheelScale} onChange={(e) => updateVal("rearWheelScale", parseFloat(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                   </>
                 )}
@@ -591,18 +658,23 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                   <>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">FRONT X:</span>
-                      <input type="number" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.FRONT_WHEEL} type="number" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.FRONT_WHEEL} type="range" min="-400" max="400" value={config.frontWheelX} onChange={(e) => updateVal("frontWheelX", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">FRONT Y:</span>
-                      <input type="number" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.FRONT_WHEEL} type="number" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.FRONT_WHEEL} type="range" min="-400" max="400" value={config.frontWheelY} onChange={(e) => updateVal("frontWheelY", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">ANGLE:</span>
+                      <input disabled={lockedMap.FRONT_WHEEL} type="number" value={config.frontWheelAngle} onChange={(e) => updateVal("frontWheelAngle", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.FRONT_WHEEL} type="range" min="-180" max="180" value={config.frontWheelAngle} onChange={(e) => updateVal("frontWheelAngle", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">SCALE:</span>
-                      <input type="number" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.FRONT_WHEEL} type="number" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.FRONT_WHEEL} type="range" min="0.05" max="2.5" step="0.01" value={config.frontWheelScale} onChange={(e) => updateVal("frontWheelScale", parseFloat(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                   </>
                 )}
@@ -611,23 +683,23 @@ export default function StudioModal({ isOpen, onClose }: { isOpen: boolean; onCl
                   <>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">RIDER X:</span>
-                      <input type="number" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.RIDER} type="number" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.RIDER} type="range" min="-400" max="400" value={config.riderX} onChange={(e) => updateVal("riderX", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">RIDER Y:</span>
-                      <input type="number" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-400" max="400" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.RIDER} type="number" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.RIDER} type="range" min="-400" max="400" value={config.riderY} onChange={(e) => updateVal("riderY", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
+                    </div>
+                    <div className="flex items-center justify-between text-xs gap-2">
+                      <span className="text-dim font-bold">RIDER ANGLE:</span>
+                      <input disabled={lockedMap.RIDER} type="number" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.RIDER} type="range" min="-180" max="180" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                     <div className="flex items-center justify-between text-xs gap-2">
                       <span className="text-dim font-bold">SCALE:</span>
-                      <input type="number" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="0.05" max="2.5" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value))} className="w-24 accent-toxic" />
-                    </div>
-                    <div className="flex items-center justify-between text-xs gap-2">
-                      <span className="text-dim font-bold">ANGLE:</span>
-                      <input type="number" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value) || 0)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold" />
-                      <input type="range" min="-180" max="180" value={config.riderAngleOffset} onChange={(e) => updateVal("riderAngleOffset", parseInt(e.target.value))} className="w-24 accent-toxic" />
+                      <input disabled={lockedMap.RIDER} type="number" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value) || 0.1)} className="w-20 border border-line bg-black px-2 py-1 text-toxic font-bold disabled:opacity-50" />
+                      <input disabled={lockedMap.RIDER} type="range" min="0.05" max="2.5" step="0.01" value={config.riderScale} onChange={(e) => updateVal("riderScale", parseFloat(e.target.value))} className="w-24 accent-toxic disabled:opacity-50" />
                     </div>
                   </>
                 )}
