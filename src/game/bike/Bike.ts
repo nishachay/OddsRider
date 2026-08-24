@@ -398,6 +398,14 @@ export class Bike {
     this.killY = y + TUNING.killDrop;
   }
 
+  park(): void {
+    const B = this.scene.matter.body;
+    for (const b of this.parts) {
+      B.setVelocity(b, { x: 0, y: 0 });
+      B.setAngularVelocity(b, 0);
+    }
+  }
+
   reset(): void {
     const B = this.scene.matter.body;
     const place = (b: Body, ox: number, oy: number): void => {

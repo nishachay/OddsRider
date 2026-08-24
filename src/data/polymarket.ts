@@ -81,22 +81,20 @@ export async function fetchPriceHistory(
   const res = await fetch(`${CLOB}/prices-history?market=${clobTokenId}&interval=${interval}&fidelity=${fidelity}`);
   if (!res.ok) throw new Error(`clob ${res.status}`);
   const data = (await res.json()) as { history?: PricePoint[] };
-  return data.history ?? [];
+  return (data.history ?? []).slice().sort((a, b) => a.t - b.t);
+}
+
+function percentileRange(series: PricePoint[]): number {
+  const ps = series.map((pt) => pt.p).sort((a, b) => a - b);
+  if (ps.length === 0) return 0;
+  const lo = ps[Math.floor((ps.length - 1) * 0.05)];
+  const hi = ps[Math.floor((ps.length - 1) * 0.95)];
+  return hi - lo;
 }
 
 export function isRideableSeries(series: PricePoint[]): boolean {
   if (series.length < MARKET_FILTERS.minPoints) return false;
-  return seriesRange(series) >= MARKET_FILTERS.minRange;
-}
-
-function seriesRange(series: PricePoint[]): number {
-  let min = 1;
-  let max = 0;
-  for (const { p } of series) {
-    if (p < min) min = p;
-    if (p > max) max = p;
-  }
-  return max - min;
+  return percentileRange(series) >= MARKET_FILTERS.minRange;
 }
 
 export async function fetchRide(markets?: RideableMarket[]): Promise<Ride> {

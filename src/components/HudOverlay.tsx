@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { bus, EV } from '../game/bus';
+import ResultModal from './ResultModal';
 
 const TOXIC = '#b6ff00';
 const CRIMSON = '#ff3355';
@@ -59,8 +60,7 @@ function MiniTrack({ pts, progress }: { pts: TrackPts | null; progress: number }
     if (!geo) return null;
     const sx = (MAP_W - MAP_PAD * 2) / Math.max(1, geo.maxX - geo.minX);
     const sy = (MAP_H - MAP_PAD * 2) / Math.max(1, geo.maxY - geo.minY);
-    const s = Math.min(sx, sy);
-    return { s, ox: (MAP_W - (geo.maxX - geo.minX) * s) / 2, oy: (MAP_H - (geo.maxY - geo.minY) * s) / 2 };
+    return { sx, sy, ox: MAP_PAD, oy: MAP_PAD };
   }, [geo]);
 
   useEffect(() => {
@@ -69,9 +69,9 @@ function MiniTrack({ pts, progress }: { pts: TrackPts | null; progress: number }
     const ctx = c.getContext('2d');
     if (!ctx) return;
     const { minX, minY } = geo;
-    const { s, ox, oy } = scale;
-    const px = (x: number) => ox + (x - minX) * s;
-    const py = (y: number) => oy + (y - minY) * s;
+    const { sx, sy, ox, oy } = scale;
+    const px = (x: number) => ox + (x - minX) * sx;
+    const py = (y: number) => oy + (y - minY) * sy;
     ctx.clearRect(0, 0, MAP_W, MAP_H);
     ctx.lineWidth = 1;
     for (let i = 1; i < pts.length; i++) {
@@ -86,7 +86,7 @@ function MiniTrack({ pts, progress }: { pts: TrackPts | null; progress: number }
   const dot = useMemo(() => {
     if (!pts || !geo || !scale) return null;
     const { minX, maxX, minY } = geo;
-    const { s, ox, oy } = scale;
+    const { sx, sy, ox, oy } = scale;
     const xT = minX + Math.min(1, Math.max(0, progress)) * (maxX - minX);
     let i = 0;
     while (i < pts.length - 2 && pts[i + 1][0] < xT) i++;
@@ -94,7 +94,7 @@ function MiniTrack({ pts, progress }: { pts: TrackPts | null; progress: number }
     const [xb, yb] = pts[i + 1] ?? pts[i];
     const t = xb > xa ? (xT - xa) / (xb - xa) : 0;
     const yv = ya + (yb - ya) * t;
-    return { left: ox + (xT - minX) * s, top: oy + (yv - minY) * s };
+    return { left: ox + (xT - minX) * sx, top: oy + (yv - minY) * sy };
   }, [pts, geo, scale, progress]);
 
   return (
@@ -205,32 +205,59 @@ export default function HudOverlay() {
         style={{ background: 'radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,0.42) 100%)' }}
       />
 
-      {/* top-left: market data cluster */}
-      <div className="absolute top-4 left-4 border border-line bg-bg/85 px-4 py-3">
-        <div className="max-w-105 truncate font-mono text-[10px] tracking-[0.08em] text-dim">{marketName}</div>
-        <div className="mt-1 font-mono text-3xl leading-none tabular-nums text-ink">
-          {score.total}
-          <span className="ml-2 text-xs tracking-[0.3em] text-dim">PTS</span>
+      {/* top-left: market panel */}
+      <div className="absolute top-4 left-4 w-105 border border-line bg-bg/85">
+        <div className="border-b border-line px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 shrink-0 bg-toxic" />
+            <span className="truncate font-mono text-[10px] tracking-[0.06em] text-dim">{marketName}</span>
+          </div>
         </div>
-        <div className={`mt-1.5 font-mono text-xs tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
-          {prob === null ? '—' : `${Math.round(prob * 100)}%`}
-          <span className="ml-2 opacity-80">
-            ({deltaStr})
-          </span>
+        <div className="flex items-stretch">
+          <div className="flex-1 px-4 py-3">
+            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">SCORE</div>
+            <div className="mt-1.5 font-mono text-3xl leading-none tabular-nums text-ink">{score.total}</div>
+          </div>
+          <div className="w-px bg-line" />
+          <div className="flex-1 px-4 py-3">
+            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">PROBABILITY</div>
+            <div className="mt-1.5 flex items-baseline gap-2">
+              <span
+                className={`font-mono text-3xl leading-none tabular-nums ${
+                  deltaUp ? 'text-toxic' : 'text-crimson'
+                }`}
+              >
+                {prob === null ? '—' : `${Math.round(prob * 100)}%`}
+              </span>
+              {market && (
+                <span
+                  className={`border px-1.5 py-0.5 font-mono text-[10px] leading-none tabular-nums ${
+                    deltaUp ? 'border-toxic/40 text-toxic' : 'border-crimson/40 text-crimson'
+                  }`}
+                >
+                  {deltaUp ? '▲' : '▼'} {Math.abs(parseFloat(deltaStr)).toFixed(1)}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* top-center: timer + nitro */}
-      <div className="absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-2">
-        <div className="border border-line bg-bg/85 px-5 py-2">
-          <div className="text-center font-mono text-2xl leading-none tabular-nums text-ink">
+      <div className="absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-stretch gap-2">
+        <div className="border border-line bg-bg/85 px-5 py-2 text-center">
+          <div className="font-mono text-[9px] tracking-[0.32em] text-dim">TIME</div>
+          <div className="mt-1 font-mono text-2xl leading-none tabular-nums text-ink">
             {formatTime(score.timeMs)}
           </div>
         </div>
-        <div className="flex gap-[3px] border border-line bg-bg/85 px-2 py-1.5">
-          {Array.from({ length: 10 }, (_, i) => (
-            <span key={i} className={`h-2.5 w-1.5 ${nitro * 10 > i ? 'bg-toxic' : 'bg-line'}`} />
-          ))}
+        <div className="flex items-center gap-2 border border-line bg-bg/85 px-3 py-1.5">
+          <span className="font-mono text-[9px] tracking-[0.24em] text-dim">NITRO</span>
+          <span className="flex gap-[3px]">
+            {Array.from({ length: 10 }, (_, i) => (
+              <span key={i} className={`h-2.5 w-1.5 ${nitro * 10 > i ? 'bg-toxic' : 'bg-line'}`} />
+            ))}
+          </span>
         </div>
       </div>
 
@@ -254,35 +281,22 @@ export default function HudOverlay() {
         }`}
       />
 
-      {/* finish result */}
-      {result && result.finished && (
-        <div className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-bg/70">
-          <div className="w-105 max-w-[90vw] border border-line bg-bg px-8 py-7">
-            <div className="font-mono text-[10px] tracking-[0.4em] text-toxic">FINISHED</div>
-            <div className="mt-3 font-display text-lg leading-snug font-bold text-ink" style={{ fontStretch: '112%' }}>
-              {market?.question ?? 'Market ride complete'}
-            </div>
-            <div className="mt-5 flex items-stretch gap-2">
-              <div className="flex-1 border border-line px-4 py-3">
-                <div className="font-mono text-[9px] tracking-[0.32em] text-dim">SCORE</div>
-                <div className="mt-1 font-mono text-3xl leading-none tabular-nums text-ink">{result.score}</div>
-              </div>
-              <div className="flex-1 border border-line px-4 py-3">
-                <div className="font-mono text-[9px] tracking-[0.32em] text-dim">TIME</div>
-                <div className="mt-1 font-mono text-3xl leading-none tabular-nums text-ink">
-                  {formatTime(result.timeMs)}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={rideAgain}
-              className="mt-6 w-full cursor-pointer border border-toxic bg-toxic/10 px-4 py-3 font-mono text-xs tracking-[0.32em] text-toxic hover:bg-toxic/20"
-            >
-              RIDE AGAIN
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Cyber Result Overlay Modal */}
+      <ResultModal
+        isOpen={Boolean(result)}
+        result={
+          result
+            ? {
+                finished: result.finished,
+                score: result.score,
+                timeMs: result.timeMs,
+                marketQuestion: market?.question,
+                finalProb: prob ?? undefined,
+              }
+            : null
+        }
+        onRetry={rideAgain}
+      />
 
       {/* bottom-right: persistent controls */}
       <div className="absolute bottom-4 right-4 flex flex-col gap-1.5 border border-line bg-bg/85 px-4 py-3">

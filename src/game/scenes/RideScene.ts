@@ -43,6 +43,7 @@ export class RideScene extends Phaser.Scene {
   private nextProbEmitAt = 0;
   private nextScoreEmitAt = 0;
   private score = new RideScore();
+  private parked = false;
 
   constructor() {
     super('ride');
@@ -161,10 +162,12 @@ export class RideScene extends Phaser.Scene {
 
     const wallX = WORLD.finishX + TERRAIN.runout + 60;
     const wallY = this.trackRenderer.groundYAt(wallX);
+    this.add.rectangle(wallX, wallY - 200, 80, 400, PALETTE.surface).setDepth(0);
+    this.add.line(wallX - 40, wallY, 0, 0, 0, -400, PALETTE.surfaceLine).setOrigin(0, 1).setDepth(1);
     this.matter.add.rectangle(wallX, wallY - 200, 80, 400, {
       isStatic: true,
       friction: 0.4,
-      restitution: 0.1,
+      restitution: 0,
       label: 'ground',
     });
     this.acc = 0;
@@ -236,6 +239,7 @@ export class RideScene extends Phaser.Scene {
     }
     if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
     this.score.step(steps * STEP_MS, this.bike.x);
+    if (this.parked) this.bike.park();
 
     this.trackRenderer.update();
     this.bikeRenderer.render(this.bike);
@@ -244,19 +248,26 @@ export class RideScene extends Phaser.Scene {
       this.crashHandled = true;
       this.score.applyCrash();
       bus.emit(EV.CRASH);
-      this.time.delayedCall(900, () => this.doReset(false));
+      this.time.delayedCall(800, () => {
+        bus.emit(EV.RESULT, {
+          finished: false,
+          score: this.score.total,
+          timeMs: this.score.timeMs,
+        });
+      });
     }
 
     if (!this.score.finished && !this.bike.crashed && this.bike.x >= WORLD.finishX) {
       this.score.applyFinish();
       this.finishFx?.cross();
-      this.time.delayedCall(1100, () =>
+      this.time.delayedCall(1100, () => {
+        this.parked = true;
         bus.emit(EV.RESULT, {
           finished: true,
           score: this.score.total,
           timeMs: this.score.timeMs,
-        }),
-      );
+        });
+      });
     }
 
     // camera: lerp follow with velocity lookahead (chase the ragdoll after a crash)
@@ -293,6 +304,7 @@ export class RideScene extends Phaser.Scene {
 
   private doReset(full: boolean): void {
     this.crashHandled = false;
+    this.parked = false;
     if (full) this.score.fullReset();
     this.bike.reset();
     this.acc = 0;
