@@ -91,8 +91,17 @@ export const TUNING = {
   invertedCrashMs: 900,
   headCrashTilt: 0.9,
 
-  killDrop: 600,
+  killDrop: 1100,
   winBonus: 1000,
+} as const;
+
+export const TERRAIN = {
+  bandTopY: 40,
+  bandBottomY: 800,
+  smoothPasses: 2,
+  maxSlopeRad: 0.61,
+  leadIn: 480,
+  runout: 1600,
 } as const;
 
 export const WORLD = {
@@ -102,9 +111,9 @@ export const WORLD = {
   groundLength: 200_000,
   groundThickness: 400,
   tickSpacing: 500,
-  markerSpacing: 2_500,
-  markerMaxX: 60_000,
-  finishX: 60_000,
+  markerSpacing: 2_000,
+  markerMaxX: 26_000,
+  finishX: 26_000,
 };
 
 export const SPRITE = {
