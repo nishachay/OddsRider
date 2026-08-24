@@ -82,6 +82,12 @@ export function buildTerrain(series: PricePoint[]): Terrain {
     ys[i] = probToY(probs[i]);
   }
 
+  // Anchor the terrain so its first point exactly matches the spawn platform height
+  const shiftY = WORLD.groundTopY - ys[0];
+  for (let i = 0; i < n; i++) {
+    ys[i] += shiftY;
+  }
+
   const points: TerrainPoint[] = [];
   const push = (x: number, y: number, p: number) => points.push({ x, y, p });
 

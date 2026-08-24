@@ -66,7 +66,7 @@ export class TrackRenderer {
     const startIdx = this.firstIndexAt(left);
     const endIdx = this.firstIndexAt(right);
 
-    const bottom = WORLD.groundTopY + 2000;
+    const bottom = WORLD.groundTopY + 5000;
 
     // Faint volume bars in the background
     gfx.fillStyle(0x1a1c20, 0.4);

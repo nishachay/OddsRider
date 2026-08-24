@@ -56,7 +56,7 @@ export class Bike {
   private lastJumpAt = -1e9;
   private jumpQ = false;
 
-  private nitroTank = 0;
+  private nitroTank = 1;
   private nitroLatch = false;
 
   private parked = false;
@@ -423,6 +423,7 @@ export class Bike {
       this.ragdollBody = null;
     }
     this.ejected = false;
+    this.nitroTank = 1;
     this.contacts = 0;
     this.backContacts = 0;
     this.frontContacts = 0;

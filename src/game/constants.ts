@@ -82,10 +82,10 @@ export const TUNING = {
   jumpCooldownMs: 350,
   coyoteSteps: 6,
 
-  nitroDrain: 0.4,
-  nitroTrickle: 0.05,
+  nitroDrain: 0.25,
+  nitroTrickle: 0.1,
   nitroArm: 0.1,
-  nitroForce: 0.0029,
+  nitroForce: 0.006,
 
   invertedCrashTilt: 2.4,
   invertedCrashMs: 900,
@@ -96,24 +96,21 @@ export const TUNING = {
 } as const;
 
 export const TERRAIN = {
-  bandTopY: 40,
-  bandBottomY: 800,
-  smoothPasses: 2,
-  maxSlopeRad: 1.0,
-  leadIn: 480,
-  runout: 4000,
-} as const;
+  bandTopY: -1000,
+  bandBottomY: 1500,
+  leadIn: 400,
+  runout: 8000,
+};
 
 export const WORLD = {
-  spawnX: 320,
-  spawnDy: 60,
-  groundTopY: 620,
-  groundLength: 200_000,
-  groundThickness: 400,
+  spawnX: 400,
+  groundTopY: 600,
+  spawnDy: 120,
+  finishY: 600,
   tickSpacing: 500,
   markerSpacing: 2_000,
-  markerMaxX: 26_000,
-  finishX: 8000,
+  markerMaxX: 24_000,
+  finishX: 24_000,
 };
 
 export const SPRITE = {
