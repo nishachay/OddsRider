@@ -50,7 +50,7 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
                 isSuccess ? 'text-toxic' : 'text-crimson'
               }`}
             >
-              {isSuccess ? 'RIDE COMPLETED — MARKET CONQUERED' : 'CRASHED — PROBABILITY OVERLOAD'}
+              {isSuccess ? 'RIDE COMPLETED - MARKET CONQUERED' : 'CRASHED - PROBABILITY OVERLOAD'}
             </div>
           </div>
           <div
@@ -72,7 +72,7 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
             {probPercent !== null && (
               <div className="mt-2 flex items-center gap-2">
                 <span className="font-mono text-[10px] text-dim">FINAL ODDS:</span>
-                <span className="font-mono text-xs font-bold text-toxic">{probPercent}% YES</span>
+                <span className={`font-mono text-xs font-bold ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>{probPercent}% YES</span>
               </div>
             )}
           </div>
@@ -80,13 +80,13 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
 
         {/* Performance Metrics Grid */}
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="border border-line bg-bg p-3">
+          <div className="border border-line bg-bg p-3 shadow-inner">
             <div className="font-mono text-[9px] tracking-[0.32em] text-dim">FINAL SCORE</div>
             <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-ink">
               {result.score.toLocaleString()}
             </div>
           </div>
-          <div className="border border-line bg-bg p-3">
+          <div className="border border-line bg-bg p-3 shadow-inner">
             <div className="font-mono text-[9px] tracking-[0.32em] text-dim">TIME ELAPSED</div>
             <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-ink">
               {formatTime(result.timeMs)}
@@ -98,9 +98,11 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
         <div className="mt-6 flex items-center gap-3">
           <button
             onClick={onRetry}
-            className="flex-1 border border-toxic bg-toxic/10 py-3 font-mono text-xs font-bold tracking-widest text-toxic transition-all hover:bg-toxic hover:text-bg cursor-pointer"
+            className={`flex-1 border py-3 font-mono text-xs font-bold tracking-widest transition-all cursor-pointer ${
+              isSuccess ? 'border-toxic bg-toxic/10 text-toxic hover:bg-toxic hover:text-bg' : 'border-crimson bg-crimson/10 text-crimson hover:bg-crimson hover:text-bg'
+            }`}
           >
-            [ 🔄 RIDE AGAIN ] <span className="text-[10px] opacity-75">(PRESS R)</span>
+            [ RIDE AGAIN ] <span className="text-[10px] opacity-75">(PRESS R)</span>
           </button>
         </div>
       </div>

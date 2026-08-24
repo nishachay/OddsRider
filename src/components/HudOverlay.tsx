@@ -7,7 +7,7 @@ const CRIMSON = '#ff3355';
 
 function Key({ label }: { label: string }) {
   return (
-    <span className="inline-flex min-w-6 items-center justify-center border border-line bg-bg/90 px-1.5 py-1 font-mono text-[10px] leading-none text-ink shadow-sm">
+    <span className="inline-flex min-w-5 items-center justify-center rounded-[3px] border border-line bg-surface px-1.5 py-0.5 font-mono text-[9px] leading-none text-ink">
       {label}
     </span>
   );
@@ -19,7 +19,7 @@ function Hint({ keys, label }: { keys: string[]; label: string }) {
       {keys.map((k) => (
         <Key key={k} label={k} />
       ))}
-      <span className="ml-0.5 font-mono text-[10px] tracking-[0.2em] text-dim">{label}</span>
+      <span className="font-mono text-[9px] tracking-[0.05em] text-dim">{label}</span>
     </span>
   );
 }
@@ -31,9 +31,9 @@ function formatTime(ms: number): string {
   return `${m}:${secs}`;
 }
 
-const MAP_W = 180;
-const MAP_H = 56;
-const MAP_PAD = 6;
+const MAP_W = 160;
+const MAP_H = 60;
+const MAP_PAD = 4;
 
 type TrackPts = Array<[number, number]>;
 
@@ -97,12 +97,12 @@ function MiniTrack({ pts, progress }: { pts: TrackPts | null; progress: number }
   }, [pts, geo, scale, progress]);
 
   return (
-    <div className="relative border border-line bg-bg/90 p-1" style={{ width: MAP_W, height: MAP_H }}>
-      <canvas ref={ref} width={MAP_W} height={MAP_H} className="absolute inset-0" />
+    <div className="relative rounded-sm border border-line bg-bg/90 p-1" style={{ width: MAP_W, height: MAP_H }}>
+      <canvas ref={ref} width={MAP_W} height={MAP_H} className="absolute inset-0 opacity-80" />
       {dot && (
         <span
-          className="absolute h-2.5 w-2.5 rounded-full bg-toxic"
-          style={{ left: dot.left - 5, top: dot.top - 5, boxShadow: `0 0 8px ${TOXIC}` }}
+          className="absolute h-2 w-2 rounded-full bg-toxic"
+          style={{ left: dot.left - 4, top: dot.top - 4, boxShadow: `0 0 6px ${TOXIC}` }}
         />
       )}
     </div>
@@ -161,7 +161,7 @@ export default function HudOverlay() {
     });
     const offResult = bus.on<ResultPayload>(EV.RESULT, setResult);
     let crashTimer = 0;
-    const offCrash = bus.on(EV.CRASH, () => {
+    const offCrash = bus.on<void>(EV.CRASH, () => {
       setCrashFlash(true);
       window.clearTimeout(crashTimer);
       crashTimer = window.setTimeout(() => setCrashFlash(false), 900);
@@ -169,7 +169,7 @@ export default function HudOverlay() {
 
     const fallbackTimer = window.setTimeout(() => setHintsVisible(false), 8000);
     let hideTimer = 0;
-    const offFirst = bus.on(EV.INPUT_FIRST, () => {
+    const offFirst = bus.on<void>(EV.INPUT_FIRST, () => {
       hideTimer = window.setTimeout(() => setHintsVisible(false), 2400);
     });
 
@@ -193,9 +193,9 @@ export default function HudOverlay() {
 
   const marketName = market
     ? market.question.length > 52
-      ? `${market.question.slice(0, 52)}…`
+      ? `${market.question.slice(0, 52)}...`
       : market.question
-    : 'LOADING POLYMARKET DATA…';
+    : 'LOADING POLYMARKET DATA...';
 
   const deltaUp = (market?.probDelta ?? 0) >= 0;
   const deltaStr = `${deltaUp ? '+' : ''}${((market?.probDelta ?? 0) * 100).toFixed(1)}`;
@@ -206,6 +206,7 @@ export default function HudOverlay() {
   };
 
   const rideAgain = () => {
+    setResult(null);
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR' }));
     window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyR' }));
   };
@@ -218,71 +219,64 @@ export default function HudOverlay() {
         style={{ background: 'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.45) 100%)' }}
       />
 
-      {/* Top-Left: Wordmark, Market Info & Real-Time Speed/Score/Odds Badges */}
-      <div className="absolute top-4 left-4 flex flex-col gap-2">
-        <div className="flex items-stretch gap-2">
-          {/* Brand Badge */}
-          <div className="border border-line bg-bg/90 px-3 py-2">
-            <div
-              className="font-display text-sm leading-none font-bold tracking-[0.18em] text-ink"
-              style={{ fontStretch: '118%' }}
-            >
-              ODDSRIDER
-            </div>
-            <div className="mt-1.5 font-mono text-[9px] tracking-[0.32em] text-dim">LIVE TERMINAL</div>
-          </div>
-
-          {/* Speedometer Badge */}
-          <div className="border border-line bg-bg/90 px-3 py-2">
-            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">SPEED</div>
-            <div className="mt-0.5 font-mono text-xl leading-none tabular-nums text-ink font-bold">
-              {speed}
-              <span className="ml-1 text-[10px] text-dim font-normal">PX/S</span>
-            </div>
-          </div>
-
-          {/* Score Badge */}
-          <div className="border border-line bg-bg/90 px-3 py-2">
-            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">SCORE</div>
-            <div className="mt-0.5 font-mono text-xl leading-none tabular-nums text-ink font-bold">
-              {score.total}
-            </div>
-          </div>
-
-          {/* Mute Tag */}
-          {muted && (
-            <div className="self-start border border-crimson bg-bg/90 px-2 py-1 font-mono text-[9px] tracking-[0.28em] text-crimson">
-              AUDIO OFF
-            </div>
-          )}
+      {/* Top-Left: Separated Brand Logo */}
+      <div className="absolute top-5 left-5">
+        <div
+          className="font-display text-lg leading-none font-bold tracking-[0.18em] text-ink drop-shadow-md"
+          style={{ fontStretch: '118%' }}
+        >
+          ODDSRIDER
         </div>
+      </div>
 
-        {/* Live Market Event Strip */}
-        <div className="w-115 border border-line bg-bg/90 px-3.5 py-2.5">
-          <div className="flex items-center justify-between gap-2 border-b border-line/60 pb-1.5">
+      {/* Mid-Left: Cohesive Telemetry & Market Panel (Matches bottom bar style) */}
+      <div className="absolute top-14 left-5 flex flex-col gap-4 border border-line bg-bg/90 px-4 py-3 shadow-2xl w-[340px]">
+        
+        {/* Market Strip */}
+        <div className="flex flex-col gap-1.5 border-b border-line/50 pb-3">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 truncate">
               <span className="h-1.5 w-1.5 shrink-0 bg-toxic" />
-              <span className="truncate font-mono text-[10px] tracking-[0.06em] text-dim">{marketName}</span>
+              <span className="truncate font-mono text-[10px] tracking-[0.06em] text-dim">
+                {marketName}
+              </span>
             </div>
             <span
               className={`shrink-0 border px-1.5 py-0.5 font-mono text-[9px] leading-none tabular-nums font-bold ${
                 deltaUp ? 'border-toxic/40 text-toxic bg-toxic/10' : 'border-crimson/40 text-crimson bg-crimson/10'
               }`}
             >
-              {deltaUp ? '▲' : '▼'} {Math.abs(parseFloat(deltaStr)).toFixed(1)}%
+              {deltaUp ? 'UP' : 'DN'} {Math.abs(parseFloat(deltaStr)).toFixed(1)}%
             </span>
           </div>
-
-          <div className="mt-2 flex items-baseline justify-between">
+          <div className="flex items-baseline justify-between">
             <span className="font-mono text-[9px] tracking-[0.32em] text-dim">CURRENT ODDS</span>
-            <span className={`font-mono text-2xl leading-none font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
-              {prob === null ? '—' : `${Math.round(prob * 100)}% YES`}
+            <span className={`font-mono text-xl leading-none font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
+              {prob === null ? '—' : `${(prob * 100).toFixed(2)}% YES`}
             </span>
+          </div>
+        </div>
+
+        {/* Telemetry Strip */}
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col">
+            <span className="font-mono text-[9px] tracking-[0.32em] text-dim">SPEED</span>
+            <div className="mt-0.5 font-mono text-lg leading-none tabular-nums text-ink font-bold">
+              {speed}
+              <span className="ml-1 text-[9px] text-dim font-normal">PX/S</span>
+            </div>
+          </div>
+          <div className="h-6 w-[1px] bg-line/50" />
+          <div className="flex flex-col">
+            <span className="font-mono text-[9px] tracking-[0.32em] text-dim">SCORE</span>
+            <div className="mt-0.5 font-mono text-lg leading-none tabular-nums text-ink font-bold">
+              {score.total.toLocaleString()}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Top-Center: Time & Nitro Bar */}
+      {/* Top-Center: Time & Nitro Bar (Studio Aesthetic) */}
       <div className="absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5">
         <div className="border border-line bg-bg/90 px-5 py-2 text-center shadow-lg">
           <div className="font-mono text-[9px] tracking-[0.32em] text-dim">TIME</div>
@@ -306,11 +300,11 @@ export default function HudOverlay() {
         <MiniTrack pts={track} progress={progress} />
         <button
           onClick={toggleMute}
-          className={`pointer-events-auto cursor-pointer border bg-bg/90 px-2.5 py-1 font-mono text-[9px] tracking-[0.24em] ${
+          className={`pointer-events-auto cursor-pointer border bg-bg/90 px-2.5 py-1 font-mono text-[9px] tracking-[0.24em] shadow-sm ${
             muted ? 'border-crimson text-crimson' : 'border-line text-dim hover:text-ink'
           }`}
         >
-          {muted ? 'SND OFF' : 'SND ON'}
+          {muted ? 'AUDIO OFF' : 'AUDIO ON'}
         </button>
       </div>
 
@@ -338,10 +332,10 @@ export default function HudOverlay() {
         onRetry={rideAgain}
       />
 
-      {/* Bottom-Center: Clean Intuitive Keyboard Control Hints (Restored) */}
+      {/* Bottom-Center: Clean Intuitive Keyboard Control Hints (Studio design explicitly restored) */}
       <div
         className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4 border border-line bg-bg/90 px-4 py-2 shadow-2xl transition-opacity duration-700 ${
-          hintsVisible ? 'opacity-100' : 'opacity-80'
+          hintsVisible ? 'opacity-100' : 'opacity-80 hover:opacity-100'
         }`}
       >
         <Hint keys={['W', '↑']} label="GAS" />

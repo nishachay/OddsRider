@@ -66,7 +66,16 @@ export class TrackRenderer {
     const startIdx = this.firstIndexAt(left);
     const endIdx = this.firstIndexAt(right);
 
-    const bottom = WORLD.groundTopY + SURFACE_DROP;
+    const bottom = WORLD.groundTopY + 2000;
+
+    // Faint volume bars in the background
+    gfx.fillStyle(0x1a1c20, 0.4);
+    const barSpacing = WORLD.tickSpacing * 2;
+    const barFrom = Math.max(0, Math.ceil(left / barSpacing) * barSpacing);
+    for (let x = barFrom; x <= right; x += barSpacing) {
+      const h = 100 + (Math.sin(x * 0.001) * 50 + 50); // pseudo-random height
+      gfx.fillRect(x - 10, bottom - h, 20, h);
+    }
 
     gfx.fillStyle(PALETTE.surface, 1);
     gfx.beginPath();
@@ -79,19 +88,19 @@ export class TrackRenderer {
     gfx.closePath();
     gfx.fillPath();
 
-    gfx.lineStyle(1, PALETTE.tick, 0.9);
+    gfx.lineStyle(1, PALETTE.tick, 0.8);
     const tickFrom = Math.max(WORLD.tickSpacing, Math.ceil(left / WORLD.tickSpacing) * WORLD.tickSpacing);
     for (let x = tickFrom; x <= right; x += WORLD.tickSpacing) {
       const y = this.groundYAt(x);
-      gfx.lineBetween(x, y + 2, x, y + 16);
+      gfx.lineBetween(x, y + 4, x, y + 24);
     }
 
     for (let i = startIdx; i < endIdx; i++) {
       const seg = terrain.segments[Math.min(i, terrain.segments.length - 1)];
       const color = seg.rising ? PALETTE.toxic : PALETTE.crimson;
-      gfx.lineStyle(11, color, 0.1);
-      gfx.lineBetween(seg.ax, seg.ay, seg.bx, seg.by);
-      gfx.lineStyle(4, color, 0.3);
+      
+      // Crisp, sharp high-fidelity line (no chunky glow)
+      gfx.lineStyle(4, color, 0.2);
       gfx.lineBetween(seg.ax, seg.ay, seg.bx, seg.by);
       gfx.lineStyle(2, color, 1);
       gfx.lineBetween(seg.ax, seg.ay, seg.bx, seg.by);

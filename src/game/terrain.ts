@@ -48,21 +48,38 @@ export function buildTerrain(series: PricePoint[]): Terrain {
     return { points: flat, segments: [] };
   }
 
-  const probs = smooth(
-    pts.map((pt) => Math.min(1, Math.max(0, pt.p))),
-    TERRAIN.smoothPasses,
-  );
+  let minP = Infinity;
+  let maxP = -Infinity;
+  for (const pt of pts) {
+    if (pt.p < minP) minP = pt.p;
+    if (pt.p > maxP) maxP = pt.p;
+  }
 
+  // Ensure minimum padding if the market is completely flat
+  if (maxP - minP < 0.05) {
+    const mid = (maxP + minP) / 2;
+    maxP = Math.min(1, mid + 0.025);
+    minP = Math.max(0, mid - 0.025);
+  }
+  const range = maxP - minP;
+
+  const rawProbs = pts.map((pt) => {
+    const norm = (pt.p - minP) / range;
+    return Math.min(1, Math.max(0, norm));
+  });
+
+  // No smoothing - exact 1:1 raw data mapping for maximum volatility
+  const probs = rawProbs;
+
+  const minT = pts[0].t;
+  const maxT = pts[n - 1].t;
+  const tSpan = maxT - minT;
   const span = WORLD.finishX - WORLD.spawnX;
-  const dx = span / (n - 1);
-  const maxDy = Math.tan(TERRAIN.maxSlopeRad) * dx;
 
   const ys: number[] = new Array(n);
   ys[0] = probToY(probs[0]);
   for (let i = 1; i < n; i++) {
-    const target = probToY(probs[i]);
-    const dy = target - ys[i - 1];
-    ys[i] = ys[i - 1] + Math.min(maxDy, Math.max(-maxDy, dy));
+    ys[i] = probToY(probs[i]);
   }
 
   const points: TerrainPoint[] = [];
@@ -72,7 +89,8 @@ export function buildTerrain(series: PricePoint[]): Terrain {
   push(WORLD.spawnX - TERRAIN.leadIn, firstY, probs[0]);
   push(WORLD.spawnX, firstY, probs[0]);
   for (let i = 1; i < n; i++) {
-    push(WORLD.spawnX + dx * i, ys[i], probs[i]);
+    const normT = tSpan > 0 ? (pts[i].t - minT) / tSpan : i / (n - 1);
+    push(WORLD.spawnX + span * normT, ys[i], probs[i]);
   }
   const lastY = ys[n - 1];
   push(WORLD.finishX + TERRAIN.runout, lastY, probs[n - 1]);

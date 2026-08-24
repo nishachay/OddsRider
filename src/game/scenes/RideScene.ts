@@ -31,7 +31,6 @@ export class RideScene extends Phaser.Scene {
   private flatGround: MatterJS.BodyType | null = null;
   private flatGfx: Phaser.GameObjects.Graphics | null = null;
   private startGate!: Gate;
-  private finishGate!: Gate;
   private finishFx: FinishCelebration | null = null;
   private rideSpawnX = WORLD.spawnX;
 
@@ -55,7 +54,6 @@ export class RideScene extends Phaser.Scene {
     this.trackRenderer = new TrackRenderer(this);
 
     this.startGate = this.createGate(WORLD.spawnX - 70, WORLD.groundTopY, 'START', PALETTE.toxic);
-    this.finishGate = this.createGate(WORLD.finishX, WORLD.groundTopY, 'FINISH', PALETTE.crimson);
 
     this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
@@ -158,7 +156,6 @@ export class RideScene extends Phaser.Scene {
     this.finishFx?.destroy();
     this.finishFx = new FinishCelebration(this, WORLD.finishX, this.trackRenderer.groundYAt(WORLD.finishX));
     this.placeGate(this.startGate, WORLD.spawnX, this.trackRenderer.groundYAt(WORLD.spawnX));
-    this.placeGate(this.finishGate, WORLD.finishX, this.trackRenderer.groundYAt(WORLD.finishX));
 
     const wallX = WORLD.finishX + TERRAIN.runout + 60;
     const wallY = this.trackRenderer.groundYAt(wallX);

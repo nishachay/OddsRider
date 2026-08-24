@@ -99,9 +99,9 @@ export const TERRAIN = {
   bandTopY: 40,
   bandBottomY: 800,
   smoothPasses: 2,
-  maxSlopeRad: 0.61,
+  maxSlopeRad: 1.0,
   leadIn: 480,
-  runout: 1600,
+  runout: 4000,
 } as const;
 
 export const WORLD = {
@@ -113,7 +113,7 @@ export const WORLD = {
   tickSpacing: 500,
   markerSpacing: 2_000,
   markerMaxX: 26_000,
-  finishX: 26_000,
+  finishX: 8000,
 };
 
 export const SPRITE = {

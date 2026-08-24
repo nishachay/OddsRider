@@ -39,4 +39,5 @@ export const EV = {
   TRACK: 'hud:track',
   POSITION: 'hud:position',
   STUDIO_UPDATE: 'studio:update',
+  RESTART: 'game:restart',
 } as const;
