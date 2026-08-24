@@ -32,5 +32,11 @@ export const EV = {
   INPUT_FIRST: 'hud:input-first',
   NITRO: 'hud:nitro',
   CRASH: 'hud:crash',
+  PROB: 'hud:prob',
+  MARKET: 'hud:market',
+  SCORE: 'hud:score',
+  RESULT: 'hud:result',
+  TRACK: 'hud:track',
+  POSITION: 'hud:position',
   STUDIO_UPDATE: 'studio:update',
 } as const;

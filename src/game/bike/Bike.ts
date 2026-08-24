@@ -392,6 +392,12 @@ export class Bike {
     fix(this.frontWheel, BIKE.frontDx);
   }
 
+  setSpawn(x: number, y: number): void {
+    this.spawnX = x;
+    this.spawnY = y;
+    this.killY = y + TUNING.killDrop;
+  }
+
   reset(): void {
     const B = this.scene.matter.body;
     const place = (b: Body, ox: number, oy: number): void => {

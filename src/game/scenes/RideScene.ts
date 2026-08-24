@@ -1,23 +1,48 @@
 import Phaser from 'phaser';
 import { bus, EV } from '../bus';
-import { PALETTE, WORLD, STEP_MS, MAX_STEPS_PER_FRAME, SPRITE } from '../constants';
+import { PALETTE, WORLD, STEP_MS, MAX_STEPS_PER_FRAME, SPRITE, TERRAIN } from '../constants';
 import { Bike } from '../bike/Bike';
 import type { DriveInput } from '../bike/Bike';
 import { BikeRenderer } from '../bike/BikeRenderer';
 import { InputManager } from '../input/InputManager';
+import { fetchRide } from '../../data/polymarket';
+import { buildTerrain, probabilityAt } from '../terrain';
+import type { Terrain } from '../terrain';
+import { TrackRenderer } from '../track/TrackRenderer';
+import { RideScore } from '../score';
+import { FinishCelebration } from '../finish';
 
 const MONO = 'JetBrains Mono, monospace';
+const SEGMENT_THICKNESS = 26;
+
+interface Gate {
+  img: Phaser.GameObjects.Image;
+  label: Phaser.GameObjects.Text;
+  color: number;
+}
 
 export class RideScene extends Phaser.Scene {
   private bike!: Bike;
   private bikeRenderer!: BikeRenderer;
   private inputMgr!: InputManager;
+  private trackRenderer!: TrackRenderer;
+
+  private terrain: Terrain | null = null;
+  private flatGround: MatterJS.BodyType | null = null;
+  private flatGfx: Phaser.GameObjects.Graphics | null = null;
+  private startGate!: Gate;
+  private finishGate!: Gate;
+  private finishFx: FinishCelebration | null = null;
+  private rideSpawnX = WORLD.spawnX;
 
   private muted = false;
   private acc = 0;
   private crashHandled = false;
   private nextSpeedEmitAt = 0;
   private nextNitroEmitAt = 0;
+  private nextProbEmitAt = 0;
+  private nextScoreEmitAt = 0;
+  private score = new RideScore();
 
   constructor() {
     super('ride');
@@ -25,9 +50,11 @@ export class RideScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(PALETTE.bg);
-    this.buildGround();
-    this.drawGate(WORLD.spawnX - 70, 'START', PALETTE.toxic);
-    this.drawGate(WORLD.finishX, 'FINISH', PALETTE.crimson);
+    this.buildFlatGround();
+    this.trackRenderer = new TrackRenderer(this);
+
+    this.startGate = this.createGate(WORLD.spawnX - 70, WORLD.groundTopY, 'START', PALETTE.toxic);
+    this.finishGate = this.createGate(WORLD.finishX, WORLD.groundTopY, 'FINISH', PALETTE.crimson);
 
     this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
@@ -36,6 +63,7 @@ export class RideScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.centerOn(this.bike.x, this.bike.y - 40);
 
+    void this.loadRide();
     this.exposeDebug();
   }
 
@@ -48,12 +76,104 @@ export class RideScene extends Phaser.Scene {
       grounded: () => this.bike.grounded,
       crashed: () => this.bike.crashed,
       nitro: () => this.bike.nitro,
-      reset: () => this.doReset(),
+      prob: () => (this.terrain ? probabilityAt(this.terrain.points, this.bike.x) : null),
+      score: () => this.score.total,
+      simMs: () => this.score.timeMs,
+      fps: () => Math.round(this.game.loop.actualFps),
+      loopInfo: () => {
+        const loop = this.game.loop as unknown as { delta: number; frame: number; fps: number; rawFps: number };
+        return { delta: Math.round(loop.delta), frame: loop.frame, fps: Math.round(loop.fps), rawFps: Math.round(loop.rawFps) };
+      },
+      surfaceY: (x: number) => this.trackRenderer.groundYAt(x),
+      probe: () => ({
+        rear: this.bike.rearWheel.position,
+        front: this.bike.frontWheel.position,
+        rearAv: this.bike.rearWheel.angularVelocity,
+        grounded: this.bike.grounded,
+        chassisY: this.bike.chassis.position.y,
+      }),
+      reset: () => this.doReset(true),
     };
   }
 
-  private buildGround(): void {
+  private async loadRide(): Promise<void> {
+    try {
+      const ride = await fetchRide();
+      const terrain = buildTerrain(ride.series);
+      this.terrain = terrain;
+      this.trackRenderer.setTerrain(terrain);
+      this.swapToTerrain(terrain);
+
+      const course = terrain.points.filter((pt) => pt.x >= WORLD.spawnX - 1 && pt.x <= WORLD.finishX + 1);
+      const stride = Math.max(1, Math.floor(course.length / 110));
+      const pts: Array<[number, number]> = [];
+      for (let i = 0; i < course.length; i += stride) pts.push([course[i].x, course[i].y]);
+      const lastPt = course[course.length - 1];
+      if (lastPt && pts[pts.length - 1] !== undefined && pts[pts.length - 1][0] !== lastPt.x) {
+        pts.push([lastPt.x, lastPt.y]);
+      }
+      bus.emit(EV.TRACK, { pts });
+
+      const series = ride.series;
+      const probNow = series[series.length - 1]?.p ?? 0.5;
+      const probDelta = probNow - (series[0]?.p ?? probNow);
+      bus.emit(EV.MARKET, { question: ride.market.question, probNow, probDelta });
+    } catch (err) {
+      console.warn('loadRide failed', err);
+      bus.emit(EV.MARKET, null);
+    }
+  }
+
+  private swapToTerrain(terrain: Terrain): void {
+    if (this.flatGround) {
+      this.matter.world.remove(this.flatGround);
+      this.flatGround = null;
+    }
+    if (this.flatGfx) {
+      this.flatGfx.destroy();
+      this.flatGfx = null;
+    }
+    for (const seg of terrain.segments) {
+      const len = Math.hypot(seg.bx - seg.ax, seg.by - seg.ay);
+      if (len < 1) continue;
+      const ang = Math.atan2(seg.by - seg.ay, seg.bx - seg.ax);
+      const cx = (seg.ax + seg.bx) / 2 - (SEGMENT_THICKNESS / 2) * Math.sin(ang);
+      const cy = (seg.ay + seg.by) / 2 + (SEGMENT_THICKNESS / 2) * Math.cos(ang);
+      this.matter.add.rectangle(cx, cy, len, SEGMENT_THICKNESS, {
+        isStatic: true,
+        angle: ang,
+        friction: 1,
+        frictionStatic: 1,
+        restitution: 0,
+        label: 'ground',
+      });
+    }
+    const spawnX = WORLD.spawnX - TERRAIN.leadIn / 2;
+    const spawnY = this.trackRenderer.groundYAt(spawnX) - WORLD.spawnDy;
+    this.rideSpawnX = spawnX;
+    this.bike.setSpawn(spawnX, spawnY);
+    this.bike.reset();
+    this.score.setCourse(spawnX);
+    this.finishFx?.destroy();
+    this.finishFx = new FinishCelebration(this, WORLD.finishX, this.trackRenderer.groundYAt(WORLD.finishX));
+    this.placeGate(this.startGate, WORLD.spawnX, this.trackRenderer.groundYAt(WORLD.spawnX));
+    this.placeGate(this.finishGate, WORLD.finishX, this.trackRenderer.groundYAt(WORLD.finishX));
+
+    const wallX = WORLD.finishX + TERRAIN.runout + 60;
+    const wallY = this.trackRenderer.groundYAt(wallX);
+    this.matter.add.rectangle(wallX, wallY - 200, 80, 400, {
+      isStatic: true,
+      friction: 0.4,
+      restitution: 0.1,
+      label: 'ground',
+    });
+    this.acc = 0;
+    this.cameras.main.centerOn(this.bike.x, this.bike.y - 40);
+  }
+
+  private buildFlatGround(): void {
     const g = this.add.graphics().setDepth(0);
+    this.flatGfx = g;
     const y = WORLD.groundTopY;
     const half = WORLD.groundLength / 2;
 
@@ -61,23 +181,8 @@ export class RideScene extends Phaser.Scene {
     g.fillRect(-half, y, WORLD.groundLength, WORLD.groundThickness);
     g.lineStyle(2, PALETTE.surfaceLine, 1);
     g.lineBetween(-half, y, half, y);
-    g.lineStyle(1, PALETTE.tick, 0.9);
-    for (let x = 0; x <= WORLD.groundLength; x += WORLD.tickSpacing) {
-      g.lineBetween(x, y + 2, x, y + 16);
-    }
 
-    for (let x = 0; x <= WORLD.markerMaxX; x += WORLD.markerSpacing) {
-      this.add
-        .text(x, y + 28, `${x / 1000}K`, {
-          fontFamily: MONO,
-          fontSize: '11px',
-          color: '#7c7f86',
-        })
-        .setOrigin(0.5, 0)
-        .setDepth(1);
-    }
-
-    this.matter.add.rectangle(half, y + WORLD.groundThickness / 2, WORLD.groundLength, WORLD.groundThickness, {
+    this.flatGround = this.matter.add.rectangle(half, y + WORLD.groundThickness / 2, WORLD.groundLength, WORLD.groundThickness, {
       isStatic: true,
       friction: 1,
       frictionStatic: 1,
@@ -86,20 +191,26 @@ export class RideScene extends Phaser.Scene {
     });
   }
 
-  private drawGate(x: number, label: string, color: number): void {
-    this.add.image(x, WORLD.groundTopY, 'flag').setOrigin(0.5, 1).setScale(SPRITE.flagScale).setDepth(2);
-    this.add
-      .text(x + 6, WORLD.groundTopY - 80, label, {
+  private createGate(x: number, y: number, text: string, color: number): Gate {
+    const img = this.add.image(x, y, 'flag').setOrigin(0.5, 1).setScale(SPRITE.flagScale).setDepth(2);
+    const label = this.add
+      .text(x + 6, y - 80, text, {
         fontFamily: MONO,
         fontSize: '10px',
         color: color === PALETTE.crimson ? '#ff3355' : '#b6ff00',
       })
       .setOrigin(0, 0)
       .setDepth(2);
+    return { img, label, color };
+  }
+
+  private placeGate(gate: Gate, x: number, y: number): void {
+    gate.img.setPosition(x, y);
+    gate.label.setPosition(x + 6, y - 80);
   }
 
   update(time: number, deltaMs: number): void {
-    if (this.inputMgr.takeReset()) this.doReset();
+    if (this.inputMgr.takeReset()) this.doReset(true);
     if (this.inputMgr.takeMute()) {
       this.muted = !this.muted;
       bus.emit(EV.MUTE, this.muted);
@@ -110,21 +221,42 @@ export class RideScene extends Phaser.Scene {
     this.acc += dt;
     let steps = 0;
     const jump = this.inputMgr.consumeJump();
+    const firstRead = this.inputMgr.read();
+    if (!this.score.started && (firstRead.gas || firstRead.brake || firstRead.leanBack || firstRead.leanFwd || firstRead.nitro || jump)) {
+      this.score.begin();
+    }
     while (this.acc >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
       const input = this.inputMgr.read();
-      const drive: DriveInput = { ...input, jumpQueued: jump && steps === 0 };
+      const drive: DriveInput = this.score.finished
+        ? { gas: false, brake: true, leanBack: false, leanFwd: false, nitro: false, jumpQueued: false }
+        : { ...input, jumpQueued: jump && steps === 0 };
       this.bike.step(drive);
       this.acc -= STEP_MS;
       steps++;
     }
     if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
+    this.score.step(steps * STEP_MS, this.bike.x);
 
+    this.trackRenderer.update();
     this.bikeRenderer.render(this.bike);
 
     if (this.bike.crashed && !this.crashHandled) {
       this.crashHandled = true;
+      this.score.applyCrash();
       bus.emit(EV.CRASH);
-      this.time.delayedCall(900, () => this.doReset());
+      this.time.delayedCall(900, () => this.doReset(false));
+    }
+
+    if (!this.score.finished && !this.bike.crashed && this.bike.x >= WORLD.finishX) {
+      this.score.applyFinish();
+      this.finishFx?.cross();
+      this.time.delayedCall(1100, () =>
+        bus.emit(EV.RESULT, {
+          finished: true,
+          score: this.score.total,
+          timeMs: this.score.timeMs,
+        }),
+      );
     }
 
     // camera: lerp follow with velocity lookahead (chase the ragdoll after a crash)
@@ -147,10 +279,21 @@ export class RideScene extends Phaser.Scene {
       this.nextNitroEmitAt = time + 120;
       bus.emit(EV.NITRO, this.bike.nitro);
     }
+    if (this.terrain && time > this.nextProbEmitAt) {
+      this.nextProbEmitAt = time + 150;
+      bus.emit(EV.PROB, probabilityAt(this.terrain.points, this.bike.x));
+      const span = WORLD.finishX - this.rideSpawnX;
+      bus.emit(EV.POSITION, span > 0 ? Math.min(1, Math.max(0, (this.bike.x - this.rideSpawnX) / span)) : 0);
+    }
+    if (time > this.nextScoreEmitAt) {
+      this.nextScoreEmitAt = time + 150;
+      bus.emit(EV.SCORE, { total: this.score.total, timeMs: this.score.timeMs, finished: this.score.finished });
+    }
   }
 
-  private doReset(): void {
+  private doReset(full: boolean): void {
     this.crashHandled = false;
+    if (full) this.score.fullReset();
     this.bike.reset();
     this.acc = 0;
     const cam = this.cameras.main;
