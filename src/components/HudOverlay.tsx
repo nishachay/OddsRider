@@ -7,34 +7,33 @@ const CRIMSON = '#ff3355';
 
 function Key({ label }: { label: string }) {
   return (
-    <span className="inline-flex min-w-6 items-center justify-center border border-line bg-bg/85 px-1 py-0.5 font-mono text-[9px] leading-none text-ink">
+    <span className="inline-flex min-w-6 items-center justify-center border border-line bg-bg/90 px-1.5 py-1 font-mono text-[10px] leading-none text-ink shadow-sm">
       {label}
     </span>
   );
 }
 
-function ControlRow({ items }: { items: Array<[string, string]> }) {
+function Hint({ keys, label }: { keys: string[]; label: string }) {
   return (
-    <div className="flex items-center gap-4">
-      {items.map(([k, label]) => (
-        <span key={label} className="flex items-center gap-1.5">
-          <Key label={k} />
-          <span className="font-mono text-[9px] tracking-[0.14em] text-dim">{label}</span>
-        </span>
+    <span className="flex items-center gap-1.5">
+      {keys.map((k) => (
+        <Key key={k} label={k} />
       ))}
-    </div>
+      <span className="ml-0.5 font-mono text-[10px] tracking-[0.2em] text-dim">{label}</span>
+    </span>
   );
 }
 
 function formatTime(ms: number): string {
   const s = ms / 1000;
   const m = Math.floor(s / 60);
-  return `${m}:${(s % 60).toFixed(1).padStart(4, '0')}`;
+  const secs = (s % 60).toFixed(1).padStart(4, '0');
+  return `${m}:${secs}`;
 }
 
-const MAP_W = 176;
-const MAP_H = 64;
-const MAP_PAD = 8;
+const MAP_W = 180;
+const MAP_H = 56;
+const MAP_PAD = 6;
 
 type TrackPts = Array<[number, number]>;
 
@@ -73,7 +72,7 @@ function MiniTrack({ pts, progress }: { pts: TrackPts | null; progress: number }
     const px = (x: number) => ox + (x - minX) * sx;
     const py = (y: number) => oy + (y - minY) * sy;
     ctx.clearRect(0, 0, MAP_W, MAP_H);
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.5;
     for (let i = 1; i < pts.length; i++) {
       ctx.strokeStyle = pts[i][1] <= pts[i - 1][1] ? TOXIC : CRIMSON;
       ctx.beginPath();
@@ -98,12 +97,12 @@ function MiniTrack({ pts, progress }: { pts: TrackPts | null; progress: number }
   }, [pts, geo, scale, progress]);
 
   return (
-    <div className="relative border border-line bg-bg/85" style={{ width: MAP_W, height: MAP_H }}>
+    <div className="relative border border-line bg-bg/90 p-1" style={{ width: MAP_W, height: MAP_H }}>
       <canvas ref={ref} width={MAP_W} height={MAP_H} className="absolute inset-0" />
       {dot && (
         <span
-          className="absolute h-2 w-2 rounded-full bg-toxic"
-          style={{ left: dot.left - 4, top: dot.top - 4, boxShadow: `0 0 6px ${TOXIC}` }}
+          className="absolute h-2.5 w-2.5 rounded-full bg-toxic"
+          style={{ left: dot.left - 5, top: dot.top - 5, boxShadow: `0 0 8px ${TOXIC}` }}
         />
       )}
     </div>
@@ -129,9 +128,11 @@ interface ResultPayload {
 }
 
 export default function HudOverlay() {
+  const [speed, setSpeed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [nitro, setNitro] = useState(0);
   const [crashFlash, setCrashFlash] = useState(false);
+  const [hintsVisible, setHintsVisible] = useState(true);
   const [prob, setProb] = useState<number | null>(null);
   const [market, setMarket] = useState<MarketPayload | null>(null);
   const [track, setTrack] = useState<TrackPts | null>(null);
@@ -140,6 +141,7 @@ export default function HudOverlay() {
   const [result, setResult] = useState<ResultPayload | null>(null);
 
   useEffect(() => {
+    const offSpeed = bus.on<number>(EV.SPEED, setSpeed);
     const offMute = bus.on<boolean>(EV.MUTE, setMuted);
     const offNitro = bus.on<number>(EV.NITRO, setNitro);
     const offProb = bus.on<number>(EV.PROB, setProb);
@@ -165,7 +167,14 @@ export default function HudOverlay() {
       crashTimer = window.setTimeout(() => setCrashFlash(false), 900);
     });
 
+    const fallbackTimer = window.setTimeout(() => setHintsVisible(false), 8000);
+    let hideTimer = 0;
+    const offFirst = bus.on(EV.INPUT_FIRST, () => {
+      hideTimer = window.setTimeout(() => setHintsVisible(false), 2400);
+    });
+
     return () => {
+      offSpeed();
       offMute();
       offNitro();
       offProb();
@@ -175,14 +184,18 @@ export default function HudOverlay() {
       offScore();
       offResult();
       offCrash();
+      offFirst();
+      window.clearTimeout(fallbackTimer);
+      window.clearTimeout(hideTimer);
+      window.clearTimeout(crashTimer);
     };
   }, []);
 
   const marketName = market
-    ? market.question.length > 46
-      ? `${market.question.slice(0, 46)}…`
+    ? market.question.length > 52
+      ? `${market.question.slice(0, 52)}…`
       : market.question
-    : 'LOADING MARKET…';
+    : 'LOADING POLYMARKET DATA…';
 
   const deltaUp = (market?.probDelta ?? 0) >= 0;
   const deltaStr = `${deltaUp ? '+' : ''}${((market?.probDelta ?? 0) * 100).toFixed(1)}`;
@@ -199,59 +212,86 @@ export default function HudOverlay() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none">
-      {/* vignette */}
+      {/* Vignette background shading */}
       <div
         className="absolute inset-0"
-        style={{ background: 'radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,0.42) 100%)' }}
+        style={{ background: 'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.45) 100%)' }}
       />
 
-      {/* top-left: market panel */}
-      <div className="absolute top-4 left-4 w-105 border border-line bg-bg/85">
-        <div className="border-b border-line px-4 py-2.5">
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 shrink-0 bg-toxic" />
-            <span className="truncate font-mono text-[10px] tracking-[0.06em] text-dim">{marketName}</span>
-          </div>
-        </div>
-        <div className="flex items-stretch">
-          <div className="flex-1 px-4 py-3">
-            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">SCORE</div>
-            <div className="mt-1.5 font-mono text-3xl leading-none tabular-nums text-ink">{score.total}</div>
-          </div>
-          <div className="w-px bg-line" />
-          <div className="flex-1 px-4 py-3">
-            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">PROBABILITY</div>
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span
-                className={`font-mono text-3xl leading-none tabular-nums ${
-                  deltaUp ? 'text-toxic' : 'text-crimson'
-                }`}
-              >
-                {prob === null ? '—' : `${Math.round(prob * 100)}%`}
-              </span>
-              {market && (
-                <span
-                  className={`border px-1.5 py-0.5 font-mono text-[10px] leading-none tabular-nums ${
-                    deltaUp ? 'border-toxic/40 text-toxic' : 'border-crimson/40 text-crimson'
-                  }`}
-                >
-                  {deltaUp ? '▲' : '▼'} {Math.abs(parseFloat(deltaStr)).toFixed(1)}
-                </span>
-              )}
+      {/* Top-Left: Wordmark, Market Info & Real-Time Speed/Score/Odds Badges */}
+      <div className="absolute top-4 left-4 flex flex-col gap-2">
+        <div className="flex items-stretch gap-2">
+          {/* Brand Badge */}
+          <div className="border border-line bg-bg/90 px-3 py-2">
+            <div
+              className="font-display text-sm leading-none font-bold tracking-[0.18em] text-ink"
+              style={{ fontStretch: '118%' }}
+            >
+              ODDSRIDER
             </div>
+            <div className="mt-1.5 font-mono text-[9px] tracking-[0.32em] text-dim">LIVE TERMINAL</div>
+          </div>
+
+          {/* Speedometer Badge */}
+          <div className="border border-line bg-bg/90 px-3 py-2">
+            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">SPEED</div>
+            <div className="mt-0.5 font-mono text-xl leading-none tabular-nums text-ink font-bold">
+              {speed}
+              <span className="ml-1 text-[10px] text-dim font-normal">PX/S</span>
+            </div>
+          </div>
+
+          {/* Score Badge */}
+          <div className="border border-line bg-bg/90 px-3 py-2">
+            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">SCORE</div>
+            <div className="mt-0.5 font-mono text-xl leading-none tabular-nums text-ink font-bold">
+              {score.total}
+            </div>
+          </div>
+
+          {/* Mute Tag */}
+          {muted && (
+            <div className="self-start border border-crimson bg-bg/90 px-2 py-1 font-mono text-[9px] tracking-[0.28em] text-crimson">
+              AUDIO OFF
+            </div>
+          )}
+        </div>
+
+        {/* Live Market Event Strip */}
+        <div className="w-115 border border-line bg-bg/90 px-3.5 py-2.5">
+          <div className="flex items-center justify-between gap-2 border-b border-line/60 pb-1.5">
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="h-1.5 w-1.5 shrink-0 bg-toxic" />
+              <span className="truncate font-mono text-[10px] tracking-[0.06em] text-dim">{marketName}</span>
+            </div>
+            <span
+              className={`shrink-0 border px-1.5 py-0.5 font-mono text-[9px] leading-none tabular-nums font-bold ${
+                deltaUp ? 'border-toxic/40 text-toxic bg-toxic/10' : 'border-crimson/40 text-crimson bg-crimson/10'
+              }`}
+            >
+              {deltaUp ? '▲' : '▼'} {Math.abs(parseFloat(deltaStr)).toFixed(1)}%
+            </span>
+          </div>
+
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="font-mono text-[9px] tracking-[0.32em] text-dim">CURRENT ODDS</span>
+            <span className={`font-mono text-2xl leading-none font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
+              {prob === null ? '—' : `${Math.round(prob * 100)}% YES`}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* top-center: timer + nitro */}
-      <div className="absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-stretch gap-2">
-        <div className="border border-line bg-bg/85 px-5 py-2 text-center">
+      {/* Top-Center: Time & Nitro Bar */}
+      <div className="absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5">
+        <div className="border border-line bg-bg/90 px-5 py-2 text-center shadow-lg">
           <div className="font-mono text-[9px] tracking-[0.32em] text-dim">TIME</div>
-          <div className="mt-1 font-mono text-2xl leading-none tabular-nums text-ink">
+          <div className="mt-0.5 font-mono text-2xl leading-none tabular-nums text-ink font-bold">
             {formatTime(score.timeMs)}
           </div>
         </div>
-        <div className="flex items-center gap-2 border border-line bg-bg/85 px-3 py-1.5">
+
+        <div className="flex items-center gap-2 border border-line bg-bg/90 px-3 py-1.5 shadow-lg">
           <span className="font-mono text-[9px] tracking-[0.24em] text-dim">NITRO</span>
           <span className="flex gap-[3px]">
             {Array.from({ length: 10 }, (_, i) => (
@@ -261,12 +301,12 @@ export default function HudOverlay() {
         </div>
       </div>
 
-      {/* top-right: minimap + mute */}
+      {/* Top-Right: Track Minimap & Sound Toggle */}
       <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
         <MiniTrack pts={track} progress={progress} />
         <button
           onClick={toggleMute}
-          className={`pointer-events-auto cursor-pointer border bg-bg/85 px-2 py-1 font-mono text-[9px] tracking-[0.24em] ${
+          className={`pointer-events-auto cursor-pointer border bg-bg/90 px-2.5 py-1 font-mono text-[9px] tracking-[0.24em] ${
             muted ? 'border-crimson text-crimson' : 'border-line text-dim hover:text-ink'
           }`}
         >
@@ -274,7 +314,7 @@ export default function HudOverlay() {
         </button>
       </div>
 
-      {/* crash flash */}
+      {/* Crash Vignette Flash */}
       <div
         className={`absolute inset-0 border-4 border-crimson transition-opacity duration-300 ${
           crashFlash ? 'opacity-70' : 'opacity-0'
@@ -298,16 +338,24 @@ export default function HudOverlay() {
         onRetry={rideAgain}
       />
 
-      {/* bottom-right: persistent controls */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-1.5 border border-line bg-bg/85 px-4 py-3">
-        <ControlRow items={[['↑', 'gas'], ['Shift/N', 'nitro']]} />
-        <ControlRow items={[['←/→', 'lean'], ['Space', 'jump']]} />
-        <ControlRow items={[['R', 'reset'], ['M', 'mute']]} />
+      {/* Bottom-Center: Clean Intuitive Keyboard Control Hints (Restored) */}
+      <div
+        className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4 border border-line bg-bg/90 px-4 py-2 shadow-2xl transition-opacity duration-700 ${
+          hintsVisible ? 'opacity-100' : 'opacity-80'
+        }`}
+      >
+        <Hint keys={['W', '↑']} label="GAS" />
+        <Hint keys={['S', '↓']} label="BRAKE" />
+        <Hint keys={['A', 'D']} label="LEAN" />
+        <Hint keys={['SPACE']} label="JUMP" />
+        <Hint keys={['SHIFT', 'N']} label="NITRO" />
+        <Hint keys={['R']} label="RESET" />
+        <Hint keys={['M']} label="MUTE" />
       </div>
 
-      {/* bottom-center: wordmark */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-[0.42em] text-dim/70">
-        ODDSRIDER
+      {/* Bottom Wordmark Watermark */}
+      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 font-mono text-[9px] tracking-[0.42em] text-dim/50">
+        ODDSRIDER TERMINAL
       </div>
     </div>
   );
