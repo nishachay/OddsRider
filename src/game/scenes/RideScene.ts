@@ -32,6 +32,7 @@ export class RideScene extends Phaser.Scene {
   private flatGfx: Phaser.GameObjects.Graphics | null = null;
   private startGate!: Gate;
   private finishFx: FinishCelebration | null = null;
+  private resultTimer: Phaser.Time.TimerEvent | null = null;
   private rideSpawnX = WORLD.spawnX;
 
   private muted = false;
@@ -58,6 +59,8 @@ export class RideScene extends Phaser.Scene {
     this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
     this.inputMgr = new InputManager();
+
+    bus.on(EV.RESTART, () => this.doReset(true));
 
     const cam = this.cameras.main;
     cam.centerOn(this.bike.x, this.bike.y - 40);
@@ -245,7 +248,7 @@ export class RideScene extends Phaser.Scene {
       this.crashHandled = true;
       this.score.applyCrash();
       bus.emit(EV.CRASH);
-      this.time.delayedCall(800, () => {
+      this.resultTimer = this.time.delayedCall(800, () => {
         bus.emit(EV.RESULT, {
           finished: false,
           score: this.score.total,
@@ -257,7 +260,7 @@ export class RideScene extends Phaser.Scene {
     if (!this.score.finished && !this.bike.crashed && this.bike.x >= WORLD.finishX) {
       this.score.applyFinish();
       this.finishFx?.cross();
-      this.time.delayedCall(1100, () => {
+      this.resultTimer = this.time.delayedCall(1100, () => {
         this.parked = true;
         bus.emit(EV.RESULT, {
           finished: true,
@@ -300,6 +303,10 @@ export class RideScene extends Phaser.Scene {
   }
 
   private doReset(full: boolean): void {
+    if (this.resultTimer) {
+      this.resultTimer.destroy();
+      this.resultTimer = null;
+    }
     this.crashHandled = false;
     this.parked = false;
     if (full) this.score.fullReset();

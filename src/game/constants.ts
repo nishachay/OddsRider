@@ -82,7 +82,7 @@ export const TUNING = {
   jumpCooldownMs: 350,
   coyoteSteps: 6,
 
-  nitroDrain: 0.25,
+  nitroDrain: 0.5,
   nitroTrickle: 0.1,
   nitroArm: 0.1,
   nitroForce: 0.006,
@@ -91,14 +91,14 @@ export const TUNING = {
   invertedCrashMs: 900,
   headCrashTilt: 0.9,
 
-  killDrop: 1100,
+  killDrop: 8000,
   winBonus: 1000,
 } as const;
 
 export const TERRAIN = {
   bandTopY: -1000,
   bandBottomY: 1500,
-  leadIn: 400,
+  leadIn: 1200,
   runout: 8000,
 };
 

@@ -218,6 +218,10 @@ export class Bike {
     const B = this.scene.matter.body;
     const chassis = this.chassis;
 
+    if (this.crashed) {
+      input = { gas: false, brake: true, leanBack: false, leanFwd: false, nitro: false, jumpQueued: false };
+    }
+
     if (input.jumpQueued) this.jumpQ = true;
 
     // --- drive ---
@@ -262,8 +266,19 @@ export class Bike {
     if (this.nitroActive) {
       this.nitroTank = clamp(this.nitroTank - TUNING.nitroDrain * dtS, 0, 1);
       const a = chassis.angle;
-      const f = TUNING.nitroForce * chassis.mass;
-      B.applyForce(chassis, chassis.position, { x: Math.cos(a) * f, y: Math.sin(a) * f });
+      
+      if (this.coyote > 0) {
+        // GROUNDED: "Magnetic" wall-climbing mode
+        const forwardF = TUNING.nitroForce * chassis.mass * 1.5; // 1.5x power on ground
+        const downF = TUNING.nitroForce * chassis.mass * 1.0;    // Push into the wall to maintain grip
+        
+        // Forward thrust
+        B.applyForce(chassis, chassis.position, { x: Math.cos(a) * forwardF, y: Math.sin(a) * forwardF });
+        // Artificial downforce (perpendicular to chassis)
+        B.applyForce(chassis, chassis.position, { x: Math.cos(a + Math.PI/2) * downF, y: Math.sin(a + Math.PI/2) * downF });
+      } else {
+        // AIRBORNE: Zero thrust. Nitro is purely for climbing traction now.
+      }
     } else {
       this.nitroTank = clamp(this.nitroTank + TUNING.nitroTrickle * dtS, 0, 1);
     }
@@ -314,6 +329,15 @@ export class Bike {
     this.ejected = true;
     const world = this.scene.matter.world;
     const B = this.scene.matter.body;
+    
+    // Stop the bike dead so it doesn't bounce violently, letting the ragdoll fly free
+    B.setVelocity(this.chassis, { x: 0, y: 0 });
+    B.setAngularVelocity(this.chassis, 0);
+    B.setVelocity(this.rearWheel, { x: 0, y: 0 });
+    B.setAngularVelocity(this.rearWheel, 0);
+    B.setVelocity(this.frontWheel, { x: 0, y: 0 });
+    B.setAngularVelocity(this.frontWheel, 0);
+
     const h = this.head.position;
     const group = world.nextGroup(true);
     const body = this.scene.matter.bodies.rectangle(h.x, h.y + 6, 14, 30, {
