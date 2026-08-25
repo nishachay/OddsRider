@@ -222,10 +222,11 @@ export default function HudOverlay() {
       {/* Top-Left: Separated Brand Logo */}
       <div className="absolute top-5 left-5">
         <div
-          className="font-display text-lg leading-none font-bold tracking-[0.18em] text-ink drop-shadow-md"
+          className="font-display text-lg leading-none font-bold tracking-[0.18em] drop-shadow-md"
           style={{ fontStretch: '118%' }}
         >
-          ODDSRIDER
+          <span className="text-toxic">Odds</span>
+          <span className="text-ink">Rider</span>
         </div>
       </div>
 
