@@ -346,11 +346,6 @@ export default function HudOverlay() {
         <Hint keys={['R']} label="RESET" />
         <Hint keys={['M']} label="MUTE" />
       </div>
-
-      {/* Bottom Wordmark Watermark */}
-      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 font-mono text-[9px] tracking-[0.42em] text-dim/50">
-        ODDSRIDER TERMINAL
-      </div>
     </div>
   );
 }

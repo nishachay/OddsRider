@@ -51,10 +51,12 @@ export class RideScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(PALETTE.bg);
+    this.matter.world.pause();
     this.buildFlatGround();
     this.trackRenderer = new TrackRenderer(this);
 
-    this.startGate = this.createGate(WORLD.spawnX - 70, WORLD.groundTopY, 'START', PALETTE.toxic);
+    // Give a run-up: start gate is 400px AHEAD of the spawn
+    this.startGate = this.createGate(WORLD.spawnX + 600, WORLD.groundTopY, 'START', PALETTE.toxic);
 
     this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
@@ -120,9 +122,12 @@ export class RideScene extends Phaser.Scene {
       const probNow = series[series.length - 1]?.p ?? 0.5;
       const probDelta = probNow - (series[0]?.p ?? probNow);
       bus.emit(EV.MARKET, { question: ride.market.question, probNow, probDelta });
+      
+      this.matter.world.resume();
     } catch (err) {
       console.warn('loadRide failed', err);
       bus.emit(EV.MARKET, null);
+      this.matter.world.resume();
     }
   }
 
@@ -213,6 +218,8 @@ export class RideScene extends Phaser.Scene {
   }
 
   update(time: number, deltaMs: number): void {
+    if (!this.terrain) return;
+    
     if (this.inputMgr.takeReset()) this.doReset(true);
     if (this.inputMgr.takeMute()) {
       this.muted = !this.muted;

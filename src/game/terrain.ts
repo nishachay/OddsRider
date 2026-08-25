@@ -74,7 +74,9 @@ export function buildTerrain(series: PricePoint[]): Terrain {
   const minT = pts[0].t;
   const maxT = pts[n - 1].t;
   const tSpan = maxT - minT;
-  const span = WORLD.finishX - WORLD.spawnX;
+  
+  const graphStartX = WORLD.spawnX + 1200;
+  const span = WORLD.finishX - graphStartX;
 
   const ys: number[] = new Array(n);
   ys[0] = probToY(probs[0]);
@@ -93,10 +95,10 @@ export function buildTerrain(series: PricePoint[]): Terrain {
 
   const firstY = ys[0];
   push(WORLD.spawnX - TERRAIN.leadIn, firstY, probs[0]);
-  push(WORLD.spawnX, firstY, probs[0]);
+  push(graphStartX, firstY, probs[0]);
   for (let i = 1; i < n; i++) {
     const normT = tSpan > 0 ? (pts[i].t - minT) / tSpan : i / (n - 1);
-    push(WORLD.spawnX + span * normT, ys[i], probs[i]);
+    push(graphStartX + span * normT, ys[i], probs[i]);
   }
   const lastY = ys[n - 1];
   push(WORLD.finishX + TERRAIN.runout, lastY, probs[n - 1]);
