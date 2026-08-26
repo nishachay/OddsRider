@@ -40,4 +40,5 @@ export const EV = {
   POSITION: 'hud:position',
   STUDIO_UPDATE: 'studio:update',
   RESTART: 'game:restart',
+  GROUNDED: 'hud:grounded',
 } as const;

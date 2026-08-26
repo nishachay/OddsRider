@@ -139,12 +139,14 @@ export default function HudOverlay() {
   const [progress, setProgress] = useState(0);
   const [score, setScore] = useState<ScorePayload>({ total: 0, timeMs: 0, finished: false });
   const [result, setResult] = useState<ResultPayload | null>(null);
+  const [isAirborne, setIsAirborne] = useState(false);
 
   useEffect(() => {
     const offSpeed = bus.on<number>(EV.SPEED, setSpeed);
     const offMute = bus.on<boolean>(EV.MUTE, setMuted);
     const offNitro = bus.on<number>(EV.NITRO, setNitro);
     const offProb = bus.on<number>(EV.PROB, setProb);
+    const offGrounded = bus.on<boolean>(EV.GROUNDED, (g) => setIsAirborne(!g));
     const offTrack = bus.on<{ pts: TrackPts }>(EV.TRACK, (t) => {
       setTrack(t.pts);
       setProgress(0);
@@ -178,6 +180,7 @@ export default function HudOverlay() {
       offMute();
       offNitro();
       offProb();
+      offGrounded();
       offTrack();
       offPos();
       offMarket();
@@ -262,9 +265,9 @@ export default function HudOverlay() {
         <div className="flex items-center gap-6">
           <div className="flex flex-col">
             <span className="font-mono text-[9px] tracking-[0.32em] text-dim">SPEED</span>
-            <div className="mt-0.5 font-mono text-lg leading-none tabular-nums text-ink font-bold">
+            <div className="mt-0.5 flex items-baseline gap-1 font-mono text-lg leading-none tabular-nums text-ink font-bold">
               {speed}
-              <span className="ml-1 text-[9px] text-dim font-normal">PX/S</span>
+              <span className="ml-0.5 text-[9px] text-dim font-normal">KM/H</span>
             </div>
           </div>
           <div className="h-6 w-[1px] bg-line/50" />
@@ -274,6 +277,11 @@ export default function HudOverlay() {
               {score.total.toLocaleString()}
             </div>
           </div>
+          {isAirborne && (
+            <div className="ml-auto border border-toxic/50 bg-toxic/10 px-2 py-0.5">
+              <span className="font-mono text-[9px] font-bold tracking-widest text-toxic">AIR</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -288,11 +296,15 @@ export default function HudOverlay() {
 
         <div className="flex items-center gap-2 border border-line bg-bg/90 px-3 py-1.5 shadow-lg">
           <span className="font-mono text-[9px] tracking-[0.24em] text-dim">NITRO</span>
-          <span className="flex gap-[3px]">
-            {Array.from({ length: 10 }, (_, i) => (
-              <span key={i} className={`h-2.5 w-1.5 ${nitro * 10 > i ? 'bg-toxic' : 'bg-line'}`} />
-            ))}
-          </span>
+          <div className="relative h-2.5 w-24 overflow-hidden bg-line">
+            <div
+              className="absolute inset-y-0 left-0 bg-toxic transition-all duration-100"
+              style={{
+                width: `${nitro * 100}%`,
+                boxShadow: nitro > 0.15 ? `0 0 6px #b6ff00` : 'none',
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -336,7 +348,7 @@ export default function HudOverlay() {
       {/* Bottom-Center: Clean Intuitive Keyboard Control Hints (Studio design explicitly restored) */}
       <div
         className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4 border border-line bg-bg/90 px-4 py-2 shadow-2xl transition-opacity duration-700 ${
-          hintsVisible ? 'opacity-100' : 'opacity-80 hover:opacity-100'
+          hintsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
         <Hint keys={['W', '↑']} label="GAS" />

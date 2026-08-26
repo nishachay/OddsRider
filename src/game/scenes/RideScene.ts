@@ -34,6 +34,7 @@ export class RideScene extends Phaser.Scene {
   private finishFx: FinishCelebration | null = null;
   private resultTimer: Phaser.Time.TimerEvent | null = null;
   private rideSpawnX = WORLD.spawnX;
+  private offRestart: (() => void) | null = null;
 
   private muted = false;
   private acc = 0;
@@ -42,8 +43,13 @@ export class RideScene extends Phaser.Scene {
   private nextNitroEmitAt = 0;
   private nextProbEmitAt = 0;
   private nextScoreEmitAt = 0;
+  private nextGroundedEmitAt = 0;
   private score = new RideScore();
   private parked = false;
+
+  // Camera crash snapshot — lerp to fixed point, not live ragdoll
+  private crashCamX = 0;
+  private crashCamY = 0;
 
   constructor() {
     super('ride');
@@ -62,7 +68,12 @@ export class RideScene extends Phaser.Scene {
     this.bikeRenderer = new BikeRenderer(this);
     this.inputMgr = new InputManager();
 
-    bus.on(EV.RESTART, () => this.doReset(true));
+    // Store handle so we can remove it on shutdown — prevents duplicate listeners on hot reload
+    if (this.offRestart) this.offRestart();
+    this.offRestart = bus.on(EV.RESTART, () => this.doReset(true));
+    this.events.once('shutdown', () => {
+      if (this.offRestart) { this.offRestart(); this.offRestart = null; }
+    });
 
     const cam = this.cameras.main;
     cam.centerOn(this.bike.x, this.bike.y - 40);
@@ -245,7 +256,8 @@ export class RideScene extends Phaser.Scene {
       steps++;
     }
     if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
-    this.score.step(steps * STEP_MS, this.bike.x);
+    // Only tick score while alive — stops timer after crash
+    if (!this.bike.crashed) this.score.step(steps * STEP_MS, this.bike.x);
     if (this.parked) this.bike.park();
 
     this.trackRenderer.update();
@@ -255,6 +267,9 @@ export class RideScene extends Phaser.Scene {
       this.crashHandled = true;
       this.score.applyCrash();
       bus.emit(EV.CRASH);
+      // Snapshot the camera target at the moment of crash — avoids camera chasing the bouncing ragdoll
+      this.crashCamX = this.bike.chassis.position.x;
+      this.crashCamY = this.bike.chassis.position.y;
       this.resultTimer = this.time.delayedCall(800, () => {
         bus.emit(EV.RESULT, {
           finished: false,
@@ -277,25 +292,36 @@ export class RideScene extends Phaser.Scene {
       });
     }
 
-    // camera: lerp follow with velocity lookahead (chase the ragdoll after a crash)
+    // camera: lerp follow with velocity lookahead
     const cam = this.cameras.main;
-    const ragdoll = this.bike.ejected ? this.bike.ragdollBody : null;
-    const p = ragdoll ? ragdoll.position : this.bike.chassis.position;
     const spd = Math.abs(this.bike.speed);
-    const dir = Math.sign(this.bike.chassis.velocity.x) || 1;
-    const look = dir * Math.min(spd * 0.22, 220);
-    const tx = p.x + look;
-    const ty = p.y - 40;
+    let tx: number;
+    let ty: number;
+    if (this.bike.crashed) {
+      // After crash: smoothly zoom out and hold at crash position — don't chase ragdoll
+      tx = this.crashCamX;
+      ty = this.crashCamY - 60;
+    } else {
+      const dir = Math.sign(this.bike.chassis.velocity.x) || 1;
+      const look = dir * Math.min(spd * 0.22, 220);
+      tx = this.bike.chassis.position.x + look;
+      ty = this.bike.chassis.position.y - 40;
+    }
     cam.scrollX += (tx - cam.width / 2 - cam.scrollX) * 0.08;
     cam.scrollY += (ty - cam.height / 2 - cam.scrollY) * 0.08;
 
     if (time > this.nextSpeedEmitAt) {
       this.nextSpeedEmitAt = time + 100;
-      bus.emit(EV.SPEED, Math.round(spd));
+      // Convert physics px/step speed to km/h (feels natural for a dirt bike: 0 to ~250 km/h range)
+      bus.emit(EV.SPEED, Math.round(spd * 0.06));
     }
     if (time > this.nextNitroEmitAt) {
       this.nextNitroEmitAt = time + 120;
       bus.emit(EV.NITRO, this.bike.nitro);
+    }
+    if (time > this.nextGroundedEmitAt) {
+      this.nextGroundedEmitAt = time + 80;
+      bus.emit(EV.GROUNDED, this.bike.grounded);
     }
     if (this.terrain && time > this.nextProbEmitAt) {
       this.nextProbEmitAt = time + 150;

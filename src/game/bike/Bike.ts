@@ -262,24 +262,18 @@ export class Bike {
     } else if (input.nitro && this.nitroTank >= TUNING.nitroArm) {
       this.nitroLatch = true;
     }
-    this.nitroActive = this.nitroLatch && this.nitroTank > 0;
+    const isGroundedForNitro = this.coyote > 0;
+    this.nitroActive = this.nitroLatch && this.nitroTank > 0 && isGroundedForNitro;
     if (this.nitroActive) {
+      // Only drain when we're actually applying thrust
       this.nitroTank = clamp(this.nitroTank - TUNING.nitroDrain * dtS, 0, 1);
       const a = chassis.angle;
-      
-      if (this.coyote > 0) {
-        // GROUNDED: "Magnetic" wall-climbing mode
-        const forwardF = TUNING.nitroForce * chassis.mass * 1.5; // 1.5x power on ground
-        const downF = TUNING.nitroForce * chassis.mass * 1.0;    // Push into the wall to maintain grip
-        
-        // Forward thrust
-        B.applyForce(chassis, chassis.position, { x: Math.cos(a) * forwardF, y: Math.sin(a) * forwardF });
-        // Artificial downforce (perpendicular to chassis)
-        B.applyForce(chassis, chassis.position, { x: Math.cos(a + Math.PI/2) * downF, y: Math.sin(a + Math.PI/2) * downF });
-      } else {
-        // AIRBORNE: Zero thrust. Nitro is purely for climbing traction now.
-      }
-    } else {
+      const forwardF = TUNING.nitroForce * chassis.mass * 1.5;
+      const downF = TUNING.nitroForce * chassis.mass * 1.0;
+      B.applyForce(chassis, chassis.position, { x: Math.cos(a) * forwardF, y: Math.sin(a) * forwardF });
+      B.applyForce(chassis, chassis.position, { x: Math.cos(a + Math.PI / 2) * downF, y: Math.sin(a + Math.PI / 2) * downF });
+    } else if (!this.nitroLatch) {
+      // Only recharge when nitro is not latched (released)
       this.nitroTank = clamp(this.nitroTank + TUNING.nitroTrickle * dtS, 0, 1);
     }
 
@@ -289,7 +283,7 @@ export class Bike {
       const now = this.scene.time.now;
       if ((this.grounded || this.coyote > 0) && now - this.lastJumpAt > TUNING.jumpCooldownMs) {
         this.lastJumpAt = now;
-        for (const b of [chassis, this.rearWheel, this.frontWheel]) {
+        for (const b of [chassis, this.rearWheel, this.frontWheel, this.head]) {
           B.setVelocity(b, { x: b.velocity.x, y: Math.min(b.velocity.y, -TUNING.jumpVelocity) });
         }
       }
@@ -329,7 +323,11 @@ export class Bike {
     this.ejected = true;
     const world = this.scene.matter.world;
     const B = this.scene.matter.body;
-    
+
+    // Read velocity BEFORE zeroing — ragdoll launch must reflect crash speed
+    const cv = this.chassis.velocity;
+    const a = this.chassis.angle;
+
     // Stop the bike dead so it doesn't bounce violently, letting the ragdoll fly free
     B.setVelocity(this.chassis, { x: 0, y: 0 });
     B.setAngularVelocity(this.chassis, 0);
@@ -349,10 +347,9 @@ export class Bike {
       chamfer: { radius: 6 },
       collisionFilter: { group, category: 0x0001, mask: 0xffffffff },
     });
-    const cv = this.chassis.velocity;
-    const a = this.chassis.angle;
     B.setAngle(body, a);
-    B.setVelocity(body, { x: cv.x + Math.cos(a) * 2.75 + 1.5, y: cv.y - 5.5 });
+    // Launch reflects actual crash speed — fast crash = ragdoll flies far
+    B.setVelocity(body, { x: cv.x * 0.8 + Math.cos(a) * 2.75 + 1.5, y: cv.y * 0.6 - 5.5 });
     B.setAngularVelocity(body, 0.3 + Math.random() * 0.25);
     world.add(body);
     this.ragdollBody = body;
