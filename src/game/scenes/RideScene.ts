@@ -155,15 +155,15 @@ export class RideScene extends Phaser.Scene {
         label: 'ground',
       });
     }
-    const spawnX = WORLD.spawnX - TERRAIN.leadIn / 2;
-    const spawnY = this.trackRenderer.groundYAt(spawnX) - WORLD.spawnDy;
+    const spawnX = WORLD.spawnX;
+    const spawnY = WORLD.groundTopY - WORLD.spawnDy;
     this.rideSpawnX = spawnX;
     this.bike.setSpawn(spawnX, spawnY);
     this.bike.reset();
     this.score.setCourse(spawnX);
     this.finishFx?.destroy();
     this.finishFx = new FinishCelebration(this, WORLD.finishX, this.trackRenderer.groundYAt(WORLD.finishX));
-    this.placeGate(this.startGate, WORLD.spawnX, this.trackRenderer.groundYAt(WORLD.spawnX));
+    this.placeGate(this.startGate, WORLD.spawnX + 600, WORLD.groundTopY);
 
     const wallX = WORLD.finishX + TERRAIN.runout + 60;
     const wallY = this.trackRenderer.groundYAt(wallX);

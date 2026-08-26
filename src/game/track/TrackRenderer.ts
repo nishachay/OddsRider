@@ -64,7 +64,7 @@ export class TrackRenderer {
     const right = view.right + 120;
 
     const startIdx = this.firstIndexAt(left);
-    const endIdx = this.firstIndexAt(right);
+    const endIdx = Math.min(terrain.points.length - 1, this.firstIndexAt(right) + 1);
 
     const bottom = WORLD.groundTopY + 5000;
 
