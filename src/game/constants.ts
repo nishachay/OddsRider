@@ -65,7 +65,7 @@ export const TUNING = {
   wheelieTorque: 0.018,
   maxWheelieAv: 0.11,
 
-  flipLean: 0.05,
+  flipLean: 0.022,
   groundLean: 0.006,
   tippedAngle: 1.75,
 
@@ -82,11 +82,12 @@ export const TUNING = {
   jumpCooldownMs: 350,
   coyoteSteps: 6,
 
-  nitroDrain: 0.67,
-  nitroTrickle: 0.08,
+  nitroDrain: 0.5,
+  nitroTrickle: 0.1,
   nitroArm: 0.05,
-  nitroWheelBoost: 2.2,
-  nitroMaxHorizSpeed: 32,
+  nitroForce: 1.2,
+  nitroGrip: 0.5,
+  nitroWheelBoost: 2.0,
 
   invertedCrashTilt: 2.4,
   invertedCrashMs: 900,
