@@ -256,24 +256,30 @@ export class Bike {
     }
 
     // --- nitro ---
+    // Model: spin the rear wheel faster, let physics handle the rest via friction.
+    // On flat ground at speed: wheel is already near max → small extra push.
+    // On steep slope where wheel was slipping: extra spin gives traction to climb.
+    // No chassis forces = no flying off steep exits.
     const dtS = STEP_MS / 1000;
     if (this.nitroLatch) {
       if (!input.nitro || this.nitroTank <= 0) this.nitroLatch = false;
     } else if (input.nitro && this.nitroTank >= TUNING.nitroArm) {
       this.nitroLatch = true;
     }
-    const isGroundedForNitro = this.coyote > 0;
-    this.nitroActive = this.nitroLatch && this.nitroTank > 0 && isGroundedForNitro;
+    const groundedForNitro = this.coyote > 0;
+    this.nitroActive = this.nitroLatch && this.nitroTank > 0 && groundedForNitro;
     if (this.nitroActive) {
-      // Only drain when we're actually applying thrust
       this.nitroTank = clamp(this.nitroTank - TUNING.nitroDrain * dtS, 0, 1);
-      const a = chassis.angle;
-      const forwardF = TUNING.nitroForce * chassis.mass * 1.5;
-      const downF = TUNING.nitroForce * chassis.mass * 1.0;
-      B.applyForce(chassis, chassis.position, { x: Math.cos(a) * forwardF, y: Math.sin(a) * forwardF });
-      B.applyForce(chassis, chassis.position, { x: Math.cos(a + Math.PI / 2) * downF, y: Math.sin(a + Math.PI / 2) * downF });
+      // Boost wheel spin beyond normal gas ceiling
+      const targetAv = TUNING.maxWheelAv * TUNING.nitroWheelBoost;
+      const av = this.rearWheel.angularVelocity;
+      B.setAngularVelocity(this.rearWheel, Math.min(av + TUNING.wheelAccel * 2, targetAv));
+      // Soft horizontal speed cap — prevents catapulting off steep exits
+      const vx = chassis.velocity.x;
+      if (Math.abs(vx) > TUNING.nitroMaxHorizSpeed) {
+        B.setVelocity(chassis, { x: Math.sign(vx) * TUNING.nitroMaxHorizSpeed, y: chassis.velocity.y });
+      }
     } else if (!this.nitroLatch) {
-      // Only recharge when nitro is not latched (released)
       this.nitroTank = clamp(this.nitroTank + TUNING.nitroTrickle * dtS, 0, 1);
     }
 

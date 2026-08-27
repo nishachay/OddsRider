@@ -270,7 +270,7 @@ export class RideScene extends Phaser.Scene {
       // Snapshot the camera target at the moment of crash — avoids camera chasing the bouncing ragdoll
       this.crashCamX = this.bike.chassis.position.x;
       this.crashCamY = this.bike.chassis.position.y;
-      this.resultTimer = this.time.delayedCall(800, () => {
+      this.resultTimer = this.time.delayedCall(1400, () => {
         bus.emit(EV.RESULT, {
           finished: false,
           score: this.score.total,

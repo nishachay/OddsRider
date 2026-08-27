@@ -82,10 +82,11 @@ export const TUNING = {
   jumpCooldownMs: 350,
   coyoteSteps: 6,
 
-  nitroDrain: 0.5,
-  nitroTrickle: 0.1,
-  nitroArm: 0.1,
-  nitroForce: 0.006,
+  nitroDrain: 0.67,
+  nitroTrickle: 0.08,
+  nitroArm: 0.05,
+  nitroWheelBoost: 2.2,
+  nitroMaxHorizSpeed: 32,
 
   invertedCrashTilt: 2.4,
   invertedCrashMs: 900,

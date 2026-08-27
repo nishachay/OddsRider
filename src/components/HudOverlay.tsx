@@ -154,12 +154,10 @@ export default function HudOverlay() {
     const offPos = bus.on<number>(EV.POSITION, setProgress);
     const offMarket = bus.on<MarketPayload | null>(EV.MARKET, (m) => {
       setMarket(m);
-      setResult(null);
       if (!m) setTrack(null);
     });
     const offScore = bus.on<ScorePayload>(EV.SCORE, (s) => {
       setScore(s);
-      if (!s.finished) setResult(null);
     });
     const offResult = bus.on<ResultPayload>(EV.RESULT, setResult);
     let crashTimer = 0;
@@ -216,119 +214,120 @@ export default function HudOverlay() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none">
-      {/* Vignette background shading */}
+      {/* Vignette */}
       <div
         className="absolute inset-0"
-        style={{ background: 'radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.45) 100%)' }}
+        style={{ background: 'radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%)' }}
       />
 
-      {/* Top-Left: Separated Brand Logo */}
-      <div className="absolute top-5 left-5">
+      {/* ── ZONE 1: TOP-LEFT — Brand + Market Context ────────────────── */}
+      <div className="absolute top-5 left-5 flex flex-col gap-3">
+        {/* Logo */}
         <div
-          className="font-display text-lg leading-none font-bold tracking-[0.18em] drop-shadow-md"
+          className="font-display text-base leading-none font-bold tracking-[0.2em] drop-shadow-md"
           style={{ fontStretch: '118%' }}
         >
           <span className="text-toxic">Odds</span>
           <span className="text-ink">Rider</span>
         </div>
-      </div>
 
-      {/* Mid-Left: Cohesive Telemetry & Market Panel (Matches bottom bar style) */}
-      <div className="absolute top-14 left-5 flex flex-col gap-4 border border-line bg-bg/90 px-4 py-3 shadow-2xl w-[340px]">
-        
-        {/* Market Strip */}
-        <div className="flex flex-col gap-1.5 border-b border-line/50 pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="h-1.5 w-1.5 shrink-0 bg-toxic" />
-              <span className="truncate font-mono text-[10px] tracking-[0.06em] text-dim">
-                {marketName}
-              </span>
-            </div>
+        {/* Market — slim, no box, just text rows */}
+        <div className="flex flex-col gap-1 max-w-[230px]">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 shrink-0 bg-toxic" />
+            <span className="truncate font-mono text-[9px] tracking-[0.06em] text-dim leading-none">
+              {marketName}
+            </span>
             <span
-              className={`shrink-0 border px-1.5 py-0.5 font-mono text-[9px] leading-none tabular-nums font-bold ${
-                deltaUp ? 'border-toxic/40 text-toxic bg-toxic/10' : 'border-crimson/40 text-crimson bg-crimson/10'
+              className={`ml-auto shrink-0 border px-1.5 py-0.5 font-mono text-[8px] leading-none tabular-nums font-bold ${
+                deltaUp ? 'border-toxic/40 text-toxic' : 'border-crimson/40 text-crimson'
               }`}
             >
-              {deltaUp ? 'UP' : 'DN'} {Math.abs(parseFloat(deltaStr)).toFixed(1)}%
+              {deltaUp ? '▲' : '▼'} {Math.abs(parseFloat(deltaStr)).toFixed(1)}%
             </span>
           </div>
-          <div className="flex items-baseline justify-between">
-            <span className="font-mono text-[9px] tracking-[0.32em] text-dim">CURRENT ODDS</span>
-            <span className={`font-mono text-xl leading-none font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
-              {prob === null ? '—' : `${(prob * 100).toFixed(2)}% YES`}
+          <div className="flex items-baseline gap-2 pl-3.5">
+            <span className={`font-mono text-lg leading-none font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
+              {prob === null ? '—' : `${(prob * 100).toFixed(1)}%`}
             </span>
+            <span className="font-mono text-[9px] text-dim">YES</span>
           </div>
-        </div>
-
-        {/* Telemetry Strip */}
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col">
-            <span className="font-mono text-[9px] tracking-[0.32em] text-dim">SPEED</span>
-            <div className="mt-0.5 flex items-baseline gap-1 font-mono text-lg leading-none tabular-nums text-ink font-bold">
-              {speed}
-              <span className="ml-0.5 text-[9px] text-dim font-normal">KM/H</span>
-            </div>
-          </div>
-          <div className="h-6 w-[1px] bg-line/50" />
-          <div className="flex flex-col">
-            <span className="font-mono text-[9px] tracking-[0.32em] text-dim">SCORE</span>
-            <div className="mt-0.5 font-mono text-lg leading-none tabular-nums text-ink font-bold">
-              {score.total.toLocaleString()}
-            </div>
-          </div>
-          {isAirborne && (
-            <div className="ml-auto border border-toxic/50 bg-toxic/10 px-2 py-0.5">
-              <span className="font-mono text-[9px] font-bold tracking-widest text-toxic">AIR</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Top-Center: Time & Nitro Bar (Studio Aesthetic) */}
+      {/* ── ZONE 2: TOP-CENTER — Time + Nitro (primary game state) ───── */}
       <div className="absolute top-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5">
-        <div className="border border-line bg-bg/90 px-5 py-2 text-center shadow-lg">
-          <div className="font-mono text-[9px] tracking-[0.32em] text-dim">TIME</div>
+        <div className="border border-line bg-bg/90 px-6 py-2 text-center">
+          <div className="font-mono text-[8px] tracking-[0.4em] text-dim">TIME</div>
           <div className="mt-0.5 font-mono text-2xl leading-none tabular-nums text-ink font-bold">
             {formatTime(score.timeMs)}
           </div>
         </div>
-
-        <div className="flex items-center gap-2 border border-line bg-bg/90 px-3 py-1.5 shadow-lg">
-          <span className="font-mono text-[9px] tracking-[0.24em] text-dim">NITRO</span>
-          <div className="relative h-2.5 w-24 overflow-hidden bg-line">
+        <div className="flex items-center gap-2 border border-line bg-bg/90 px-3 py-1.5">
+          <span className="font-mono text-[8px] tracking-[0.3em] text-dim">NITRO</span>
+          <div className="relative h-2 w-28 overflow-hidden bg-line">
             <div
-              className="absolute inset-y-0 left-0 bg-toxic transition-all duration-100"
+              className="absolute inset-y-0 left-0 bg-toxic transition-all duration-75"
               style={{
                 width: `${nitro * 100}%`,
-                boxShadow: nitro > 0.15 ? `0 0 6px #b6ff00` : 'none',
+                boxShadow: nitro > 0.12 ? '0 0 5px #b6ff00' : 'none',
               }}
             />
           </div>
+          {/* Nitro active pulse dot */}
+          <span
+            className={`h-1.5 w-1.5 rounded-full transition-opacity duration-75 ${
+              nitro > 0.12 ? 'bg-toxic opacity-100' : 'bg-line opacity-40'
+            }`}
+          />
         </div>
       </div>
 
-      {/* Top-Right: Track Minimap & Sound Toggle */}
+      {/* ── ZONE 3: TOP-RIGHT — Minimap + Mute ───────────────────────── */}
       <div className="absolute top-4 right-4 flex flex-col items-end gap-2">
         <MiniTrack pts={track} progress={progress} />
         <button
           onClick={toggleMute}
-          className={`pointer-events-auto cursor-pointer border bg-bg/90 px-2.5 py-1 font-mono text-[9px] tracking-[0.24em] shadow-sm ${
-            muted ? 'border-crimson text-crimson' : 'border-line text-dim hover:text-ink'
+          className={`pointer-events-auto cursor-pointer border bg-bg/90 px-2.5 py-1 font-mono text-[8px] tracking-[0.28em] ${
+            muted ? 'border-crimson/60 text-crimson' : 'border-line text-dim hover:text-ink'
           }`}
         >
-          {muted ? 'AUDIO OFF' : 'AUDIO ON'}
+          {muted ? 'MUTED' : 'AUDIO ON'}
         </button>
+      </div>
+
+      {/* ── ZONE 4: BOTTOM-LEFT — Speed + Score + Airborne ───────────── */}
+      <div className="absolute bottom-14 left-5 flex items-center gap-5 border border-line bg-bg/90 px-4 py-2.5">
+        <div className="flex flex-col">
+          <span className="font-mono text-[8px] tracking-[0.3em] text-dim">SPEED</span>
+          <div className="mt-0.5 flex items-baseline gap-1">
+            <span className="font-mono text-xl leading-none tabular-nums text-ink font-bold">{speed}</span>
+            <span className="font-mono text-[8px] text-dim">KM/H</span>
+          </div>
+        </div>
+        <div className="h-7 w-px bg-line/50" />
+        <div className="flex flex-col">
+          <span className="font-mono text-[8px] tracking-[0.3em] text-dim">SCORE</span>
+          <div className="mt-0.5 font-mono text-xl leading-none tabular-nums text-ink font-bold">
+            {score.total.toLocaleString()}
+          </div>
+        </div>
+        {isAirborne && (
+          <>
+            <div className="h-7 w-px bg-line/50" />
+            <span className="font-mono text-[9px] font-bold tracking-[0.3em] text-toxic">AIR</span>
+          </>
+        )}
       </div>
 
       {/* Crash Vignette Flash */}
       <div
-        className={`absolute inset-0 border-4 border-crimson transition-opacity duration-300 ${
-          crashFlash ? 'opacity-70' : 'opacity-0'
+        className={`absolute inset-0 border-[3px] border-crimson transition-opacity duration-200 ${
+          crashFlash ? 'opacity-60' : 'opacity-0'
         }`}
       />
 
-      {/* Cyber Result Overlay Modal */}
+      {/* Result Modal */}
       <ResultModal
         isOpen={Boolean(result)}
         result={
@@ -345,9 +344,9 @@ export default function HudOverlay() {
         onRetry={rideAgain}
       />
 
-      {/* Bottom-Center: Clean Intuitive Keyboard Control Hints (Studio design explicitly restored) */}
+      {/* Bottom-Center: Control Hints — fully hidden after first input */}
       <div
-        className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4 border border-line bg-bg/90 px-4 py-2 shadow-2xl transition-opacity duration-700 ${
+        className={`absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-4 border border-line bg-bg/90 px-4 py-2 transition-opacity duration-700 ${
           hintsVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       >
@@ -355,7 +354,7 @@ export default function HudOverlay() {
         <Hint keys={['S', '↓']} label="BRAKE" />
         <Hint keys={['A', 'D']} label="LEAN" />
         <Hint keys={['SPACE']} label="JUMP" />
-        <Hint keys={['SHIFT', 'N']} label="NITRO" />
+        <Hint keys={['SHIFT']} label="NITRO" />
         <Hint keys={['R']} label="RESET" />
         <Hint keys={['M']} label="MUTE" />
       </div>
