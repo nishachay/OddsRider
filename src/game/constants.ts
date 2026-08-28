@@ -100,13 +100,15 @@ export const TUNING = {
 export const TERRAIN = {
   bandTopY: -1000,
   bandBottomY: 1500,
-  leadIn: 400,
+  leadIn: 1200,
   runout: 8000,
 };
 
 export const WORLD = {
   spawnX: 400,
   groundTopY: 600,
+  groundLength: 32_000,
+  groundThickness: 120,
   spawnDy: 120,
   finishY: 600,
   tickSpacing: 500,
