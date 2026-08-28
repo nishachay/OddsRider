@@ -64,7 +64,7 @@ export class RideScene extends Phaser.Scene {
     // Flag is 80px ahead — immediately visible to the right of spawn
     this.startGate = this.createGate(WORLD.spawnX + 600, WORLD.groundTopY, 'START', PALETTE.toxic);
 
-    this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - WORLD.spawnDy);
+    this.bike = new Bike(this, WORLD.spawnX + 450, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
     this.inputMgr = new InputManager();
 
@@ -166,7 +166,7 @@ export class RideScene extends Phaser.Scene {
         label: 'ground',
       });
     }
-    const spawnX = WORLD.spawnX;
+    const spawnX = WORLD.spawnX + 450;
     const spawnY = WORLD.groundTopY - WORLD.spawnDy;
     this.rideSpawnX = spawnX;
     this.bike.setSpawn(spawnX, spawnY);
