@@ -61,8 +61,8 @@ export class RideScene extends Phaser.Scene {
     this.buildFlatGround();
     this.trackRenderer = new TrackRenderer(this);
 
-    // Give a run-up: start gate is 400px AHEAD of the spawn
-    this.startGate = this.createGate(WORLD.spawnX + 600, WORLD.groundTopY, 'START', PALETTE.toxic);
+    // Give a short run-up: start gate is 300px ahead of spawn, visible from the start
+    this.startGate = this.createGate(WORLD.spawnX + 300, WORLD.groundTopY, 'START', PALETTE.toxic);
 
     this.bike = new Bike(this, WORLD.spawnX, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);

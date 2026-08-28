@@ -1,11 +1,15 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bus, EV } from "../game/bus";
 import ResultModal from "./ResultModal";
 
 const TOXIC = "#b6ff00";
 const CRIMSON = "#ff3355";
+const LINE = "#232529";
+const BG = "rgba(10,10,11,0.97)";
+const DIM = "#7c7f86";
+const INK = "#e8e8ea";
 
-function formatTime(ms: number): string {
+function fmt(ms: number): string {
   const s = ms / 1000;
   const m = Math.floor(s / 60);
   const secs = (s % 60).toFixed(1).padStart(4, "0");
@@ -13,73 +17,51 @@ function formatTime(ms: number): string {
 }
 
 type TrackPts = Array<[number, number]>;
-
-const MAP_W = 120;
-const MAP_H = 38;
-const MAP_PAD = 3;
+const CW = 128, CH = 40, CP = 3;
 
 function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
-
   const geo = useMemo(() => {
     if (!pts || pts.length < 2) return null;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const [x, y] of pts) {
-      if (x < minX) minX = x; if (x > maxX) maxX = x;
-      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+      y0 = Math.min(y0, y); y1 = Math.max(y1, y);
     }
-    return { minX, maxX, minY, maxY };
+    return { x0, x1, y0, y1 };
   }, [pts]);
-
-  const scale = useMemo(() => {
+  const sc = useMemo(() => {
     if (!geo) return null;
-    const sx = (MAP_W - MAP_PAD * 2) / Math.max(1, geo.maxX - geo.minX);
-    const sy = (MAP_H - MAP_PAD * 2) / Math.max(1, geo.maxY - geo.minY);
-    return { sx, sy };
+    return { sx: (CW - CP * 2) / Math.max(1, geo.x1 - geo.x0), sy: (CH - CP * 2) / Math.max(1, geo.y1 - geo.y0) };
   }, [geo]);
-
   useEffect(() => {
-    const c = ref.current;
-    if (!c || !pts || !geo || !scale) return;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    const { minX, minY } = geo;
-    const { sx, sy } = scale;
-    const px = (x: number) => MAP_PAD + (x - minX) * sx;
-    const py = (y: number) => MAP_PAD + (y - minY) * sy;
-    ctx.clearRect(0, 0, MAP_W, MAP_H);
+    const c = ref.current; if (!c || !pts || !geo || !sc) return;
+    const ctx = c.getContext("2d"); if (!ctx) return;
+    const px = (x: number) => CP + (x - geo.x0) * sc.sx;
+    const py = (y: number) => CP + (y - geo.y0) * sc.sy;
+    ctx.clearRect(0, 0, CW, CH);
     ctx.lineWidth = 1.5;
     for (let i = 1; i < pts.length; i++) {
       ctx.strokeStyle = pts[i][1] <= pts[i - 1][1] ? TOXIC : CRIMSON;
-      ctx.beginPath();
-      ctx.moveTo(px(pts[i - 1][0]), py(pts[i - 1][1]));
-      ctx.lineTo(px(pts[i][0]), py(pts[i][1]));
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px(pts[i-1][0]), py(pts[i-1][1]));
+      ctx.lineTo(px(pts[i][0]), py(pts[i][1])); ctx.stroke();
     }
-  }, [pts, geo, scale]);
-
+  }, [pts, geo, sc]);
   const dot = useMemo(() => {
-    if (!pts || !geo || !scale) return null;
-    const { minX, maxX, minY } = geo;
-    const { sx, sy } = scale;
-    const xT = minX + Math.min(1, Math.max(0, progress)) * (maxX - minX);
+    if (!pts || !geo || !sc) return null;
+    const xT = geo.x0 + Math.min(1, Math.max(0, progress)) * (geo.x1 - geo.x0);
     let i = 0;
     while (i < pts.length - 2 && pts[i + 1][0] < xT) i++;
-    const [xa, ya] = pts[i];
-    const [xb, yb] = pts[i + 1] ?? pts[i];
+    const [xa, ya] = pts[i], [xb, yb] = pts[i + 1] ?? pts[i];
     const t = xb > xa ? (xT - xa) / (xb - xa) : 0;
-    const yv = ya + (yb - ya) * t;
-    return { left: MAP_PAD + (xT - minX) * sx, top: MAP_PAD + (yv - minY) * sy };
-  }, [pts, geo, scale, progress]);
-
+    return { left: CP + (xT - geo.x0) * sc.sx, top: CP + (ya + (yb - ya) * t - geo.y0) * sc.sy };
+  }, [pts, geo, sc, progress]);
   return (
-    <div className="relative" style={{ width: MAP_W, height: MAP_H }}>
-      <canvas ref={ref} width={MAP_W} height={MAP_H} className="absolute inset-0" />
+    <div className="relative" style={{ width: CW, height: CH }}>
+      <canvas ref={ref} width={CW} height={CH} className="absolute inset-0" />
       {dot && (
-        <span
-          className="absolute h-1.5 w-1.5 rounded-full bg-toxic"
-          style={{ left: dot.left - 3, top: dot.top - 3, boxShadow: `0 0 4px ${TOXIC}` }}
-        />
+        <span className="absolute rounded-full"
+          style={{ width: 6, height: 6, background: TOXIC, boxShadow: `0 0 5px ${TOXIC}`, left: dot.left - 3, top: dot.top - 3 }} />
       )}
     </div>
   );
@@ -89,52 +71,63 @@ interface ScorePayload { total: number; timeMs: number; finished: boolean; }
 interface MarketPayload { question: string; probNow: number; probDelta: number; }
 interface ResultPayload { finished: boolean; score: number; timeMs: number; }
 
+const SEP = <span style={{ width: 1, alignSelf: "stretch", background: LINE }} />;
+
+const CONTROLS = [
+  { key: "W / ↑", label: "Gas" },
+  { key: "S / ↓", label: "Brake" },
+  { key: "A / D", label: "Lean" },
+  { key: "SPC", label: "Jump" },
+  { key: "SHIFT", label: "Nitro" },
+  { key: "R", label: "Reset" },
+  { key: "M", label: "Mute" },
+];
+
 export default function HudOverlay() {
   const [speed, setSpeed] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [nitro, setNitro] = useState(0);
+  const [nitro, setNitro] = useState(1);
   const [crashFlash, setCrashFlash] = useState(false);
-  const [hintsVisible, setHintsVisible] = useState(true);
+  const [hintsHighlight, setHintsHighlight] = useState(true);
   const [prob, setProb] = useState<number | null>(null);
   const [market, setMarket] = useState<MarketPayload | null>(null);
   const [track, setTrack] = useState<TrackPts | null>(null);
   const [progress, setProgress] = useState(0);
   const [score, setScore] = useState<ScorePayload>({ total: 0, timeMs: 0, finished: false });
   const [result, setResult] = useState<ResultPayload | null>(null);
-  const [isAirborne, setIsAirborne] = useState(false);
+  const [airborne, setAirborne] = useState(false);
 
   useEffect(() => {
-    const offSpeed = bus.on<number>(EV.SPEED, setSpeed);
-    const offMute = bus.on<boolean>(EV.MUTE, setMuted);
-    const offNitro = bus.on<number>(EV.NITRO, setNitro);
-    const offProb = bus.on<number>(EV.PROB, setProb);
-    const offGrounded = bus.on<boolean>(EV.GROUNDED, (g) => setIsAirborne(!g));
-    const offTrack = bus.on<{ pts: TrackPts }>(EV.TRACK, (t) => { setTrack(t.pts); setProgress(0); });
-    const offPos = bus.on<number>(EV.POSITION, setProgress);
-    const offMarket = bus.on<MarketPayload | null>(EV.MARKET, (m) => { setMarket(m); if (!m) setTrack(null); });
-    const offScore = bus.on<ScorePayload>(EV.SCORE, setScore);
-    const offResult = bus.on<ResultPayload>(EV.RESULT, setResult);
-    let crashTimer = 0;
+    const offs = [
+      bus.on<number>(EV.SPEED, setSpeed),
+      bus.on<boolean>(EV.MUTE, setMuted),
+      bus.on<number>(EV.NITRO, setNitro),
+      bus.on<boolean>(EV.GROUNDED, (g) => setAirborne(!g)),
+      bus.on<{ pts: TrackPts }>(EV.TRACK, (t) => { setTrack(t.pts); setProgress(0); }),
+      bus.on<number>(EV.POSITION, setProgress),
+      bus.on<MarketPayload | null>(EV.MARKET, (m) => { setMarket(m); if (!m) setTrack(null); }),
+      bus.on<ScorePayload>(EV.SCORE, setScore),
+      bus.on<ResultPayload>(EV.RESULT, setResult),
+      bus.on<number>(EV.PROB, setProb),
+    ];
+    let ct = 0;
     const offCrash = bus.on<void>(EV.CRASH, () => {
-      setCrashFlash(true);
-      window.clearTimeout(crashTimer);
-      crashTimer = window.setTimeout(() => setCrashFlash(false), 900);
+      setCrashFlash(true); window.clearTimeout(ct);
+      ct = window.setTimeout(() => setCrashFlash(false), 900);
     });
-    const fallbackTimer = window.setTimeout(() => setHintsVisible(false), 8000);
-    let hideTimer = 0;
+    const t1 = window.setTimeout(() => setHintsHighlight(false), 6000);
     const offFirst = bus.on<void>(EV.INPUT_FIRST, () => {
-      hideTimer = window.setTimeout(() => setHintsVisible(false), 2400);
+      window.setTimeout(() => setHintsHighlight(false), 3000);
     });
-    return () => {
-      offSpeed(); offMute(); offNitro(); offProb(); offGrounded();
-      offTrack(); offPos(); offMarket(); offScore(); offResult(); offCrash(); offFirst();
-      window.clearTimeout(fallbackTimer); window.clearTimeout(hideTimer); window.clearTimeout(crashTimer);
-    };
+    return () => { offs.forEach(f => f()); offCrash(); offFirst(); window.clearTimeout(ct); window.clearTimeout(t1); };
   }, []);
 
   const deltaUp = (market?.probDelta ?? 0) >= 0;
   const deltaAbs = Math.abs((market?.probDelta ?? 0) * 100).toFixed(1);
-  const probPct = prob === null ? null : (prob * 100);
+  const probPct = prob === null ? null : prob * 100;
+  const question = market
+    ? market.question.length > 60 ? market.question.slice(0, 60) + "..." : market.question
+    : "LOADING MARKET DATA...";
 
   const toggleMute = useCallback(() => {
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyM" }));
@@ -147,248 +140,173 @@ export default function HudOverlay() {
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyR" }));
   }, []);
 
-  const questionText = market
-    ? market.question.length > 58 ? market.question.slice(0, 58) + "..." : market.question
-    : "LOADING MARKET DATA...";
+  // Nitro visual state
+  const nitroPct = Math.round(nitro * 100);
+  const nitroColor = nitro > 0.6 ? TOXIC : nitro > 0.25 ? "#8bc400" : nitro > 0.08 ? "#526000" : "#2a2a2a";
+  const nitroGlow = nitro > 0.5 ? `0 0 8px ${TOXIC}55` : "none";
+  const nitroLabel = nitro <= 0.04 ? "EMPTY" : nitro < 0.12 ? "LOW" : nitro > 0.9 ? "FULL" : `${nitroPct}%`;
+
+  const BAR = "1px solid " + LINE;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-10 select-none">
+    <div className="pointer-events-none fixed inset-0 z-10 select-none font-mono">
 
-      {/* ── TOP BAR: Brand | Live Market | Probability | Chart ─────────── */}
-      <div
-        className="absolute top-0 left-0 right-0 flex items-stretch"
-        style={{ height: 48, borderBottom: "1px solid #232529", background: "rgba(10,10,11,0.96)" }}
-      >
-        {/* Brand wordmark */}
-        <div className="flex items-center px-5" style={{ borderRight: "1px solid #232529" }}>
-          <span className="font-display font-bold tracking-[0.18em]" style={{ fontSize: 13, fontStretch: "120%" }}>
-            <span style={{ color: TOXIC }}>Odds</span>
-            <span style={{ color: "#e8e8ea" }}>Rider</span>
+      {/* ── TOP BAR ─────────────────────────────────────────────────── */}
+      <div className="absolute top-0 left-0 right-0 flex items-stretch" style={{ height: 48, background: BG, borderBottom: BAR }}>
+
+        {/* Wordmark */}
+        <div className="flex items-center px-5 shrink-0" style={{ borderRight: BAR }}>
+          <span className="font-display font-bold" style={{ fontSize: 14, letterSpacing: "0.18em", fontStretch: "118%" }}>
+            <span style={{ color: TOXIC }}>Odds</span><span style={{ color: INK }}>Rider</span>
           </span>
         </div>
 
-        {/* Market data — the hero of this game */}
-        <div className="flex flex-1 items-center gap-3 px-5">
-          {/* Live indicator */}
+        {/* Live market strip — the hero of this game */}
+        <div className="flex flex-1 items-center gap-3 px-4 min-w-0">
           <span className="flex items-center gap-1.5 shrink-0">
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ background: TOXIC, boxShadow: `0 0 4px ${TOXIC}` }}
-            />
-            <span style={{ fontFamily: "JetBrains Mono", fontSize: 8, letterSpacing: "0.3em", color: "#7c7f86" }}>
-              POLYMARKET
-            </span>
+            <span className="rounded-full" style={{ width: 5, height: 5, background: TOXIC, boxShadow: `0 0 4px ${TOXIC}` }} />
+            <span style={{ fontSize: 7, letterSpacing: "0.35em", color: DIM }}>POLYMARKET</span>
           </span>
-          {/* Question */}
-          <span
-            className="truncate"
-            style={{ fontFamily: "JetBrains Mono", fontSize: 10, letterSpacing: "0.04em", color: "#7c7f86" }}
-          >
-            {questionText}
-          </span>
-          {/* Delta badge */}
+          <span className="truncate" style={{ fontSize: 10, letterSpacing: "0.04em", color: DIM }}>{question}</span>
           {market && (
-            <span
-              className="shrink-0 px-1.5 py-0.5"
-              style={{
-                fontFamily: "JetBrains Mono",
-                fontSize: 8,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                border: `1px solid ${deltaUp ? "rgba(182,255,0,0.35)" : "rgba(255,51,85,0.35)"}`,
-                color: deltaUp ? TOXIC : CRIMSON,
-              }}
-            >
+            <span className="shrink-0" style={{
+              fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 6px",
+              border: `1px solid ${deltaUp ? "rgba(182,255,0,0.3)" : "rgba(255,51,85,0.3)"}`,
+              color: deltaUp ? TOXIC : CRIMSON,
+            }}>
               {deltaUp ? "▲" : "▼"} {deltaAbs}%
             </span>
           )}
         </div>
 
-        {/* Probability — large, right-aligned */}
-        <div
-          className="flex items-center gap-2 px-5"
-          style={{ borderLeft: "1px solid #232529" }}
-        >
-          <span
-            style={{
-              fontFamily: "JetBrains Mono",
-              fontSize: 22,
-              fontWeight: 700,
-              lineHeight: 1,
-              color: probPct === null ? "#7c7f86" : (deltaUp ? TOXIC : CRIMSON),
-              letterSpacing: "-0.02em",
-            }}
-          >
+        {/* Probability — large, the key market number */}
+        <div className="flex items-center gap-2 px-5 shrink-0" style={{ borderLeft: BAR }}>
+          <span style={{
+            fontSize: 24, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.02em",
+            color: probPct === null ? DIM : deltaUp ? TOXIC : CRIMSON,
+          }}>
             {probPct === null ? "—" : `${probPct.toFixed(1)}%`}
           </span>
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 9, letterSpacing: "0.2em", color: "#7c7f86" }}>
-            YES
-          </span>
+          <span style={{ fontSize: 8, letterSpacing: "0.22em", color: DIM }}>YES</span>
         </div>
 
         {/* Mini chart */}
-        <div
-          className="flex items-center px-3"
-          style={{ borderLeft: "1px solid #232529" }}
-        >
+        <div className="flex items-center px-3 shrink-0" style={{ borderLeft: BAR }}>
           <MiniChart pts={track} progress={progress} />
         </div>
       </div>
 
-      {/* ── BOTTOM BAR: Speed | Nitro | Time | Score | Progress | Controls ─ */}
-      <div
-        className="absolute bottom-0 left-0 right-0 flex items-stretch"
-        style={{ height: 56, borderTop: "1px solid #232529", background: "rgba(10,10,11,0.96)" }}
-      >
+      {/* ── BOTTOM BAR ──────────────────────────────────────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 flex items-stretch" style={{ height: 58, background: BG, borderTop: BAR }}>
+
         {/* Speed */}
-        <div className="flex flex-col justify-center px-5" style={{ borderRight: "1px solid #232529", minWidth: 90 }}>
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 8, letterSpacing: "0.32em", color: "#7c7f86" }}>SPEED</span>
+        <div className="flex flex-col justify-center px-5 shrink-0" style={{ borderRight: BAR, minWidth: 88 }}>
+          <span style={{ fontSize: 7, letterSpacing: "0.35em", color: DIM }}>SPEED</span>
           <div className="flex items-baseline gap-1 mt-0.5">
-            <span style={{ fontFamily: "JetBrains Mono", fontSize: 20, fontWeight: 700, color: "#e8e8ea", lineHeight: 1 }}>
-              {speed}
-            </span>
-            <span style={{ fontFamily: "JetBrains Mono", fontSize: 8, color: "#7c7f86" }}>KM/H</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1 }}>{speed}</span>
+            <span style={{ fontSize: 7, color: DIM }}>KM/H</span>
           </div>
         </div>
 
         {/* Nitro */}
-        <div className="flex flex-col justify-center gap-1 px-5" style={{ borderRight: "1px solid #232529", minWidth: 160 }}>
+        <div className="flex flex-col justify-center gap-1.5 px-5 shrink-0" style={{ borderRight: BAR, minWidth: 170 }}>
           <div className="flex items-center justify-between">
-            <span style={{ fontFamily: "JetBrains Mono", fontSize: 8, letterSpacing: "0.32em", color: "#7c7f86" }}>NITRO</span>
-            {nitro > 0.08 && (
-              <span style={{ fontFamily: "JetBrains Mono", fontSize: 7, letterSpacing: "0.2em", color: TOXIC }}>READY</span>
-            )}
+            <span style={{ fontSize: 7, letterSpacing: "0.35em", color: DIM }}>NITRO</span>
+            <span style={{
+              fontSize: 7, letterSpacing: "0.15em", fontWeight: 700,
+              color: nitro <= 0.04 ? CRIMSON : nitro < 0.12 ? "#ff6633" : nitro > 0.9 ? TOXIC : DIM,
+            }}>
+              {nitroLabel}
+            </span>
           </div>
-          <div className="relative overflow-hidden" style={{ height: 4, background: "#232529" }}>
-            <div
-              className="absolute inset-y-0 left-0 transition-all duration-75"
-              style={{
-                width: `${nitro * 100}%`,
-                background: nitro > 0.6 ? TOXIC : nitro > 0.25 ? "#7ca800" : "#4a6800",
-                boxShadow: nitro > 0.5 ? `0 0 6px ${TOXIC}60` : "none",
-              }}
-            />
+          {/* Segmented fill bar — 10 ticks, smooth fill */}
+          <div className="relative" style={{ height: 6, background: "#1a1a1b" }}>
+            <div className="absolute inset-y-0 left-0 transition-all" style={{
+              width: `${nitroPct}%`, background: nitroColor, boxShadow: nitroGlow, transitionDuration: "80ms",
+            }} />
+            {/* Tick marks */}
+            {[20, 40, 60, 80].map(p => (
+              <span key={p} className="absolute inset-y-0" style={{ left: `${p}%`, width: 1, background: "#0a0a0b", opacity: 0.6 }} />
+            ))}
           </div>
         </div>
 
-        {/* Time — primary center */}
+        {/* Time — center hero */}
         <div className="flex flex-1 flex-col items-center justify-center">
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 8, letterSpacing: "0.4em", color: "#7c7f86" }}>TIME</span>
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 24, fontWeight: 700, color: "#e8e8ea", lineHeight: 1, marginTop: 2 }}>
-            {formatTime(score.timeMs)}
+          <span style={{ fontSize: 7, letterSpacing: "0.45em", color: DIM }}>TIME</span>
+          <span style={{ fontSize: 26, fontWeight: 700, color: INK, lineHeight: 1, marginTop: 1, letterSpacing: "-0.01em" }}>
+            {fmt(score.timeMs)}
           </span>
         </div>
 
         {/* Score */}
-        <div className="flex flex-col justify-center px-5" style={{ borderLeft: "1px solid #232529", minWidth: 100 }}>
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 8, letterSpacing: "0.32em", color: "#7c7f86" }}>SCORE</span>
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 20, fontWeight: 700, color: "#e8e8ea", lineHeight: 1, marginTop: 2 }}>
+        <div className="flex flex-col justify-center px-5 shrink-0" style={{ borderLeft: BAR, minWidth: 96 }}>
+          <span style={{ fontSize: 7, letterSpacing: "0.35em", color: DIM }}>SCORE</span>
+          <span style={{ fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1, marginTop: 2 }}>
             {score.total.toLocaleString()}
           </span>
         </div>
 
-        {/* Airborne indicator */}
-        <div
-          className="flex flex-col justify-center items-center px-4"
-          style={{ borderLeft: "1px solid #232529", minWidth: 60, opacity: isAirborne ? 1 : 0, transition: "opacity 0.1s" }}
-        >
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 7, letterSpacing: "0.3em", color: TOXIC, fontWeight: 700 }}>
-            AIR
-          </span>
-          <span style={{ fontFamily: "JetBrains Mono", fontSize: 7, letterSpacing: "0.1em", color: "rgba(182,255,0,0.5)" }}>
-            TIME
-          </span>
+        {/* Airborne — appears only when in air */}
+        <div className="flex flex-col justify-center items-center shrink-0" style={{
+          borderLeft: BAR, minWidth: 58, transition: "opacity 0.12s",
+          opacity: airborne ? 1 : 0,
+        }}>
+          <span style={{ fontSize: 7, letterSpacing: "0.3em", fontWeight: 700, color: TOXIC }}>AIR</span>
         </div>
 
-        {/* Mute — rightmost */}
+        {/* Mute */}
         <button
+          className="pointer-events-auto flex flex-col justify-center items-center shrink-0 cursor-pointer"
           onClick={toggleMute}
-          className="pointer-events-auto flex flex-col justify-center items-center px-4 cursor-pointer"
           style={{
-            borderLeft: "1px solid #232529",
-            minWidth: 64,
-            fontFamily: "JetBrains Mono",
-            fontSize: 8,
-            letterSpacing: "0.2em",
-            color: muted ? CRIMSON : "#7c7f86",
-            background: "none",
-            border: "none",
-            borderLeft: "1px solid #232529",
+            borderLeft: BAR, minWidth: 58, background: "none", border: "none",
+            borderLeft: "1px solid " + LINE, outline: "none",
           }}
         >
-          <span>{muted ? "MUTED" : "♪"}</span>
-          <span style={{ fontSize: 7, opacity: 0.7 }}>[M]</span>
+          <span style={{ fontSize: 14, lineHeight: 1, color: muted ? CRIMSON : DIM }}>
+            {muted ? "○" : "◉"}
+          </span>
+          <span style={{ fontSize: 7, letterSpacing: "0.18em", color: muted ? CRIMSON : DIM, marginTop: 2 }}>
+            {muted ? "MUTED" : "AUDIO"}
+          </span>
         </button>
       </div>
 
-      {/* Crash vignette flash */}
-      <div
-        className="absolute inset-0 transition-opacity duration-200"
-        style={{
-          borderWidth: 3,
-          borderStyle: "solid",
-          borderColor: CRIMSON,
-          opacity: crashFlash ? 0.65 : 0,
-          pointerEvents: "none",
-        }}
-      />
+      {/* Crash border flash */}
+      <div className="absolute inset-0" style={{
+        border: `3px solid ${CRIMSON}`, opacity: crashFlash ? 0.65 : 0,
+        transition: "opacity 0.18s", pointerEvents: "none",
+      }} />
 
       {/* Result modal */}
       <ResultModal
         isOpen={Boolean(result)}
-        result={
-          result
-            ? {
-                finished: result.finished,
-                score: result.score,
-                timeMs: result.timeMs,
-                marketQuestion: market?.question,
-                finalProb: prob ?? undefined,
-              }
-            : null
-        }
+        result={result ? {
+          finished: result.finished, score: result.score, timeMs: result.timeMs,
+          marketQuestion: market?.question, finalProb: prob ?? undefined,
+        } : null}
         onRetry={rideAgain}
       />
 
-      {/* Control hints — centered, above bottom bar, fully disappear after first input */}
-      <div
-        className="absolute left-1/2 flex items-center gap-3 transition-opacity duration-700"
-        style={{
-          bottom: 68,
-          transform: "translateX(-50%)",
-          opacity: hintsVisible ? 1 : 0,
-          pointerEvents: hintsVisible ? "auto" : "none",
-          background: "rgba(10,10,11,0.92)",
-          border: "1px solid #232529",
-          padding: "6px 14px",
-        }}
-      >
-        {[
-          { keys: ["W", "↑"], label: "GAS" },
-          { keys: ["S", "↓"], label: "BRAKE" },
-          { keys: ["A", "D"], label: "LEAN" },
-          { keys: ["SPC"], label: "JUMP" },
-          { keys: ["SHIFT"], label: "NITRO" },
-          { keys: ["R"], label: "RESET" },
-        ].map(({ keys, label }) => (
-          <span key={label} className="flex items-center gap-1">
-            {keys.map((k) => (
-              <span
-                key={k}
-                style={{
-                  fontFamily: "JetBrains Mono",
-                  fontSize: 8,
-                  padding: "2px 5px",
-                  border: "1px solid #383a40",
-                  background: "#101113",
-                  color: "#e8e8ea",
-                  lineHeight: 1.4,
-                }}
-              >
-                {k}
-              </span>
-            ))}
-            <span style={{ fontFamily: "JetBrains Mono", fontSize: 8, color: "#7c7f86", marginLeft: 2 }}>{label}</span>
+      {/* Control hints — always visible but dim after first input, ABOVE the bottom bar */}
+      <div className="absolute left-1/2 flex items-center gap-0" style={{
+        bottom: 66, transform: "translateX(-50%)",
+        background: BG, border: BAR,
+        opacity: hintsHighlight ? 1 : 0.28,
+        transition: "opacity 1s",
+        pointerEvents: "none",
+      }}>
+        {CONTROLS.map(({ key, label }, i) => (
+          <span key={label} className="flex items-center" style={{ borderRight: i < CONTROLS.length - 1 ? BAR : "none" }}>
+            <span className="flex items-center gap-1.5 px-3 py-1.5">
+              <span style={{
+                fontSize: 8, fontWeight: 700, padding: "1px 4px",
+                border: "1px solid #383a40", background: "#0f1012", color: INK,
+                letterSpacing: "0.05em", lineHeight: 1.5,
+              }}>{key}</span>
+              <span style={{ fontSize: 7, color: DIM, letterSpacing: "0.12em" }}>{label}</span>
+            </span>
           </span>
         ))}
       </div>

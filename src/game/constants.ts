@@ -85,8 +85,8 @@ export const TUNING = {
   nitroDrain: 0.5,
   nitroTrickle: 0.1,
   nitroArm: 0.05,
-  nitroForce: 1.2,
-  nitroGrip: 0.5,
+  nitroForce: 0.009,
+  nitroGrip: 0.004,
   nitroWheelBoost: 2.0,
 
   invertedCrashTilt: 2.4,

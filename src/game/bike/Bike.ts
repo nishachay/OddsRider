@@ -374,8 +374,8 @@ export class Bike {
       const vy = Math.min(b.velocity.y, TUNING.maxFallPerStep);
       if (vx !== b.velocity.x || vy !== b.velocity.y) B.setVelocity(b, { x: vx, y: vy });
     }
-    // Clamp chassis spin — prevents uncontrollable spinning from impact spikes or lean input on steep walls
-    const maxAngV = 0.22;
+    // Clamp chassis spin — stops impact-spike spinning without interfering with wheelies/lean
+    const maxAngV = 0.35;
     const cav = this.chassis.angularVelocity;
     if (Math.abs(cav) > maxAngV) B.setAngularVelocity(this.chassis, Math.sign(cav) * maxAngV);
 
