@@ -4,8 +4,8 @@ import ResultModal from "./ResultModal";
 
 const TOXIC = "#b6ff00";
 const CRIMSON = "#ff3355";
-const DIM = "#6e727d";
-const INK = "#f0f0f2";
+const DIM = "#7c7f86";
+const INK = "#e8e8ea";
 
 function fmtTime(ms: number): { main: string; ms: string } {
   const s = ms / 1000;
@@ -87,7 +87,7 @@ export default function HudOverlay() {
   const [result, setResult] = useState<ResultPayload | null>(null);
   const [airborne, setAirborne] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
-  const [showHints, setShowHints] = useState(true);
+  const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
     const offs = [
@@ -109,7 +109,7 @@ export default function HudOverlay() {
     });
 
     const offFirst = bus.on<void>(EV.INPUT_FIRST, () => {
-      window.setTimeout(() => setShowHints(false), 2500);
+      setHasStarted(true);
     });
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -118,6 +118,7 @@ export default function HudOverlay() {
         next.add(e.code);
         return next;
       });
+      if (!hasStarted) setHasStarted(true);
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       setActiveKeys((prev) => {
@@ -134,13 +135,13 @@ export default function HudOverlay() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, []);
+  }, [hasStarted]);
 
   const deltaUp = (market?.probDelta ?? 0) >= 0;
   const deltaAbs = Math.abs((market?.probDelta ?? 0) * 100).toFixed(1);
   const probPct = prob === null ? null : prob * 100;
   const question = market
-    ? market.question.length > 52 ? market.question.slice(0, 52) + "..." : market.question
+    ? market.question.length > 56 ? market.question.slice(0, 56) + "..." : market.question
     : "FETCHING LIVE POLYMARKET DATA...";
 
   const toggleMute = useCallback(() => {
@@ -150,38 +151,35 @@ export default function HudOverlay() {
 
   const rideAgain = useCallback(() => {
     setResult(null);
+    setHasStarted(false);
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR" }));
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyR" }));
   }, []);
 
   const timeObj = fmtTime(score.timeMs);
   const isNitroActive = activeKeys.has("ShiftLeft") || activeKeys.has("ShiftRight") || activeKeys.has("KeyN");
-
-  const isGasPressed = activeKeys.has("KeyW") || activeKeys.has("ArrowUp");
-  const isBrakePressed = activeKeys.has("KeyS") || activeKeys.has("ArrowDown");
-  const isLeanPressed = activeKeys.has("KeyA") || activeKeys.has("KeyD") || activeKeys.has("ArrowLeft") || activeKeys.has("ArrowRight");
-  const isJumpPressed = activeKeys.has("Space");
-  const isResetPressed = activeKeys.has("KeyR");
-
   const speedGauge = Math.min(100, Math.round((speed / 180) * 100));
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-10 select-none font-mono p-6 flex flex-col justify-between">
+    <div className="pointer-events-none fixed inset-0 z-10 select-none font-mono">
 
-      {/* ── TOP HEADER: Single Clean Baseline (Brand + Market + Ticker) ── */}
-      <div className="flex items-center justify-between w-full">
-
-        {/* Top-Left: Brand + Live Market Question */}
-        <div className="flex items-center gap-3 max-w-2xl">
-          <span className="font-display font-black text-lg tracking-wider shrink-0" style={{ textShadow: `0 0 12px ${TOXIC}40` }}>
+      {/* ── TOP HUD BAND (Sleek dark backdrop prevents track merging) ── */}
+      <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 py-2.5" style={{
+        background: "rgba(10, 10, 11, 0.95)",
+        borderBottom: "1px solid #1e2026",
+        height: 46,
+      }}>
+        {/* Brand + Polymarket Live Question */}
+        <div className="flex items-center gap-3 max-w-2xl min-w-0">
+          <span className="font-display font-black text-base tracking-wider shrink-0" style={{ textShadow: `0 0 10px ${TOXIC}40` }}>
             <span style={{ color: TOXIC }}>Odds</span><span style={{ color: INK }}>Rider</span>
           </span>
 
-          <span className="text-[10px] font-bold tracking-widest px-1.5 py-0.5 shrink-0" style={{ color: TOXIC, background: "rgba(182,255,0,0.1)" }}>
+          <span className="text-[9px] font-bold tracking-widest px-1.5 py-0.5 shrink-0" style={{ color: TOXIC, background: "rgba(182,255,0,0.1)" }}>
             LIVE
           </span>
 
-          <span className="font-medium text-xs truncate" style={{ color: INK, textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>
+          <span className="font-medium text-xs truncate" style={{ color: INK }}>
             {question}
           </span>
 
@@ -195,14 +193,14 @@ export default function HudOverlay() {
           )}
         </div>
 
-        {/* Top-Right: Hero Odds + Mini-Chart */}
+        {/* Hero Odds + Mini-Chart */}
         <div className="flex items-center gap-4 shrink-0">
           <div className="flex items-baseline gap-1.5">
-            <span style={{ fontSize: 9, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>PROBABILITY</span>
+            <span style={{ fontSize: 8, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>PROBABILITY</span>
             <span style={{
-              fontSize: 26, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em",
+              fontSize: 24, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em",
               color: probPct === null ? DIM : deltaUp ? TOXIC : CRIMSON,
-              textShadow: probPct === null ? "none" : deltaUp ? `0 0 14px ${TOXIC}60` : `0 0 14px ${CRIMSON}60`,
+              textShadow: probPct === null ? "none" : deltaUp ? `0 0 12px ${TOXIC}60` : `0 0 12px ${CRIMSON}60`,
             }}>
               {probPct === null ? "—" : `${probPct.toFixed(1)}%`}
             </span>
@@ -211,131 +209,134 @@ export default function HudOverlay() {
 
           <MiniChart pts={track} progress={progress} />
         </div>
-
       </div>
 
-      {/* ── BOTTOM HUD: Clean Telemetry Cluster & Controls Below ── */}
-      <div className="flex flex-col gap-3 w-full">
+      {/* ── BOTTOM HUD BAND (Sleek dark backdrop prevents track merging) ── */}
+      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-2" style={{
+        background: "rgba(10, 10, 11, 0.95)",
+        borderTop: "1px solid #1e2026",
+        height: 52,
+      }}>
 
-        <div className="flex items-end justify-between w-full">
-
-          {/* Bottom-Left: Speed & Nitro Grouped */}
-          <div className="flex items-end gap-5">
-            {/* Speedometer */}
-            <div className="flex flex-col">
-              <span style={{ fontSize: 8, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SPEED</span>
-              <div className="flex items-baseline gap-1">
-                <span style={{
-                  fontSize: 28, fontWeight: 800, lineHeight: 1,
-                  color: speed > 100 ? TOXIC : speed > 60 ? "#d2f060" : INK,
-                  textShadow: speed > 100 ? `0 0 12px ${TOXIC}80` : "0 2px 6px rgba(0,0,0,0.8)",
-                }}>
-                  {speed.toString().padStart(3, "0")}
-                </span>
-                <span style={{ fontSize: 8, color: DIM, fontWeight: 700 }}>KM/H</span>
-              </div>
-              <div className="w-20 bg-[#16181d] h-1 mt-1">
-                <div className="h-full transition-all duration-100" style={{
-                  width: `${speedGauge}%`, background: speed > 100 ? TOXIC : "#7ca800",
-                }} />
-              </div>
-            </div>
-
-            {/* Nitro Gauge */}
-            <div className="flex flex-col gap-1 w-28 pb-0.5">
-              <div className="flex items-center justify-between">
-                <span style={{ fontSize: 8, letterSpacing: "0.15em", color: isNitroActive ? TOXIC : DIM, fontWeight: 700 }}>
-                  {isNitroActive ? "⚡ NITRO" : "NITRO"}
-                </span>
-                <span style={{ fontSize: 8, fontWeight: 800, color: nitro <= 0.04 ? CRIMSON : nitro > 0.9 ? TOXIC : INK }}>
-                  {Math.round(nitro * 100)}%
-                </span>
-              </div>
-              <div className="flex items-center gap-1 h-1.5">
-                {[0, 1, 2, 3, 4].map((i) => {
-                  const isFilled = nitro >= (i + 1) * 0.2 - 0.15;
-                  return (
-                    <div
-                      key={i}
-                      className="flex-1 h-full transition-all duration-150"
-                      style={{
-                        background: isFilled ? (nitro > 0.6 ? TOXIC : "#7ca800") : "rgba(255,255,255,0.08)",
-                        boxShadow: isFilled && isNitroActive ? `0 0 6px ${TOXIC}` : "none",
-                      }}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom-Center: Clean Race Time Anchor */}
-          <div className="flex flex-col items-center">
-            {airborne && (
-              <span className="mb-0.5 text-[8px] font-extrabold tracking-widest text-toxic animate-pulse">
-                AIRBORNE
-              </span>
-            )}
-            <span style={{ fontSize: 8, letterSpacing: "0.3em", color: DIM, fontWeight: 700 }}>TIME</span>
-            <div className="flex items-baseline">
-              <span style={{ fontSize: 32, fontWeight: 800, color: INK, lineHeight: 1, textShadow: "0 4px 10px rgba(0,0,0,0.9)" }}>
-                {timeObj.main}
-              </span>
-              <span style={{ fontSize: 18, fontWeight: 800, color: TOXIC, lineHeight: 1 }}>
-                {timeObj.ms}
-              </span>
-            </div>
-          </div>
-
-          {/* Bottom-Right: Score & Audio */}
-          <div className="flex items-end gap-5">
-            <div className="flex flex-col items-end">
-              <span style={{ fontSize: 8, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SCORE</span>
+        {/* Speedometer & Nitro */}
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col">
+            <span style={{ fontSize: 7, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SPEED</span>
+            <div className="flex items-baseline gap-1">
               <span style={{
-                fontSize: 26, fontWeight: 800, lineHeight: 1,
-                color: score.total > 500 ? TOXIC : score.total > 200 ? "#d2f060" : INK,
-                textShadow: score.total > 500 ? `0 0 10px ${TOXIC}60` : "0 2px 6px rgba(0,0,0,0.8)",
+                fontSize: 22, fontWeight: 800, lineHeight: 1,
+                color: speed > 100 ? TOXIC : speed > 60 ? "#d2f060" : INK,
+                textShadow: speed > 100 ? `0 0 10px ${TOXIC}80` : "none",
               }}>
-                {score.total.toString().padStart(6, "0")}
+                {speed.toString().padStart(3, "0")}
               </span>
+              <span style={{ fontSize: 7, color: DIM, fontWeight: 700 }}>KM/H</span>
             </div>
-
-            <button
-              className="pointer-events-auto cursor-pointer pb-0.5 text-right opacity-75 hover:opacity-100 transition-opacity"
-              onClick={toggleMute}
-            >
-              <span style={{ fontSize: 8, letterSpacing: "0.15em", fontWeight: 700, color: muted ? CRIMSON : TOXIC }}>
-                {muted ? "MUTED" : "AUDIO ON"}
-              </span>
-            </button>
+            <div className="w-20 bg-[#16181d] h-1 mt-0.5">
+              <div className="h-full transition-all duration-100" style={{
+                width: `${speedGauge}%`, background: speed > 100 ? TOXIC : "#7ca800",
+              }} />
+            </div>
           </div>
 
+          {/* Nitro Gauge */}
+          <div className="flex flex-col gap-1 w-28">
+            <div className="flex items-center justify-between">
+              <span style={{ fontSize: 7, letterSpacing: "0.15em", color: isNitroActive ? TOXIC : DIM, fontWeight: 700 }}>
+                {isNitroActive ? "⚡ NITRO" : "NITRO"}
+              </span>
+              <span style={{ fontSize: 7, fontWeight: 800, color: nitro <= 0.04 ? CRIMSON : nitro > 0.9 ? TOXIC : INK }}>
+                {Math.round(nitro * 100)}%
+              </span>
+            </div>
+            <div className="flex items-center gap-1 h-1.5">
+              {[0, 1, 2, 3, 4].map((i) => {
+                const isFilled = nitro >= (i + 1) * 0.2 - 0.15;
+                return (
+                  <div
+                    key={i}
+                    className="flex-1 h-full transition-all duration-150"
+                    style={{
+                      background: isFilled ? (nitro > 0.6 ? TOXIC : "#7ca800") : "rgba(255,255,255,0.08)",
+                      boxShadow: isFilled && isNitroActive ? `0 0 6px ${TOXIC}` : "none",
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* ── CONTROLS HINTS BAR: Placed at VERY BOTTOM, Fades Out on Drive ── */}
-        <div className="flex items-center justify-center gap-1.5 pt-1 transition-opacity duration-700" style={{
-          opacity: showHints ? 0.9 : 0.2,
-          pointerEvents: "none",
-        }}>
-          {[
-            { key: "W / ↑", label: "GAS", active: isGasPressed },
-            { key: "S / ↓", label: "BRAKE", active: isBrakePressed },
-            { key: "A / D", label: "LEAN", active: isLeanPressed },
-            { key: "SPACE", label: "JUMP", active: isJumpPressed },
-            { key: "SHIFT", label: "NITRO", active: isNitroActive },
-            { key: "R", label: "RESET", active: isResetPressed },
-          ].map(({ key, label, active }) => (
-            <div key={label} className="flex items-center gap-1 px-1.5 py-0.5 transition-all duration-100" style={{
-              background: active ? "rgba(182,255,0,0.2)" : "rgba(12,13,16,0.6)",
-              borderBottom: `2px solid ${active ? TOXIC : "rgba(255,255,255,0.1)"}`,
+        {/* Center Race Time */}
+        <div className="flex flex-col items-center">
+          {airborne && (
+            <span className="text-[8px] font-extrabold tracking-widest text-toxic animate-pulse">
+              AIRBORNE
+            </span>
+          )}
+          <span style={{ fontSize: 7, letterSpacing: "0.3em", color: DIM, fontWeight: 700 }}>TIME</span>
+          <div className="flex items-baseline">
+            <span style={{ fontSize: 26, fontWeight: 800, color: INK, lineHeight: 1 }}>
+              {timeObj.main}
+            </span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: TOXIC, lineHeight: 1 }}>
+              {timeObj.ms}
+            </span>
+          </div>
+        </div>
+
+        {/* Right Score & Mute */}
+        <div className="flex items-center gap-5">
+          <div className="flex flex-col items-end">
+            <span style={{ fontSize: 7, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SCORE</span>
+            <span style={{
+              fontSize: 22, fontWeight: 800, lineHeight: 1,
+              color: score.total > 500 ? TOXIC : score.total > 200 ? "#d2f060" : INK,
+              textShadow: score.total > 500 ? `0 0 10px ${TOXIC}60` : "none",
             }}>
-              <span style={{ fontSize: 8, fontWeight: 800, color: active ? TOXIC : INK }}>{key}</span>
-              <span style={{ fontSize: 6, color: active ? TOXIC : DIM, letterSpacing: "0.08em" }}>{label}</span>
-            </div>
-          ))}
+              {score.total.toString().padStart(6, "0")}
+            </span>
+          </div>
+
+          <button
+            className="pointer-events-auto cursor-pointer text-right opacity-80 hover:opacity-100 transition-opacity"
+            onClick={toggleMute}
+          >
+            <span style={{ fontSize: 8, letterSpacing: "0.15em", fontWeight: 700, color: muted ? CRIMSON : TOXIC }}>
+              {muted ? "MUTED" : "AUDIO ON"}
+            </span>
+          </button>
         </div>
 
       </div>
+
+      {/* ── CONTROLS CARD (Shows ONLY BEFORE playtime, completely disappears on drive) ── */}
+      {!hasStarted && (
+        <div className="absolute left-1/2 flex flex-col items-center gap-2 p-3 transition-all duration-500" style={{
+          bottom: 64, transform: "translateX(-50%)",
+          background: "rgba(12, 13, 16, 0.95)",
+          border: "1px solid #282a33",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.8)",
+        }}>
+          <span style={{ fontSize: 7, letterSpacing: "0.3em", color: TOXIC, fontWeight: 700 }}>CONTROLS GUIDE</span>
+          <div className="flex items-center gap-2">
+            {[
+              { key: "W / ↑", label: "GAS" },
+              { key: "S / ↓", label: "BRAKE" },
+              { key: "A / D", label: "LEAN" },
+              { key: "SPACE", label: "JUMP" },
+              { key: "SHIFT", label: "NITRO" },
+              { key: "R", label: "RESET" },
+            ].map(({ key, label }) => (
+              <div key={label} className="flex items-center gap-1 px-2 py-1 bg-[#16181e] border border-[#232630]">
+                <span style={{ fontSize: 8, fontWeight: 800, color: INK }}>{key}</span>
+                <span style={{ fontSize: 7, color: DIM, letterSpacing: "0.08em" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <span style={{ fontSize: 7, color: DIM, letterSpacing: "0.15em" }}>PRESS ANY KEY TO START RIDING</span>
+        </div>
+      )}
 
       {/* Crash Vignette Flash */}
       <div className="absolute inset-0 pointer-events-none" style={{
