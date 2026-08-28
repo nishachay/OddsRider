@@ -65,7 +65,7 @@ export const TUNING = {
   wheelieTorque: 0.018,
   maxWheelieAv: 0.11,
 
-  flipLean: 0.022,
+  flipLean: 0.012,
   groundLean: 0.006,
   tippedAngle: 1.75,
 
@@ -100,7 +100,7 @@ export const TUNING = {
 export const TERRAIN = {
   bandTopY: -1000,
   bandBottomY: 1500,
-  leadIn: 1200,
+  leadIn: 400,
   runout: 8000,
 };
 

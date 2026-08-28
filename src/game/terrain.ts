@@ -75,7 +75,7 @@ export function buildTerrain(series: PricePoint[]): Terrain {
   const maxT = pts[n - 1].t;
   const tSpan = maxT - minT;
   
-  const graphStartX = WORLD.spawnX + 1200;
+  const graphStartX = WORLD.spawnX + TERRAIN.leadIn;
   const span = WORLD.finishX - graphStartX;
 
   const ys: number[] = new Array(n);

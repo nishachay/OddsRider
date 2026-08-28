@@ -203,7 +203,11 @@ export default function HudOverlay() {
         <div className="flex flex-col justify-center px-5 shrink-0" style={{ borderRight: BAR, minWidth: 88 }}>
           <span style={{ fontSize: 7, letterSpacing: "0.35em", color: DIM }}>SPEED</span>
           <div className="flex items-baseline gap-1 mt-0.5">
-            <span style={{ fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1 }}>{speed}</span>
+            <span style={{
+              fontSize: 22, fontWeight: 700, lineHeight: 1,
+              color: speed > 100 ? TOXIC : speed > 60 ? "#c8e860" : INK,
+              transition: "color 0.3s",
+            }}>{speed}</span>
             <span style={{ fontSize: 7, color: DIM }}>KM/H</span>
           </div>
         </div>
@@ -219,22 +223,26 @@ export default function HudOverlay() {
               {nitroLabel}
             </span>
           </div>
-          {/* Segmented fill bar — 10 ticks, smooth fill */}
-          <div className="relative" style={{ height: 6, background: "#1a1a1b" }}>
-            <div className="absolute inset-y-0 left-0 transition-all" style={{
-              width: `${nitroPct}%`, background: nitroColor, boxShadow: nitroGlow, transitionDuration: "80ms",
+          {/* Nitro fill bar — thicker, outer glow when charged */}
+          <div className="relative" style={{
+            height: 8, background: "#141415",
+            boxShadow: nitro > 0.8 ? `0 0 10px ${TOXIC}35` : "none",
+            transition: "box-shadow 0.4s",
+          }}>
+            <div className="absolute inset-y-0 left-0" style={{
+              width: `${nitroPct}%`, background: nitroColor,
+              boxShadow: nitroGlow, transition: "width 80ms, background 0.3s",
             }} />
-            {/* Tick marks */}
-            {[20, 40, 60, 80].map(p => (
-              <span key={p} className="absolute inset-y-0" style={{ left: `${p}%`, width: 1, background: "#0a0a0b", opacity: 0.6 }} />
+            {[25, 50, 75].map(p => (
+              <span key={p} className="absolute inset-y-0" style={{ left: `${p}%`, width: 1, background: "#0a0a0b", opacity: 0.7 }} />
             ))}
           </div>
         </div>
 
-        {/* Time — center hero */}
+        {/* Time — center hero, larger */}
         <div className="flex flex-1 flex-col items-center justify-center">
           <span style={{ fontSize: 7, letterSpacing: "0.45em", color: DIM }}>TIME</span>
-          <span style={{ fontSize: 26, fontWeight: 700, color: INK, lineHeight: 1, marginTop: 1, letterSpacing: "-0.01em" }}>
+          <span style={{ fontSize: 28, fontWeight: 700, color: INK, lineHeight: 1, marginTop: 1, letterSpacing: "-0.02em" }}>
             {fmt(score.timeMs)}
           </span>
         </div>
@@ -242,7 +250,11 @@ export default function HudOverlay() {
         {/* Score */}
         <div className="flex flex-col justify-center px-5 shrink-0" style={{ borderLeft: BAR, minWidth: 96 }}>
           <span style={{ fontSize: 7, letterSpacing: "0.35em", color: DIM }}>SCORE</span>
-          <span style={{ fontSize: 22, fontWeight: 700, color: INK, lineHeight: 1, marginTop: 2 }}>
+          <span style={{
+            fontSize: 22, fontWeight: 700, lineHeight: 1, marginTop: 2,
+            color: score.total > 500 ? TOXIC : score.total > 200 ? "#c8e860" : INK,
+            transition: "color 0.3s",
+          }}>
             {score.total.toLocaleString()}
           </span>
         </div>

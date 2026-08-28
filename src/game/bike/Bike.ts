@@ -229,7 +229,7 @@ export class Bike {
       const av = this.rearWheel.angularVelocity;
       B.setAngularVelocity(this.rearWheel, Math.min(av + TUNING.wheelAccel, TUNING.maxWheelAv));
       const spool = Math.max(0, 1 - av / TUNING.maxWheelAv);
-      if (spool > 0 && this.grounded && chassis.angularVelocity > -TUNING.maxWheelieAv) {
+      if (spool > 0 && this.grounded && chassis.angularVelocity > -TUNING.maxWheelieAv && !this.nitroActive) {
         B.setAngularVelocity(chassis, chassis.angularVelocity - TUNING.wheelieTorque * spool);
       }
     } else if (input.brake) {
@@ -256,9 +256,11 @@ export class Bike {
     }
 
     // --- nitro ---
-    // Hybrid model: wheel torque (traction) + chassis force (climbing power) + grip (slope adhesion).
-    // nitroForce = 1.2 px/step² acceleration — overcomes gravity component on slopes up to ~85°.
-    // Purely wheel-torque was insufficient: friction force < gravity on near-vertical walls.
+    // - Wheel boost: always (traction at contact point)
+    // - Chassis forward force + grip: only when climbing (angle < -0.2 rad = 11°+ tilt upward)
+    //   On flat ground: wheel boost only → small speed increase, no flying
+    //   On steep slopes: full force → overcomes gravity component
+    // - Upward velocity cap: prevents launching off peaks when transitioning to flat
     const dtS = STEP_MS / 1000;
     if (this.nitroLatch) {
       if (!input.nitro || this.nitroTank <= 0) this.nitroLatch = false;
@@ -270,17 +272,20 @@ export class Bike {
     if (this.nitroActive) {
       this.nitroTank = clamp(this.nitroTank - TUNING.nitroDrain * dtS, 0, 1);
       const a = chassis.angle;
-      // 1. Wheel torque boost — more traction at the contact point
+      // 1. Wheel torque boost — always on
       const targetAv = TUNING.maxWheelAv * TUNING.nitroWheelBoost;
       B.setAngularVelocity(this.rearWheel, Math.min(this.rearWheel.angularVelocity + TUNING.wheelAccel * 2, targetAv));
-      // 2. Forward force along chassis — the actual climbing power
-      const fwd = TUNING.nitroForce * chassis.mass;
-      B.applyForce(chassis, chassis.position, { x: Math.cos(a) * fwd, y: Math.sin(a) * fwd });
-      // 3. Perpendicular grip force INTO the slope — prevents sliding off steep walls
-      // (-sin(a), cos(a)) is the left-perpendicular of (cos(a), sin(a))
-      // For a right-going upward slope (a < 0): this vector points toward the slope surface
-      const grip = TUNING.nitroGrip * chassis.mass;
-      B.applyForce(chassis, chassis.position, { x: -Math.sin(a) * grip, y: Math.cos(a) * grip });
+      // 2. Chassis forces — only when actively climbing (prevents flat-ground catapult)
+      if (a < -0.2) {
+        const fwd = TUNING.nitroForce * chassis.mass;
+        B.applyForce(chassis, chassis.position, { x: Math.cos(a) * fwd, y: Math.sin(a) * fwd });
+        const grip = TUNING.nitroGrip * chassis.mass;
+        B.applyForce(chassis, chassis.position, { x: -Math.sin(a) * grip, y: Math.cos(a) * grip });
+      }
+      // 3. Upward velocity cap — prevents launching off steep-slope peaks
+      if (chassis.velocity.y < -10) {
+        B.setVelocity(chassis, { x: chassis.velocity.x, y: -10 });
+      }
     } else if (!this.nitroLatch) {
       this.nitroTank = clamp(this.nitroTank + TUNING.nitroTrickle * dtS, 0, 1);
     }
