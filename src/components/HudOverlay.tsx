@@ -18,7 +18,7 @@ function fmtTime(ms: number): { main: string; ms: string } {
 }
 
 type TrackPts = Array<[number, number]>;
-const CW = 110, CH = 34, CP = 2;
+const CW = 114, CH = 36, CP = 3;
 
 function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -43,6 +43,15 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
     const py = (y: number) => CP + (y - geo.y0) * sc.sy;
     ctx.clearRect(0, 0, CW, CH);
 
+    // Subtle dark grid
+    ctx.strokeStyle = "#17191e";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, CH / 2); ctx.lineTo(CW, CH / 2);
+    ctx.moveTo(CW / 2, 0); ctx.lineTo(CW / 2, CH);
+    ctx.stroke();
+
+    // Track line
     ctx.lineWidth = 1.8;
     for (let i = 1; i < pts.length; i++) {
       ctx.strokeStyle = pts[i][1] <= pts[i - 1][1] ? TOXIC : CRIMSON;
@@ -64,6 +73,11 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
   return (
     <div className="relative" style={{ width: CW, height: CH }}>
       <canvas ref={ref} width={CW} height={CH} className="absolute inset-0" />
+      {/* Corner reticles */}
+      <span className="absolute top-0 left-0 w-1 h-1" style={{ borderTop: `1px solid ${TOXIC}60`, borderLeft: `1px solid ${TOXIC}60` }} />
+      <span className="absolute top-0 right-0 w-1 h-1" style={{ borderTop: `1px solid ${TOXIC}60`, borderRight: `1px solid ${TOXIC}60` }} />
+      <span className="absolute bottom-0 left-0 w-1 h-1" style={{ borderBottom: `1px solid ${TOXIC}60`, borderLeft: `1px solid ${TOXIC}60` }} />
+      <span className="absolute bottom-0 right-0 w-1 h-1" style={{ borderBottom: `1px solid ${TOXIC}60`, borderRight: `1px solid ${TOXIC}60` }} />
       {dot && (
         <span className="absolute rounded-full animate-pulse"
           style={{ width: 5, height: 5, background: TOXIC, boxShadow: `0 0 8px ${TOXIC}`, left: dot.left - 2.5, top: dot.top - 2.5 }} />
@@ -137,7 +151,7 @@ export default function HudOverlay() {
   const deltaAbs = Math.abs((market?.probDelta ?? 0) * 100).toFixed(1);
   const probPct = prob === null ? null : prob * 100;
   const question = market
-    ? market.question.length > 56 ? market.question.slice(0, 56) + "..." : market.question
+    ? market.question.length > 54 ? market.question.slice(0, 54) + "..." : market.question
     : "LOADING MARKET DATA...";
 
   const toggleMute = useCallback(() => {
@@ -163,26 +177,24 @@ export default function HudOverlay() {
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none font-mono p-5">
 
-      {/* ── TOP-LEFT: BRAND & MARKET CONTEXT STACK ──────────────────── */}
-      <div className="absolute top-5 left-5 flex flex-col gap-1 max-w-xl">
+      {/* ── TOP-LEFT: MARKET HERO STACK (HIERARCHY ELEVATED) ───────── */}
+      <div className="absolute top-5 left-5 flex flex-col gap-1 max-w-lg">
+        {/* Brand Row */}
         <div className="flex items-center gap-2">
-          <span className="font-display font-black text-xl tracking-wider" style={{ textShadow: `0 0 12px ${TOXIC}50` }}>
+          <span className="font-display font-black text-lg tracking-wider" style={{ textShadow: `0 0 12px ${TOXIC}40` }}>
             <span style={{ color: TOXIC }}>Odds</span><span style={{ color: INK }}>Rider</span>
           </span>
-          <span className="text-[9px] font-extrabold tracking-widest px-1.5 py-0.5" style={{ color: TOXIC, background: "rgba(182,255,0,0.1)", border: `1px solid ${TOXIC}30` }}>
+          <span className="text-[8px] font-extrabold tracking-widest px-1.5 py-0.5" style={{ color: TOXIC, background: "rgba(182,255,0,0.08)", border: `1px solid ${TOXIC}30` }}>
             LIVE
           </span>
         </div>
 
-        <span className="font-medium text-xs truncate mt-0.5" style={{ color: INK, textShadow: "0 1px 4px rgba(0,0,0,0.9)" }}>
-          {question}
-        </span>
-
-        <div className="flex items-center gap-2 mt-0.5">
+        {/* Hero Odds Readout */}
+        <div className="flex items-baseline gap-2 mt-0.5">
           <span style={{
-            fontSize: 24, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em",
+            fontSize: 28, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em",
             color: probPct === null ? DIM : deltaUp ? TOXIC : CRIMSON,
-            textShadow: probPct === null ? "none" : deltaUp ? `0 0 12px ${TOXIC}60` : `0 0 12px ${CRIMSON}60`,
+            textShadow: probPct === null ? "none" : deltaUp ? `0 0 14px ${TOXIC}70` : `0 0 14px ${CRIMSON}70`,
           }}>
             {probPct === null ? "—" : `${probPct.toFixed(1)}%`}
           </span>
@@ -198,50 +210,66 @@ export default function HudOverlay() {
             </span>
           )}
         </div>
+
+        {/* Market Question */}
+        <span className="font-medium text-xs truncate mt-0.5" style={{ color: DIM, textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>
+          {question}
+        </span>
       </div>
 
-      {/* ── TOP-CENTER: RACE TIMER & NITRO BAR COMBO (STONKRIDER STYLE) ── */}
-      <div className="absolute top-5 left-1/2 flex flex-col items-center gap-1" style={{ transform: "translateX(-50%)" }}>
-        <div className="flex items-baseline px-4 py-1" style={{ background: BG_CARD, border: `1px solid ${LINE}` }}>
-          <span style={{ fontSize: 28, fontWeight: 800, color: INK, lineHeight: 1, letterSpacing: "-0.02em" }}>
-            {timeObj.main}
-          </span>
-          <span style={{ fontSize: 16, fontWeight: 800, color: TOXIC, lineHeight: 1 }}>
-            {timeObj.ms}
-          </span>
-        </div>
+      {/* ── TOP-CENTER: UNIFIED RACE DECK (TIMER + NITRO INTEGRATED) ── */}
+      <div className="absolute top-5 left-1/2 flex flex-col items-center" style={{ transform: "translateX(-50%)" }}>
+        <div className="flex flex-col items-center" style={{ background: BG_CARD, border: `1px solid ${LINE}` }}>
+          {/* Top Half: Timer */}
+          <div className="flex items-baseline px-5 py-1.5">
+            <span style={{ fontSize: 28, fontWeight: 800, color: INK, lineHeight: 1, letterSpacing: "-0.02em" }}>
+              {timeObj.main}
+            </span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: TOXIC, lineHeight: 1 }}>
+              {timeObj.ms}
+            </span>
+          </div>
 
-        {/* Nitro bar stacked directly under timer */}
-        <div className="flex items-center gap-1 px-3 py-1" style={{ background: BG_CARD, border: `1px solid ${LINE}`, minWidth: 140 }}>
-          <span style={{ fontSize: 7, letterSpacing: "0.15em", color: isNitroActive ? TOXIC : DIM, fontWeight: 800 }}>
-            NITRO
-          </span>
-          <div className="flex items-center gap-1 flex-1 h-1.5 ml-1">
-            {[0, 1, 2, 3, 4].map((i) => {
-              const isFilled = nitro >= (i + 1) * 0.2 - 0.15;
-              return (
-                <div
-                  key={i}
-                  className="flex-1 h-full transition-all duration-150"
-                  style={{
-                    background: isFilled ? (nitro > 0.6 ? TOXIC : "#7ca800") : "rgba(255,255,255,0.08)",
-                    boxShadow: isFilled && isNitroActive ? `0 0 6px ${TOXIC}` : "none",
-                  }}
-                />
-              );
-            })}
+          {/* Bottom Half: Nitro Bar (Seamlessly integrated) */}
+          <div className="flex items-center gap-1.5 px-3 py-1 w-full" style={{
+            borderTop: `1px solid ${LINE}`,
+            background: isNitroActive ? "rgba(182,255,0,0.06)" : "transparent",
+            boxShadow: isNitroActive ? `0 0 12px ${TOXIC}40` : "none",
+            transition: "all 0.15s",
+          }}>
+            <span style={{
+              fontSize: 7, letterSpacing: "0.15em", fontWeight: 800,
+              color: isNitroActive ? TOXIC : DIM,
+            }}>
+              {isNitroActive ? "⚡ NITRO" : "NITRO"}
+            </span>
+            <div className="flex items-center gap-1 flex-1 h-1.5">
+              {[0, 1, 2, 3, 4].map((i) => {
+                const isFilled = nitro >= (i + 1) * 0.2 - 0.15;
+                return (
+                  <div
+                    key={i}
+                    className="flex-1 h-full transition-all duration-150"
+                    style={{
+                      background: isFilled ? (nitro > 0.6 ? TOXIC : "#7ca800") : "rgba(255,255,255,0.08)",
+                      boxShadow: isFilled && isNitroActive ? `0 0 6px ${TOXIC}` : "none",
+                    }}
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {airborne && (
-          <span className="text-[8px] font-extrabold tracking-widest text-toxic animate-pulse mt-0.5">
-            AIRBORNE
+          <span className="text-[8px] font-extrabold tracking-widest text-toxic animate-pulse mt-1" style={{ textShadow: `0 0 8px ${TOXIC}` }}>
+            ▲ AIRBORNE
           </span>
         )}
       </div>
 
-      {/* ── TOP-RIGHT: MINIMAP BOX & AUDIO BUTTON ───────────────────── */}
-      <div className="absolute top-5 right-5 flex flex-col items-end gap-2">
+      {/* ── TOP-RIGHT: TACTICAL MINIMAP & AUDIO DECK ────────────────── */}
+      <div className="absolute top-5 right-5 flex flex-col items-end gap-1.5">
         <div style={{ background: BG_CARD, border: `1px solid ${LINE}`, padding: 4 }}>
           <MiniChart pts={track} progress={progress} />
         </div>
@@ -251,98 +279,106 @@ export default function HudOverlay() {
           onClick={toggleMute}
           style={{ background: BG_CARD, border: `1px solid ${LINE}` }}
         >
-          <span style={{ fontSize: 10, color: muted ? CRIMSON : TOXIC }}>{muted ? "✕" : "🔊"}</span>
-          <span style={{ fontSize: 8, letterSpacing: "0.15em", fontWeight: 700, color: muted ? CRIMSON : DIM }}>
+          <span style={{ fontSize: 9, color: muted ? CRIMSON : TOXIC }}>{muted ? "✕" : "🔊"}</span>
+          <span style={{ fontSize: 7, letterSpacing: "0.15em", fontWeight: 700, color: muted ? CRIMSON : DIM }}>
             {muted ? "MUTED" : "AUDIO"}
           </span>
         </button>
       </div>
 
-      {/* ── BOTTOM-LEFT: TELEMETRY CARDS (ORNN-RIDER STYLE) ─────────── */}
+      {/* ── BOTTOM-LEFT: TWIN TELEMETRY CARDS (SPEED & SCORE) ───────── */}
       <div className="absolute bottom-5 left-5 flex items-center gap-2">
         {/* Speed Card */}
-        <div className="flex flex-col px-3 py-2" style={{ background: BG_CARD, border: `1px solid ${LINE}`, minWidth: 90 }}>
+        <div className="flex flex-col px-3.5 py-2" style={{ background: BG_CARD, border: `1px solid ${LINE}`, minWidth: 96, height: 48 }}>
           <span style={{ fontSize: 7, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SPEED</span>
           <div className="flex items-baseline gap-1 mt-0.5">
             <span style={{
-              fontSize: 20, fontWeight: 800, lineHeight: 1,
+              fontSize: 22, fontWeight: 800, lineHeight: 1,
               color: speed > 100 ? TOXIC : speed > 60 ? "#d2f060" : INK,
+              textShadow: speed > 100 ? `0 0 10px ${TOXIC}80` : "none",
             }}>
-              {speed}
+              {speed.toString().padStart(3, "0")}
             </span>
             <span style={{ fontSize: 7, color: DIM, fontWeight: 700 }}>km/h</span>
           </div>
         </div>
 
         {/* Score Card */}
-        <div className="flex flex-col px-3 py-2" style={{ background: BG_CARD, border: `1px solid ${LINE}`, minWidth: 100 }}>
+        <div className="flex flex-col px-3.5 py-2" style={{ background: BG_CARD, border: `1px solid ${LINE}`, minWidth: 104, height: 48 }}>
           <span style={{ fontSize: 7, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SCORE</span>
           <span style={{
-            fontSize: 20, fontWeight: 800, lineHeight: 1, marginTop: 2,
+            fontSize: 22, fontWeight: 800, lineHeight: 1, marginTop: 2,
             color: score.total > 500 ? TOXIC : score.total > 200 ? "#d2f060" : INK,
+            textShadow: score.total > 500 ? `0 0 10px ${TOXIC}60` : "none",
           }}>
             {score.total.toLocaleString()}
           </span>
         </div>
       </div>
 
-      {/* ── BOTTOM-RIGHT: CONTROLS LEGEND CARD ──────────────────────── */}
-      <div className="absolute bottom-5 right-5 flex flex-col gap-1 px-3 py-2" style={{ background: BG_CARD, border: `1px solid ${LINE}` }}>
-        <div className="flex items-center gap-3">
+      {/* ── BOTTOM-RIGHT: LIVE INPUT TELEMETRY LEGEND ────────────────── */}
+      <div className="absolute bottom-5 right-5 flex flex-col gap-1.5 px-3 py-2" style={{ background: BG_CARD, border: `1px solid ${LINE}` }}>
+        <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1">
-            <span className="px-1 py-0.5 text-[8px] font-extrabold border" style={{
+            <span className="px-1.5 py-0.5 text-[8px] font-extrabold border transition-all duration-100" style={{
               background: isGasPressed ? "rgba(182,255,0,0.2)" : "#16181e",
               borderColor: isGasPressed ? TOXIC : "#232630",
               color: isGasPressed ? TOXIC : INK,
+              boxShadow: isGasPressed ? `0 0 8px ${TOXIC}50` : "none",
             }}>W / ↑</span>
-            <span style={{ fontSize: 7, color: DIM }}>gas</span>
+            <span style={{ fontSize: 7, color: isGasPressed ? TOXIC : DIM }}>gas</span>
           </span>
 
           <span className="flex items-center gap-1">
-            <span className="px-1 py-0.5 text-[8px] font-extrabold border" style={{
+            <span className="px-1.5 py-0.5 text-[8px] font-extrabold border transition-all duration-100" style={{
               background: isBrakePressed ? "rgba(182,255,0,0.2)" : "#16181e",
               borderColor: isBrakePressed ? TOXIC : "#232630",
               color: isBrakePressed ? TOXIC : INK,
+              boxShadow: isBrakePressed ? `0 0 8px ${TOXIC}50` : "none",
             }}>S / ↓</span>
-            <span style={{ fontSize: 7, color: DIM }}>brake</span>
+            <span style={{ fontSize: 7, color: isBrakePressed ? TOXIC : DIM }}>brake</span>
           </span>
 
           <span className="flex items-center gap-1">
-            <span className="px-1 py-0.5 text-[8px] font-extrabold border" style={{
+            <span className="px-1.5 py-0.5 text-[8px] font-extrabold border transition-all duration-100" style={{
               background: isLeanPressed ? "rgba(182,255,0,0.2)" : "#16181e",
               borderColor: isLeanPressed ? TOXIC : "#232630",
               color: isLeanPressed ? TOXIC : INK,
+              boxShadow: isLeanPressed ? `0 0 8px ${TOXIC}50` : "none",
             }}>A / D</span>
-            <span style={{ fontSize: 7, color: DIM }}>lean</span>
+            <span style={{ fontSize: 7, color: isLeanPressed ? TOXIC : DIM }}>lean</span>
           </span>
         </div>
 
-        <div className="flex items-center gap-3 mt-1">
+        <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1">
-            <span className="px-1 py-0.5 text-[8px] font-extrabold border" style={{
+            <span className="px-1.5 py-0.5 text-[8px] font-extrabold border transition-all duration-100" style={{
               background: isJumpPressed ? "rgba(182,255,0,0.2)" : "#16181e",
               borderColor: isJumpPressed ? TOXIC : "#232630",
               color: isJumpPressed ? TOXIC : INK,
+              boxShadow: isJumpPressed ? `0 0 8px ${TOXIC}50` : "none",
             }}>Space</span>
-            <span style={{ fontSize: 7, color: DIM }}>jump</span>
+            <span style={{ fontSize: 7, color: isJumpPressed ? TOXIC : DIM }}>jump</span>
           </span>
 
           <span className="flex items-center gap-1">
-            <span className="px-1 py-0.5 text-[8px] font-extrabold border" style={{
+            <span className="px-1.5 py-0.5 text-[8px] font-extrabold border transition-all duration-100" style={{
               background: isNitroActive ? "rgba(182,255,0,0.2)" : "#16181e",
               borderColor: isNitroActive ? TOXIC : "#232630",
               color: isNitroActive ? TOXIC : INK,
+              boxShadow: isNitroActive ? `0 0 8px ${TOXIC}50` : "none",
             }}>Shift</span>
-            <span style={{ fontSize: 7, color: DIM }}>nitro</span>
+            <span style={{ fontSize: 7, color: isNitroActive ? TOXIC : DIM }}>nitro</span>
           </span>
 
           <span className="flex items-center gap-1">
-            <span className="px-1 py-0.5 text-[8px] font-extrabold border" style={{
+            <span className="px-1.5 py-0.5 text-[8px] font-extrabold border transition-all duration-100" style={{
               background: isResetPressed ? "rgba(182,255,0,0.2)" : "#16181e",
               borderColor: isResetPressed ? TOXIC : "#232630",
               color: isResetPressed ? TOXIC : INK,
+              boxShadow: isResetPressed ? `0 0 8px ${TOXIC}50` : "none",
             }}>R</span>
-            <span style={{ fontSize: 7, color: DIM }}>reset</span>
+            <span style={{ fontSize: 7, color: isResetPressed ? TOXIC : DIM }}>reset</span>
           </span>
         </div>
       </div>
