@@ -5,9 +5,8 @@ import ResultModal from "./ResultModal";
 const TOXIC = "#b6ff00";
 const CRIMSON = "#ff3355";
 const LINE = "#232529";
-const BG_CARD = "rgba(16, 17, 19, 0.92)";
-const DIM = "#8a8e99";
-const INK = "#f0f0f2";
+const DIM = "#7c7f86";
+const INK = "#e8e8ea";
 
 function fmtTime(ms: number): { main: string; ms: string } {
   const s = ms / 1000;
@@ -18,7 +17,7 @@ function fmtTime(ms: number): { main: string; ms: string } {
 }
 
 type TrackPts = Array<[number, number]>;
-const CW = 120, CH = 38, CP = 3;
+const CW = 114, CH = 34, CP = 3;
 
 function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -43,7 +42,7 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
     const py = (y: number) => CP + (y - geo.y0) * sc.sy;
     ctx.clearRect(0, 0, CW, CH);
 
-    // Subtle dark grid
+    // Grid line
     ctx.strokeStyle = "#1a1d24";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -98,6 +97,7 @@ export default function HudOverlay() {
   const [result, setResult] = useState<ResultPayload | null>(null);
   const [airborne, setAirborne] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
+  const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
     const offs = [
@@ -118,12 +118,17 @@ export default function HudOverlay() {
       ct = window.setTimeout(() => setCrashFlash(false), 900);
     });
 
+    const offFirst = bus.on<void>(EV.INPUT_FIRST, () => {
+      setHasStarted(true);
+    });
+
     const handleKeyDown = (e: KeyboardEvent) => {
       setActiveKeys((prev) => {
         const next = new Set(prev);
         next.add(e.code);
         return next;
       });
+      if (!hasStarted) setHasStarted(true);
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       setActiveKeys((prev) => {
@@ -136,17 +141,17 @@ export default function HudOverlay() {
     window.addEventListener("keyup", handleKeyUp);
 
     return () => {
-      offs.forEach(f => f()); offCrash(); window.clearTimeout(ct);
+      offs.forEach(f => f()); offCrash(); offFirst(); window.clearTimeout(ct);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, []);
+  }, [hasStarted]);
 
   const deltaUp = (market?.probDelta ?? 0) >= 0;
   const deltaAbs = Math.abs((market?.probDelta ?? 0) * 100).toFixed(1);
   const probPct = prob === null ? null : prob * 100;
-
-  // NO TRUNCATION - Show FULL Polymarket Question!
+  
+  // Full untruncated question text
   const fullQuestion = market?.question ?? "LOADING MARKET DATA...";
 
   const toggleMute = useCallback(() => {
@@ -156,6 +161,7 @@ export default function HudOverlay() {
 
   const rideAgain = useCallback(() => {
     setResult(null);
+    setHasStarted(false);
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR" }));
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyR" }));
   }, []);
@@ -170,17 +176,18 @@ export default function HudOverlay() {
   const isResetPressed = activeKeys.has("KeyR");
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-10 select-none font-mono p-5">
+    <div className="pointer-events-none fixed inset-0 z-10 select-none font-mono p-6">
 
-      {/* ── TOP-LEFT: SEPARATED BRAND CARD & FULL MARKET DATA CARD ── */}
-      <div className="absolute top-5 left-5 flex flex-col gap-2 max-w-xl">
-        {/* Brand Module Card */}
-        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-sm shrink-0 w-fit" style={{
-          background: BG_CARD,
+      {/* ── TOP-LEFT: BRAND & FULL MARKET CONTEXT STACK (NO CRAMMING) ─ */}
+      <div className="absolute top-6 left-6 flex flex-col gap-2 max-w-xl">
+        {/* Brand Module */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm shrink-0 w-fit" style={{
+          background: "rgba(12, 13, 16, 0.85)",
           border: `1px solid ${LINE}`,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.6)",
         }}>
-          <span className="font-display font-black text-base tracking-wider" style={{ textShadow: `0 0 10px ${TOXIC}40` }}>
+          <span className="font-display font-black text-lg tracking-wider" style={{ textShadow: `0 0 10px ${TOXIC}40` }}>
             <span style={{ color: TOXIC }}>Odds</span><span style={{ color: INK }}>Rider</span>
           </span>
           <span className="text-[8px] font-extrabold tracking-widest px-1.5 py-0.5 rounded-sm" style={{ color: TOXIC, background: "rgba(182,255,0,0.1)", border: `1px solid ${TOXIC}30` }}>
@@ -189,24 +196,25 @@ export default function HudOverlay() {
         </div>
 
         {/* Polymarket Full Question & Hero Odds Card */}
-        <div className="flex flex-col gap-1.5 px-3.5 py-2.5 rounded-sm" style={{
-          background: BG_CARD,
+        <div className="flex flex-col gap-2 px-4 py-3 rounded-sm" style={{
+          background: "rgba(12, 13, 16, 0.85)",
           border: `1px solid ${LINE}`,
-          boxShadow: "0 4px 14px rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
         }}>
           {/* Full Question Text (NO TRUNCATION!) */}
           <span className="font-medium text-xs leading-relaxed" style={{ color: INK }}>
             {fullQuestion}
           </span>
 
-          {/* Hero Odds & Change Pill */}
-          <div className="flex items-center gap-3 pt-1 border-t border-[#1e2129]">
+          {/* Hero Odds & Change Tag */}
+          <div className="flex items-center gap-3 pt-1.5 border-t border-[#1e2129]">
             <div className="flex items-baseline gap-1.5">
-              <span style={{ fontSize: 8, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>PREDICTION ODDS</span>
+              <span style={{ fontSize: 8, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>PROBABILITY</span>
               <span style={{
-                fontSize: 24, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em",
+                fontSize: 26, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.03em",
                 color: probPct === null ? DIM : deltaUp ? TOXIC : CRIMSON,
-                textShadow: probPct === null ? "none" : deltaUp ? `0 0 12px ${TOXIC}60` : `0 0 12px ${CRIMSON}60`,
+                textShadow: probPct === null ? "none" : deltaUp ? `0 0 14px ${TOXIC}60` : `0 0 14px ${CRIMSON}60`,
               }}>
                 {probPct === null ? "—" : `${probPct.toFixed(1)}%`}
               </span>
@@ -226,14 +234,15 @@ export default function HudOverlay() {
         </div>
       </div>
 
-      {/* ── TOP-CENTER: RACE DECK CARD (TIMER + NITRO) ─────────────── */}
-      <div className="absolute top-5 left-1/2 flex flex-col items-center" style={{ transform: "translateX(-50%)" }}>
+      {/* ── TOP-CENTER: RACE CLOCK & NITRO DECK (STONKRIDER STYLE) ──── */}
+      <div className="absolute top-6 left-1/2 flex flex-col items-center" style={{ transform: "translateX(-50%)" }}>
         <div className="flex flex-col items-center rounded-sm overflow-hidden" style={{
-          background: BG_CARD,
+          background: "rgba(12, 13, 16, 0.88)",
           border: `1px solid ${LINE}`,
           boxShadow: "0 4px 16px rgba(0,0,0,0.7)",
+          backdropFilter: "blur(4px)",
         }}>
-          {/* Top Half: Timer */}
+          {/* Top Half: Precision Stopwatch */}
           <div className="flex items-baseline px-5 py-1.5">
             <span style={{ fontSize: 28, fontWeight: 800, color: INK, lineHeight: 1, letterSpacing: "-0.02em" }}>
               {timeObj.main}
@@ -243,7 +252,7 @@ export default function HudOverlay() {
             </span>
           </div>
 
-          {/* Bottom Half: Nitro Bar */}
+          {/* Bottom Half: 5-Cell Nitro Battery (Integrated) */}
           <div className="flex items-center gap-1.5 px-3.5 py-1 w-full" style={{
             borderTop: `1px solid ${LINE}`,
             background: isNitroActive ? "rgba(182,255,0,0.08)" : "transparent",
@@ -281,16 +290,27 @@ export default function HudOverlay() {
         )}
       </div>
 
-      {/* ── TOP-RIGHT: MINIMAP & AUDIO CARD DECK ────────────────────── */}
-      <div className="absolute top-5 right-5 flex flex-col items-end gap-2">
-        <div className="rounded-sm overflow-hidden" style={{ background: BG_CARD, border: `1px solid ${LINE}`, padding: 4, boxShadow: "0 4px 12px rgba(0,0,0,0.6)" }}>
+      {/* ── TOP-RIGHT: MINIMAP & AUDIO DECK ────────────────────────── */}
+      <div className="absolute top-6 right-6 flex flex-col items-end gap-2">
+        <div className="rounded-sm overflow-hidden" style={{
+          background: "rgba(12, 13, 16, 0.85)",
+          border: `1px solid ${LINE}`,
+          padding: 4,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)",
+        }}>
           <MiniChart pts={track} progress={progress} />
         </div>
 
         <button
           className="pointer-events-auto cursor-pointer px-2.5 py-1 rounded-sm flex items-center gap-1.5 transition-colors"
           onClick={toggleMute}
-          style={{ background: BG_CARD, border: `1px solid ${LINE}`, boxShadow: "0 2px 8px rgba(0,0,0,0.5)" }}
+          style={{
+            background: "rgba(12, 13, 16, 0.85)",
+            border: `1px solid ${LINE}`,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+            backdropFilter: "blur(4px)",
+          }}
         >
           <span style={{ fontSize: 9, color: muted ? CRIMSON : TOXIC }}>{muted ? "✕" : "🔊"}</span>
           <span style={{ fontSize: 7, letterSpacing: "0.15em", fontWeight: 700, color: muted ? CRIMSON : DIM }}>
@@ -300,9 +320,15 @@ export default function HudOverlay() {
       </div>
 
       {/* ── BOTTOM-LEFT: TELEMETRY CARDS (SPEED & SCORE) ───────────── */}
-      <div className="absolute bottom-5 left-5 flex items-center gap-2">
+      <div className="absolute bottom-6 left-6 flex items-center gap-2">
         {/* Speed Card */}
-        <div className="flex flex-col px-3.5 py-2 rounded-sm" style={{ background: BG_CARD, border: `1px solid ${LINE}`, minWidth: 96, height: 48, boxShadow: "0 4px 12px rgba(0,0,0,0.6)" }}>
+        <div className="flex flex-col px-3.5 py-2 rounded-sm" style={{
+          background: "rgba(12, 13, 16, 0.85)",
+          border: `1px solid ${LINE}`,
+          minWidth: 96, height: 48,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)",
+        }}>
           <span style={{ fontSize: 7, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SPEED</span>
           <div className="flex items-baseline gap-1 mt-0.5">
             <span style={{
@@ -317,7 +343,13 @@ export default function HudOverlay() {
         </div>
 
         {/* Score Card */}
-        <div className="flex flex-col px-3.5 py-2 rounded-sm" style={{ background: BG_CARD, border: `1px solid ${LINE}`, minWidth: 104, height: 48, boxShadow: "0 4px 12px rgba(0,0,0,0.6)" }}>
+        <div className="flex flex-col px-3.5 py-2 rounded-sm" style={{
+          background: "rgba(12, 13, 16, 0.85)",
+          border: `1px solid ${LINE}`,
+          minWidth: 104, height: 48,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)",
+        }}>
           <span style={{ fontSize: 7, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>SCORE</span>
           <span style={{
             fontSize: 22, fontWeight: 800, lineHeight: 1, marginTop: 2,
@@ -329,8 +361,13 @@ export default function HudOverlay() {
         </div>
       </div>
 
-      {/* ── BOTTOM-RIGHT: LIVE INPUT TELEMETRY LEGEND ────────────────── */}
-      <div className="absolute bottom-5 right-5 flex flex-col gap-1.5 px-3 py-2 rounded-sm" style={{ background: BG_CARD, border: `1px solid ${LINE}`, boxShadow: "0 4px 14px rgba(0,0,0,0.6)" }}>
+      {/* ── BOTTOM-RIGHT: LIVE INPUT TELEMETRY MONITOR ─────────────── */}
+      <div className="absolute bottom-6 right-6 flex flex-col gap-1.5 px-3 py-2 rounded-sm" style={{
+        background: "rgba(12, 13, 16, 0.85)",
+        border: `1px solid ${LINE}`,
+        boxShadow: "0 4px 14px rgba(0,0,0,0.6)",
+        backdropFilter: "blur(4px)",
+      }}>
         <div className="flex items-center gap-2.5">
           <span className="flex items-center gap-1">
             <span className="px-1.5 py-0.5 text-[8px] font-extrabold border rounded-xs transition-all duration-100" style={{
