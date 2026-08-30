@@ -90,7 +90,7 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
 function VolumeIcon({ muted }: { muted: boolean }) {
   if (muted) {
     return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
         <path d="M11 5L6 9H2v6h4l5 4V5z" />
         <line x1="23" y1="9" x2="17" y2="15" />
         <line x1="17" y1="9" x2="23" y2="15" />
@@ -98,7 +98,7 @@ function VolumeIcon({ muted }: { muted: boolean }) {
     );
   }
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
       <path d="M11 5L6 9H2v6h4l5 4V5z" />
       <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
@@ -123,6 +123,7 @@ export default function HudOverlay() {
   const [result, setResult] = useState<ResultPayload | null>(null);
   const [airborne, setAirborne] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
+  const [hasStarted, setHasStarted] = useState(false);
 
   useEffect(() => {
     const offs = [
@@ -143,7 +144,12 @@ export default function HudOverlay() {
       ct = window.setTimeout(() => setCrashFlash(false), 900);
     });
 
-    const handleKeyDown = (e: KeyboardEvent) => setActiveKeys((prev) => new Set(prev).add(e.code));
+    const offFirst = bus.on<void>(EV.INPUT_FIRST, () => setHasStarted(true));
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      setActiveKeys((prev) => new Set(prev).add(e.code));
+      if (!["KeyM", "KeyR"].includes(e.code)) setHasStarted(true);
+    };
     const handleKeyUp = (e: KeyboardEvent) => setActiveKeys((prev) => {
       const next = new Set(prev); next.delete(e.code); return next;
     });
@@ -151,7 +157,7 @@ export default function HudOverlay() {
     window.addEventListener("keyup", handleKeyUp);
 
     return () => {
-      offs.forEach(f => f()); offCrash(); window.clearTimeout(ct);
+      offs.forEach(f => f()); offCrash(); offFirst(); window.clearTimeout(ct);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
@@ -170,6 +176,7 @@ export default function HudOverlay() {
 
   const rideAgain = useCallback(() => {
     setResult(null);
+    setHasStarted(false);
     window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR" }));
     window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyR" }));
   }, []);
@@ -180,16 +187,16 @@ export default function HudOverlay() {
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none font-sans p-6 sm:p-8 flex flex-col justify-between">
 
-      {/* ── TOP DECK: FOCUS & SPARKLINE ── */}
+      {/* ── TOP DECK: FOCUS & TACTICAL SPARKLINE ── */}
       <div className="flex items-start justify-between w-full">
         
-        {/* Brand: Pure, bold, confident wordmark without arbitrary dots */}
+        {/* Top-Left: Brand Identity */}
         <div className="flex items-baseline tracking-[0.24em] uppercase font-display font-black text-sm sm:text-base">
           <span className="text-ink">Odds</span>
           <span style={{ color: TOXIC }}>Rider</span>
         </div>
 
-        {/* Center: Precision Race Clock (Geist Mono Tabular) */}
+        {/* Top-Center: Precision Race Clock */}
         <div className="flex flex-col items-center -mt-1 font-mono">
           <div className="flex items-baseline tracking-tight tabular-nums">
             <span style={{ fontSize: 40, fontWeight: 700, color: INK, lineHeight: 1 }}>
@@ -206,17 +213,19 @@ export default function HudOverlay() {
           )}
         </div>
 
-        {/* Top-Right: Sparkline & Precision SVG Audio Toggle */}
-        <div className="flex items-center gap-2.5">
+        {/* Top-Right: Tactical Sparkline Stacked with Audio Control */}
+        <div className="flex flex-col items-end gap-1.5">
           <MiniChart pts={track} progress={progress} />
           <button
-            className="pointer-events-auto cursor-pointer p-1.5 opacity-60 hover:opacity-100 transition-opacity"
-            style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${LINE}` }}
+            className="pointer-events-auto cursor-pointer flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"
             onClick={toggleMute}
             title={muted ? "Unmute (M)" : "Mute (M)"}
           >
             <span style={{ color: muted ? CRIMSON : SUBTLE }}>
               <VolumeIcon muted={muted} />
+            </span>
+            <span className="text-[8px] font-sans font-bold tracking-[0.16em]" style={{ color: muted ? CRIMSON : DIM }}>
+              {muted ? "MUTED" : "AUDIO"}
             </span>
           </button>
         </div>
@@ -224,14 +233,14 @@ export default function HudOverlay() {
       </div>
 
 
-      {/* ── BOTTOM DECK: COCKPIT & MARKET OUTCOME ── */}
+      {/* ── BOTTOM DECK: COCKPIT INSTRUMENT PANEL & PREDICTION OUTCOME ── */}
       <div className="flex items-end justify-between w-full">
 
-        {/* Left: Vehicle Cockpit Column */}
-        <div className="flex flex-col gap-2.5 max-w-sm">
+        {/* Bottom-Left: Pure Cockpit Telemetry (Speed + Score + Nitro) */}
+        <div className="flex flex-col gap-2">
           
-          {/* Speed & Score Baseline Group */}
-          <div className="flex items-baseline gap-7 font-mono tabular-nums">
+          {/* Speed & Score Baseline Duo */}
+          <div className="flex items-baseline gap-6 font-mono tabular-nums">
             <div className="flex items-baseline gap-1">
               <span style={{
                 fontSize: 34, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em",
@@ -256,7 +265,7 @@ export default function HudOverlay() {
           </div>
 
           {/* Nitro Fuel Meter */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <span className="font-sans" style={{
               fontSize: 8, letterSpacing: "0.22em", fontWeight: 800,
               color: isNitroActive ? TOXIC : DIM,
@@ -269,7 +278,7 @@ export default function HudOverlay() {
                 return (
                   <div
                     key={i}
-                    className="w-6 h-1.5 transition-all duration-100"
+                    className="w-5 h-1.5 transition-all duration-100"
                     style={{
                       background: isFilled ? TOXIC : "#181a20",
                       boxShadow: isFilled && isNitroActive ? `0 0 8px ${TOXIC}` : "none",
@@ -278,38 +287,45 @@ export default function HudOverlay() {
                 );
               })}
             </div>
-          </div>
-
-          {/* Calibrated Micro-Keycaps Legend (Pure text, zero icons/emojis) */}
-          <div className="flex items-center gap-2 pt-0.5 font-sans">
-            {[
-              { key: "W", label: "GAS" },
-              { key: "S", label: "BRAKE" },
-              { key: "A/D", label: "LEAN" },
-              { key: "SPACE", label: "JUMP" },
-              { key: "SHIFT", label: "NITRO" },
-              { key: "R", label: "RESET" },
-            ].map(({ key, label }) => (
-              <span key={label} className="flex items-center gap-1">
-                <span className="font-mono px-1 py-0.5 text-[7.5px] font-bold text-subtle leading-none" 
-                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #232529" }}>
-                  {key}
-                </span>
-                <span className="text-[7px] text-[#6b7280] font-bold tracking-wider">
-                  {label}
-                </span>
-              </span>
-            ))}
+            <span className="font-mono text-[8px] text-dim ml-1">
+              {Math.round(nitro * 100)}%
+            </span>
           </div>
 
         </div>
 
 
-        {/* Right: Polymarket Prediction Outcome Column */}
+        {/* Bottom-Center: Start-Gate Keycaps Helper (Gracefully Fades Out On Drive) */}
+        <div 
+          className="flex items-center gap-2 pb-1 font-sans transition-opacity duration-500 ease-out"
+          style={{ opacity: hasStarted ? 0 : 0.75 }}
+        >
+          {[
+            { key: "W", label: "GAS" },
+            { key: "S", label: "BRAKE" },
+            { key: "A/D", label: "LEAN" },
+            { key: "SPACE", label: "JUMP" },
+            { key: "SHIFT", label: "NITRO" },
+            { key: "R", label: "RESET" },
+          ].map(({ key, label }) => (
+            <span key={label} className="flex items-center gap-1">
+              <span className="font-mono px-1 py-0.5 text-[7.5px] font-bold text-subtle leading-none" 
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #232529" }}>
+                {key}
+              </span>
+              <span className="text-[7px] text-[#7c7f86] font-bold tracking-wider">
+                {label}
+              </span>
+            </span>
+          ))}
+        </div>
+
+
+        {/* Bottom-Right: Polymarket Prediction Outcome Column */}
         <div className="flex flex-col items-end gap-1.5 max-w-[460px] text-right pl-6" 
              style={{ borderRight: `2px solid ${deltaUp ? TOXIC : CRIMSON}`, paddingRight: 12 }}>
           
-          {/* Full Question Text in Space Grotesk */}
+          {/* Full Question Text */}
           <span className="font-sans font-medium text-[12.5px] leading-[1.38] text-ink/90 tracking-[-0.01em]">
             {fullQuestion}
           </span>
