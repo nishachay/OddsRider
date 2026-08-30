@@ -7,7 +7,7 @@ const CRIMSON = "#ff3355";
 const DIM = "#6b7280";
 const SUBTLE = "#9ca3af";
 const INK = "#f3f4f6";
-const HAIRLINE = "#1f242d";
+const LINE = "#1f242d";
 
 function fmtTime(ms: number): { main: string; ms: string } {
   const s = ms / 1000;
@@ -18,7 +18,7 @@ function fmtTime(ms: number): { main: string; ms: string } {
 }
 
 type TrackPts = Array<[number, number]>;
-const CW = 130, CH = 38, CP = 3;
+const CW = 120, CH = 30, CP = 2;
 
 function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -43,13 +43,6 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
     const py = (y: number) => CP + (y - geo.y0) * sc.sy;
     ctx.clearRect(0, 0, CW, CH);
 
-    // Subtle tactical horizontal gridline
-    ctx.strokeStyle = "#161922";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, CH / 2); ctx.lineTo(CW, CH / 2);
-    ctx.stroke();
-
     // Area fill under track line
     ctx.beginPath();
     ctx.moveTo(px(pts[0][0]), CH);
@@ -59,13 +52,13 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
     }
     ctx.lineTo(px(pts[pts.length - 1][0]), CH);
     const grad = ctx.createLinearGradient(0, 0, 0, CH);
-    grad.addColorStop(0, "rgba(182, 255, 0, 0.12)");
+    grad.addColorStop(0, "rgba(182, 255, 0, 0.16)");
     grad.addColorStop(1, "rgba(182, 255, 0, 0.0)");
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Track line segments with color-coding
-    ctx.lineWidth = 1.8;
+    // Colored line segments
+    ctx.lineWidth = 1.6;
     for (let i = 1; i < pts.length; i++) {
       ctx.strokeStyle = pts[i][1] <= pts[i - 1][1] ? TOXIC : CRIMSON;
       ctx.beginPath(); ctx.moveTo(px(pts[i-1][0]), py(pts[i-1][1]));
@@ -84,11 +77,11 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
   }, [pts, geo, sc, progress]);
 
   return (
-    <div className="relative overflow-hidden" style={{ width: CW, height: CH, borderBottom: `1px solid ${HAIRLINE}` }}>
+    <div className="relative overflow-hidden" style={{ width: CW, height: CH }}>
       <canvas ref={ref} width={CW} height={CH} className="absolute inset-0" />
       {dot && (
         <span className="absolute rounded-full animate-pulse"
-          style={{ width: 5, height: 5, background: TOXIC, boxShadow: `0 0 8px ${TOXIC}`, left: dot.left - 2.5, top: dot.top - 2.5 }} />
+          style={{ width: 4, height: 4, background: TOXIC, boxShadow: `0 0 6px ${TOXIC}`, left: dot.left - 2, top: dot.top - 2 }} />
       )}
     </div>
   );
@@ -167,117 +160,94 @@ export default function HudOverlay() {
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none font-mono p-6 sm:p-8 flex flex-col justify-between">
 
-      {/* ── TOP DECK: STATUS, RACE TIMER & TACTICAL SPARKLINE ── */}
+      {/* ── TOP DECK ── */}
       <div className="flex items-start justify-between w-full">
         
-        {/* Top-Left: Brand & Protocol Telemetry */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="font-display font-black text-sm tracking-[0.2em] text-ink uppercase">
-              Odds<span style={{ color: TOXIC }}>Rider</span>
-            </span>
-            <span className="text-[8px] font-extrabold tracking-[0.2em] px-1.5 py-0.5 rounded-xs" 
-                  style={{ color: TOXIC, background: "rgba(182,255,0,0.08)", border: `1px solid rgba(182,255,0,0.25)` }}>
-              LIVE PROBABILITY
-            </span>
-          </div>
-          <span className="text-[8px] tracking-[0.18em] text-[#555a66] font-bold">
-            POLYMARKET CLOB PROTOCOL
+        {/* Brand: Pure, Minimalist, Confident */}
+        <div className="flex items-center gap-2">
+          <span className="font-display font-black text-sm sm:text-base tracking-[0.2em] text-ink uppercase">
+            Odds<span style={{ color: TOXIC }}>Rider</span>
           </span>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: TOXIC, boxShadow: `0 0 6px ${TOXIC}` }} />
         </div>
 
-        {/* Top-Center: Precision Racing Clock */}
-        <div className="flex flex-col items-center">
-          <div className="flex items-baseline tracking-tight">
-            <span style={{ fontSize: 44, fontWeight: 900, color: INK, lineHeight: 1 }}>
+        {/* Center: Precision Race Clock (Undisputed focal point, zero label clutter) */}
+        <div className="flex flex-col items-center -mt-1">
+          <div className="flex items-baseline tracking-tight font-mono">
+            <span style={{ fontSize: 40, fontWeight: 900, color: INK, lineHeight: 1 }}>
               {timeObj.main}
             </span>
-            <span style={{ fontSize: 22, fontWeight: 900, color: TOXIC, lineHeight: 1 }}>
+            <span style={{ fontSize: 20, fontWeight: 900, color: TOXIC, lineHeight: 1 }}>
               {timeObj.ms}
             </span>
           </div>
-          <span style={{ fontSize: 8, letterSpacing: "0.25em", color: DIM, fontWeight: 800, marginTop: 2 }}>
-            SESSION TIME
-          </span>
           {airborne && (
-            <span className="text-[8px] font-extrabold tracking-[0.2em] text-toxic animate-pulse mt-1" style={{ textShadow: `0 0 8px ${TOXIC}` }}>
-              ▲ AIRBORNE
+            <span className="text-[8px] font-extrabold tracking-[0.2em] text-toxic animate-pulse mt-0.5" style={{ textShadow: `0 0 8px ${TOXIC}` }}>
+              AIRBORNE
             </span>
           )}
         </div>
 
-        {/* Top-Right: Sparkline Minimap & Controls */}
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex items-center gap-2">
-            <span style={{ fontSize: 8, letterSpacing: "0.2em", color: DIM, fontWeight: 700 }}>CHART SPARKLINE</span>
-            <button
-              className="pointer-events-auto cursor-pointer flex items-center gap-1 opacity-70 hover:opacity-100 transition-opacity"
-              onClick={toggleMute}
-            >
-              <span style={{ fontSize: 9, color: muted ? CRIMSON : TOXIC }}>{muted ? "✕" : "🔊"}</span>
-              <span style={{ fontSize: 7, letterSpacing: "0.15em", fontWeight: 700, color: muted ? CRIMSON : SUBTLE }}>
-                {muted ? "MUTED" : "M"}
-              </span>
-            </button>
-          </div>
+        {/* Top-Right: Sparkline Chart & Audio Button */}
+        <div className="flex items-center gap-2.5">
           <MiniChart pts={track} progress={progress} />
+          <button
+            className="pointer-events-auto cursor-pointer p-1.5 rounded-[1px] opacity-60 hover:opacity-100 transition-opacity"
+            style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${LINE}` }}
+            onClick={toggleMute}
+            title={muted ? "Unmute" : "Mute"}
+          >
+            <span style={{ fontSize: 9, color: muted ? CRIMSON : SUBTLE }}>{muted ? "✕" : "🔊"}</span>
+          </button>
         </div>
 
       </div>
 
 
-      {/* ── BOTTOM DECK: COCKPIT TELEMETRY & LIVE PREDICTION ENGINE ── */}
-      <div className="flex items-end justify-between w-full pt-6">
+      {/* ── BOTTOM DECK ── */}
+      <div className="flex items-end justify-between w-full">
 
-        {/* Bottom-Left: Vehicle Cockpit Dashboard */}
-        <div className="flex flex-col gap-3 max-w-xs">
+        {/* Left: Cockpit Cluster */}
+        <div className="flex flex-col gap-2.5 max-w-sm">
           
           {/* Speed & Score Duo */}
-          <div className="flex items-end gap-6">
-            <div className="flex flex-col">
-              <span style={{ fontSize: 8, letterSpacing: "0.25em", color: DIM, fontWeight: 800 }}>VELOCITY</span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span style={{
-                  fontSize: 34, fontWeight: 900, lineHeight: 1,
-                  color: speed > 100 ? TOXIC : speed > 60 ? "#d2f060" : INK,
-                  textShadow: speed > 100 ? `0 0 12px ${TOXIC}70` : "none",
-                }}>
-                  {speed.toString().padStart(3, "0")}
-                </span>
-                <span style={{ fontSize: 9, color: DIM, fontWeight: 800 }}>KM/H</span>
-              </div>
+          <div className="flex items-baseline gap-6 font-mono">
+            <div className="flex items-baseline gap-1">
+              <span style={{
+                fontSize: 32, fontWeight: 900, lineHeight: 1,
+                color: speed > 100 ? TOXIC : INK,
+                textShadow: speed > 100 ? `0 0 12px ${TOXIC}80` : "none",
+              }}>
+                {speed.toString().padStart(3, "0")}
+              </span>
+              <span style={{ fontSize: 9, color: DIM, fontWeight: 800, letterSpacing: "0.05em" }}>KM/H</span>
             </div>
 
-            <div className="flex flex-col pb-0.5">
-              <span style={{ fontSize: 8, letterSpacing: "0.25em", color: DIM, fontWeight: 800 }}>SCORE</span>
-              <span style={{ fontSize: 20, fontWeight: 900, color: INK, lineHeight: 1, marginTop: 4 }}>
+            <div className="flex items-baseline gap-1.5">
+              <span style={{ fontSize: 8, letterSpacing: "0.2em", color: DIM, fontWeight: 800 }}>PTS</span>
+              <span style={{ fontSize: 18, fontWeight: 900, color: INK, lineHeight: 1 }}>
                 {score.total.toLocaleString()}
               </span>
             </div>
           </div>
 
-          {/* Nitro Fuel Cell Meter */}
-          <div className="flex flex-col gap-1 w-44">
-            <div className="flex items-center justify-between">
-              <span style={{
-                fontSize: 8, letterSpacing: "0.2em", fontWeight: 800,
-                color: isNitroActive ? TOXIC : DIM,
-              }}>
-                {isNitroActive ? "⚡ NITRO BOOST" : "NITRO RESERVE"}
-              </span>
-              <span style={{ fontSize: 8, color: DIM, fontWeight: 700 }}>
-                {Math.round(nitro * 100)}%
-              </span>
-            </div>
-            <div className="flex items-center gap-1 h-2">
+          {/* Nitro Battery Gauge */}
+          <div className="flex items-center gap-2">
+            <span style={{
+              fontSize: 8, letterSpacing: "0.2em", fontWeight: 800,
+              color: isNitroActive ? TOXIC : DIM,
+            }}>
+              NITRO
+            </span>
+            <div className="flex items-center gap-1">
               {[0, 1, 2, 3, 4].map((i) => {
                 const isFilled = nitro >= (i + 1) * 0.2 - 0.15;
                 return (
                   <div
                     key={i}
-                    className="flex-1 h-full rounded-2xs transition-all duration-100"
+                    className="w-6 h-1.5 rounded-[1px] transition-all duration-100"
                     style={{
-                      background: isFilled ? TOXIC : "#171922",
+                      background: isFilled ? TOXIC : "#181a20",
                       boxShadow: isFilled && isNitroActive ? `0 0 8px ${TOXIC}` : "none",
                     }}
                   />
@@ -286,53 +256,61 @@ export default function HudOverlay() {
             </div>
           </div>
 
-          {/* Micro Controls Footnote */}
-          <div className="flex items-center gap-2.5 pt-1 text-[8px] text-[#555a66] font-bold">
-            <span><strong className="text-subtle font-extrabold">W/↑</strong> GAS</span>
-            <span><strong className="text-subtle font-extrabold">S/↓</strong> BRAKE</span>
-            <span><strong className="text-subtle font-extrabold">A/D</strong> LEAN</span>
-            <span><strong className="text-subtle font-extrabold">SPACE</strong> JUMP</span>
-            <span><strong className="text-subtle font-extrabold">SHIFT</strong> NITRO</span>
-            <span><strong className="text-subtle font-extrabold">R</strong> RESET</span>
+          {/* Micro Keycaps Legend */}
+          <div className="flex items-center gap-2 pt-0.5 font-mono">
+            {[
+              { key: "W", label: "GAS" },
+              { key: "S", label: "BRAKE" },
+              { key: "A/D", label: "LEAN" },
+              { key: "SPACE", label: "JUMP" },
+              { key: "SHIFT", label: "NITRO" },
+              { key: "R", label: "RESET" },
+            ].map(({ key, label }) => (
+              <span key={label} className="flex items-center gap-1">
+                <span className="px-1 py-0.5 rounded-[1px] text-[7.5px] font-bold text-subtle" 
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #232529" }}>
+                  {key}
+                </span>
+                <span className="text-[7px] text-[#555a66] font-bold tracking-wider">
+                  {label}
+                </span>
+              </span>
+            ))}
           </div>
 
         </div>
 
 
-        {/* Bottom-Right: Live Polymarket Outcome Engine */}
-        <div className="flex flex-col items-end gap-1.5 max-w-lg text-right pl-6" 
+        {/* Right: Polymarket Outcome Readout */}
+        <div className="flex flex-col items-end gap-1.5 max-w-md text-right pl-6" 
              style={{ borderRight: `2px solid ${deltaUp ? TOXIC : CRIMSON}`, paddingRight: 10 }}>
           
-          <span style={{ fontSize: 8, letterSpacing: "0.25em", color: DIM, fontWeight: 800 }}>
-            CURRENT MARKET CONTRACT
-          </span>
-
-          {/* Full Question Text with deliberate typesetting */}
-          <span className="font-medium text-xs leading-relaxed text-ink/90">
+          {/* Full Question with clean typography */}
+          <span className="font-medium text-xs leading-snug text-ink/90 font-mono tracking-tight">
             {fullQuestion}
           </span>
 
-          {/* Probability Hero Block */}
-          <div className="flex items-baseline gap-2.5 mt-0.5">
+          {/* Hero Probability Block */}
+          <div className="flex items-baseline gap-2 mt-0.5 font-mono">
             <span style={{
-              fontSize: 38, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.03em",
+              fontSize: 36, fontWeight: 900, lineHeight: 1, letterSpacing: "-0.03em",
               color: probPct === null ? DIM : deltaUp ? TOXIC : CRIMSON,
               textShadow: probPct === null ? "none" : deltaUp ? `0 0 16px ${TOXIC}60` : `0 0 16px ${CRIMSON}60`,
             }}>
               {probPct === null ? "—" : `${probPct.toFixed(1)}%`}
             </span>
             
-            <span style={{ fontSize: 11, letterSpacing: "0.15em", fontWeight: 800, color: INK }}>
+            <span style={{ fontSize: 10, letterSpacing: "0.15em", fontWeight: 800, color: INK }}>
               YES
             </span>
 
             {market && (
-              <span className="text-[10px] font-extrabold ml-1 px-1.5 py-0.5 rounded-xs" style={{
+              <span className="text-[9.5px] font-extrabold ml-1 px-1.5 py-0.5 rounded-[1px]" style={{
                 color: deltaUp ? TOXIC : CRIMSON,
-                background: deltaUp ? "rgba(182,255,0,0.1)" : "rgba(255,51,85,0.1)",
-                border: `1px solid ${deltaUp ? TOXIC : CRIMSON}40`,
+                background: deltaUp ? "rgba(182,255,0,0.08)" : "rgba(255,51,85,0.08)",
+                border: `1px solid ${deltaUp ? TOXIC : CRIMSON}30`,
               }}>
-                {deltaUp ? "▲" : "▼"} {deltaAbs}% 24H
+                {deltaUp ? "▲" : "▼"} {deltaAbs}%
               </span>
             )}
           </div>
