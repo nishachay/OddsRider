@@ -69,7 +69,7 @@ Headless chromium smoke tests are the substitute for playtesting:
 
 ## Design language (locked)
 
-Betting-terminal aesthetic, explicitly anti-AI-slop: radius-0 corners, 1px `#232529` borders, mono numerals (JetBrains Mono), Archivo expanded wordmark, toxic `#b6ff00` / crimson `#ff3355` accents used sparingly. Banned: gradients on UI, glassmorphism, rounded cards, emoji, purple/blue palettes. Tokens live in `index.css @theme` + `PALETTE` in `constants.ts` — change them there, not inline.
+Betting-terminal aesthetic, explicitly anti-AI-slop: radius-0 corners, 1px `#232529` borders, 2-Font System (`Space Grotesk` interface + `Geist Mono` tabular telemetry), toxic `#b6ff00` / crimson `#ff3355` accents used sparingly. Banned: gradients on UI, glassmorphism, rounded cards, emoji, purple/blue palettes. Full specification documented in `docs/DESIGN_SYSTEM.md`. Tokens live in `index.css @theme` + `PALETTE` in `constants.ts` — change them there, not inline.
 
 ## Code traps (learned the hard way)
 

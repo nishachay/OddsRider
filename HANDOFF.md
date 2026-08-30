@@ -13,9 +13,10 @@ Master spec is V2 (user holds it; its decisions are repeated throughout this doc
 Locked creative choices:
 - **Dark Cyber Dirt Bike** only (one bike, no garage)
 - Near-black background (`#0a0a0b`), the **glowing probability track is the visual hero**
-- Betting-terminal aesthetic ("anti-AI-slop"): radius-0 corners, 1px `#232529` borders, mono numerals (JetBrains Mono), Archivo expanded wordmark, toxic `#b6ff00` + crimson `#ff3355` accents used sparingly
+- Betting-terminal aesthetic ("anti-AI-slop"): radius-0 corners, 1px `#232529` borders, 2-Font System (`Space Grotesk` interface/brand/questions + `Geist Mono` tabular telemetry), toxic `#b6ff00` + crimson `#ff3355` accents used sparingly. Full specification in `docs/DESIGN_SYSTEM.md`.
 - **Banned**: gradients on UI, glassmorphism, rounded cards, emoji, purple/blue palettes
 - Tokens live in `src/index.css` `@theme` + `PALETTE` in `src/game/constants.ts`. Change them there, never inline.
+- Advanced Polymarket features & mechanics documented in `docs/POLYMARKET_MECHANICS_ROADMAP.md`.
 
 ## 2. Stack (pinned — do not upgrade casually)
 
