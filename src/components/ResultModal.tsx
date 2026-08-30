@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 
 interface ResultModalProps {
   isOpen: boolean;
@@ -36,21 +36,21 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
   if (!isOpen || !result) return null;
 
   const isSuccess = result.finished;
-  const probPercent = result.finalProb !== undefined ? Math.round(result.finalProb * 100) : null;
+  const probPercent = result.finalProb !== undefined ? (result.finalProb * 100).toFixed(1) : null;
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-bg/85 backdrop-blur-sm select-none animate-in fade-in duration-200">
+    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0b]/85 backdrop-blur-sm select-none animate-in fade-in duration-200 font-sans">
       <div className="w-full max-w-lg border border-line bg-bg p-6 shadow-2xl">
-        {/* Header Badge */}
+        {/* Header Status */}
         <div className="flex items-center justify-between border-b border-line pb-4">
           <div>
-            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">ODDSRIDER TELEMETRY</div>
+            <div className="text-[8px] font-extrabold tracking-[0.24em] text-dim uppercase">ODDSRIDER TELEMETRY</div>
             <div
-              className={`mt-1 font-display text-xl font-bold tracking-wider ${
+              className={`mt-1 font-display text-lg font-black tracking-wider uppercase ${
                 isSuccess ? 'text-toxic' : 'text-crimson'
               }`}
             >
-              {isSuccess ? 'RIDE COMPLETED - MARKET CONQUERED' : 'CRASHED - PROBABILITY OVERLOAD'}
+              {isSuccess ? 'MARKET CONQUERED' : 'CRASHED - PROBABILITY OVERLOAD'}
             </div>
           </div>
           <div
@@ -62,17 +62,17 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </div>
         </div>
 
-        {/* Market Question Box */}
+        {/* Market Event Box */}
         {result.marketQuestion && (
           <div className="mt-4 border border-line bg-surface/50 p-3.5">
-            <div className="font-mono text-[9px] tracking-[0.28em] text-dim">LIVE POLYMARKET EVENT</div>
-            <div className="mt-1 font-mono text-xs font-semibold text-ink line-clamp-2">
+            <div className="text-[8px] font-bold tracking-[0.22em] text-dim uppercase">LIVE EVENT</div>
+            <div className="mt-1 text-xs font-medium leading-snug text-ink/90">
               {result.marketQuestion}
             </div>
             {probPercent !== null && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="font-mono text-[10px] text-dim">FINAL ODDS:</span>
-                <span className={`font-mono text-xs font-bold ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>{probPercent}% YES</span>
+              <div className="mt-2.5 flex items-center gap-2 font-mono text-xs">
+                <span className="text-[9px] font-bold text-dim tracking-wider uppercase">FINAL ODDS:</span>
+                <span className={`font-bold ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>{probPercent}% YES</span>
               </div>
             )}
           </div>
@@ -80,14 +80,14 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
 
         {/* Performance Metrics Grid */}
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="border border-line bg-bg p-3 shadow-inner">
-            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">FINAL SCORE</div>
+          <div className="border border-line bg-bg p-3.5">
+            <div className="text-[8px] font-bold tracking-[0.22em] text-dim uppercase">FINAL SCORE</div>
             <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-ink">
               {result.score.toLocaleString()}
             </div>
           </div>
-          <div className="border border-line bg-bg p-3 shadow-inner">
-            <div className="font-mono text-[9px] tracking-[0.32em] text-dim">TIME ELAPSED</div>
+          <div className="border border-line bg-bg p-3.5">
+            <div className="text-[8px] font-bold tracking-[0.22em] text-dim uppercase">TIME ELAPSED</div>
             <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-ink">
               {formatTime(result.timeMs)}
             </div>
@@ -102,7 +102,7 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
               isSuccess ? 'border-toxic bg-toxic/10 text-toxic hover:bg-toxic hover:text-bg' : 'border-crimson bg-crimson/10 text-crimson hover:bg-crimson hover:text-bg'
             }`}
           >
-            [ RIDE AGAIN ] <span className="text-[10px] opacity-75">(PRESS R)</span>
+            [ RIDE AGAIN ] <span className="text-[10px] opacity-75 font-sans">(PRESS R)</span>
           </button>
         </div>
       </div>

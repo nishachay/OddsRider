@@ -77,13 +77,32 @@ function MiniChart({ pts, progress }: { pts: TrackPts | null; progress: number }
   }, [pts, geo, sc, progress]);
 
   return (
-    <div className="relative overflow-hidden rounded-xs" style={{ width: CW, height: CH }}>
+    <div className="relative overflow-hidden" style={{ width: CW, height: CH }}>
       <canvas ref={ref} width={CW} height={CH} className="absolute inset-0" />
       {dot && (
-        <span className="absolute rounded-full animate-pulse"
+        <span className="absolute rounded-none animate-pulse"
           style={{ width: 4, height: 4, background: TOXIC, boxShadow: `0 0 6px ${TOXIC}`, left: dot.left - 2, top: dot.top - 2 }} />
       )}
     </div>
+  );
+}
+
+function VolumeIcon({ muted }: { muted: boolean }) {
+  if (muted) {
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
+        <path d="M11 5L6 9H2v6h4l5 4V5z" />
+        <line x1="23" y1="9" x2="17" y2="15" />
+        <line x1="17" y1="9" x2="23" y2="15" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square">
+      <path d="M11 5L6 9H2v6h4l5 4V5z" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
   );
 }
 
@@ -139,7 +158,8 @@ export default function HudOverlay() {
   }, []);
 
   const deltaUp = (market?.probDelta ?? 0) >= 0;
-  const deltaAbs = Math.abs((market?.probDelta ?? 0) * 100).toFixed(1);
+  const deltaSign = deltaUp ? "+" : "";
+  const deltaAbs = ((market?.probDelta ?? 0) * 100).toFixed(1);
   const probPct = prob === null ? null : prob * 100;
   const fullQuestion = market?.question ?? "LOADING LIVE POLYMARKET DATA...";
 
@@ -163,12 +183,10 @@ export default function HudOverlay() {
       {/* ── TOP DECK: FOCUS & SPARKLINE ── */}
       <div className="flex items-start justify-between w-full">
         
-        {/* Brand: Space Grotesk Bold Wordmark */}
-        <div className="flex items-center gap-2.5">
-          <span className="font-display font-black text-sm sm:text-base tracking-[0.22em] text-ink uppercase">
-            Odds<span style={{ color: TOXIC }}>Rider</span>
-          </span>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: TOXIC, boxShadow: `0 0 8px ${TOXIC}` }} />
+        {/* Brand: Pure, bold, confident wordmark without arbitrary dots */}
+        <div className="flex items-baseline tracking-[0.24em] uppercase font-display font-black text-sm sm:text-base">
+          <span className="text-ink">Odds</span>
+          <span style={{ color: TOXIC }}>Rider</span>
         </div>
 
         {/* Center: Precision Race Clock (Geist Mono Tabular) */}
@@ -188,16 +206,18 @@ export default function HudOverlay() {
           )}
         </div>
 
-        {/* Top-Right: Sparkline & Audio */}
+        {/* Top-Right: Sparkline & Precision SVG Audio Toggle */}
         <div className="flex items-center gap-2.5">
           <MiniChart pts={track} progress={progress} />
           <button
-            className="pointer-events-auto cursor-pointer p-1.5 rounded-xs opacity-60 hover:opacity-100 transition-opacity"
+            className="pointer-events-auto cursor-pointer p-1.5 opacity-60 hover:opacity-100 transition-opacity"
             style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${LINE}` }}
             onClick={toggleMute}
-            title={muted ? "Unmute" : "Mute"}
+            title={muted ? "Unmute (M)" : "Mute (M)"}
           >
-            <span style={{ fontSize: 9, color: muted ? CRIMSON : SUBTLE }}>{muted ? "✕" : "🔊"}</span>
+            <span style={{ color: muted ? CRIMSON : SUBTLE }}>
+              <VolumeIcon muted={muted} />
+            </span>
           </button>
         </div>
 
@@ -249,7 +269,7 @@ export default function HudOverlay() {
                 return (
                   <div
                     key={i}
-                    className="w-6 h-1.5 rounded-[1px] transition-all duration-100"
+                    className="w-6 h-1.5 transition-all duration-100"
                     style={{
                       background: isFilled ? TOXIC : "#181a20",
                       boxShadow: isFilled && isNitroActive ? `0 0 8px ${TOXIC}` : "none",
@@ -260,7 +280,7 @@ export default function HudOverlay() {
             </div>
           </div>
 
-          {/* Calibrated Keycaps Legend */}
+          {/* Calibrated Micro-Keycaps Legend (Pure text, zero icons/emojis) */}
           <div className="flex items-center gap-2 pt-0.5 font-sans">
             {[
               { key: "W", label: "GAS" },
@@ -271,7 +291,7 @@ export default function HudOverlay() {
               { key: "R", label: "RESET" },
             ].map(({ key, label }) => (
               <span key={label} className="flex items-center gap-1">
-                <span className="font-mono px-1 py-0.5 rounded-[1px] text-[7.5px] font-bold text-subtle leading-none" 
+                <span className="font-mono px-1 py-0.5 text-[7.5px] font-bold text-subtle leading-none" 
                       style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #232529" }}>
                   {key}
                 </span>
@@ -294,7 +314,7 @@ export default function HudOverlay() {
             {fullQuestion}
           </span>
 
-          {/* Hero Probability + Delta Block */}
+          {/* Hero Probability + Financial Delta Block */}
           <div className="flex items-center gap-2 mt-0.5">
             <div className="flex items-baseline gap-1 font-mono tabular-nums">
               <span style={{
@@ -311,12 +331,12 @@ export default function HudOverlay() {
             </div>
 
             {market && (
-              <span className="font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded-[1px]" style={{
+              <span className="font-mono text-[9.5px] font-bold px-1.5 py-0.5" style={{
                 color: deltaUp ? TOXIC : CRIMSON,
                 background: deltaUp ? "rgba(182,255,0,0.08)" : "rgba(255,51,85,0.08)",
                 border: `1px solid ${deltaUp ? TOXIC : CRIMSON}30`,
               }}>
-                {deltaUp ? "▲" : "▼"} {deltaAbs}%
+                {deltaSign}{deltaAbs}%
               </span>
             )}
           </div>
@@ -332,6 +352,7 @@ export default function HudOverlay() {
         opacity: crashFlash ? 0.8 : 0,
       }} />
 
+      {/* Result Modal */}
       <ResultModal
         isOpen={Boolean(result)}
         result={result ? {
