@@ -40,43 +40,63 @@ function MiniChart({ pts, deltaUp }: { pts: number[]; deltaUp: boolean }) {
 
 export default function MarketCard({ market, onSelect }: MarketCardProps) {
   const deltaUp = market.probDelta >= 0;
-  const ticker = market.slug.toUpperCase().slice(0, 8);
+  const probPct = Math.round(market.currentProb * 100);
 
-  const diffIcon =
+  const diffBadge =
     market.difficulty === 'EASY'
-      ? '🟢 EASY'
+      ? 'text-[#00df81] bg-[#00df81]/10 border-[#00df81]/30'
       : market.difficulty === 'MEDIUM'
-      ? '🟠 MEDIUM'
+      ? 'text-[#f59e0b] bg-[#f59e0b]/10 border-[#f59e0b]/30'
       : market.difficulty === 'HARD'
-      ? '🔴 HARD'
-      : '💀 INSANE';
+      ? 'text-[#f97316] bg-[#f97316]/10 border-[#f97316]/30'
+      : 'text-[#ff4455] bg-[#ff4455]/10 border-[#ff4455]/30';
 
   return (
     <div
       onClick={() => onSelect(market)}
       className="border border-[#1b202a] bg-[#111317] rounded-2xl p-5 hover:border-[#2e3748] transition-all cursor-pointer flex flex-col justify-between select-none group"
     >
-      {/* ── Top Row: Ticker & Difficulty ── */}
+      {/* ── Top Row: Category Icon & Difficulty ── */}
       <div className="flex items-center justify-between">
-        <span className="font-display font-bold text-lg text-white group-hover:text-[#00df81] transition-colors">
-          {ticker}
-        </span>
-        <span className="font-mono text-[11px] text-[#7c7f86]">
-          {diffIcon}
+        <div className="flex items-center gap-2">
+          <span className="text-base">{market.iconEmoji}</span>
+          <span className="font-mono text-[9px] font-bold text-[#7c7f86] uppercase border border-[#1f242d] px-1.5 py-0.5 rounded">
+            {market.category}
+          </span>
+        </div>
+
+        <span className={`font-mono text-[10px] font-bold uppercase border px-2 py-0.5 rounded ${diffBadge}`}>
+          {market.difficulty}
         </span>
       </div>
 
-      {/* ── Middle: Smooth StonkRider Elevation Chart Line ── */}
+      {/* ── Full Question Title (Polymarket Contract) ── */}
+      <h3 className="font-display font-bold text-[15px] leading-snug text-white group-hover:text-[#00df81] transition-colors pt-3 flex-1">
+        {market.question}
+      </h3>
+
+      {/* ── Probability Elevation Sparkline ── */}
       <MiniChart pts={market.sparkline} deltaUp={deltaUp} />
 
-      {/* ── Bottom Row: Full Question & Delta ── */}
-      <div className="flex items-end justify-between gap-2 pt-1 border-t border-[#161a22]">
-        <span className="text-xs text-[#7c7f86] truncate max-w-[200px]" title={market.question}>
-          {market.question}
-        </span>
-        <span className={`font-mono text-xs font-bold tabular-nums ${deltaUp ? 'text-[#00df81]' : 'text-[#ff4455]'}`}>
-          {deltaUp ? '+' : ''}{(market.probDelta * 100).toFixed(1)}%
-        </span>
+      {/* ── Bottom Row: Odds Chance % + 24H Delta + Volume ── */}
+      <div className="flex items-center justify-between pt-2 border-t border-[#161a22] font-mono text-xs">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-lg font-black text-white">
+            {probPct}%
+          </span>
+          <span className="text-[10px] font-sans font-bold text-[#7c7f86] uppercase">
+            CHANCE
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className={`font-bold ${deltaUp ? 'text-[#00df81]' : 'text-[#ff4455]'}`}>
+            {deltaUp ? '+' : ''}{(market.probDelta * 100).toFixed(1)}% 24H
+          </span>
+          <span className="text-[#525866] text-[11px]">
+            {market.volumeFormatted}
+          </span>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { getGlobalPlatformStats, getPlayerStats } from '../data/playerStorage';
 
 interface HeroSectionProps {
@@ -19,7 +19,7 @@ export default function HeroSection({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stats = getGlobalPlatformStats(getPlayerStats());
 
-  // Animated Dirt Bike riding across sleek line (StonkRider Image 1 match)
+  // Animated Dirt Bike riding across live neon Polymarket probability curve
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -31,7 +31,6 @@ export default function HeroSection({
     const W = canvas.width;
     const H = canvas.height;
 
-    // StonkRider curve topography
     const curvePoints: Array<[number, number]> = [];
     for (let x = 0; x <= W; x += 3) {
       const p = x / W;
@@ -58,7 +57,7 @@ export default function HeroSection({
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // 2. Clean Mint Line (StonkRider style)
+      // 2. Clean Glowing Probability Line
       ctx.beginPath();
       for (let i = 0; i < curvePoints.length; i++) {
         const [x, y] = curvePoints[i];
@@ -74,10 +73,10 @@ export default function HeroSection({
       // 3. Start & Finish Labels
       ctx.fillStyle = '#6b7280';
       ctx.font = 'bold 10px Geist Mono, monospace';
-      ctx.fillText('START', curvePoints[10][0], curvePoints[10][1] - 12);
-      ctx.fillText('🏁', curvePoints[curvePoints.length - 16][0] - 8, curvePoints[curvePoints.length - 16][1] - 14);
+      ctx.fillText('0% PROB (START)', curvePoints[10][0], curvePoints[10][1] - 12);
+      ctx.fillText('100% PROB 🏁', curvePoints[curvePoints.length - 20][0] - 20, curvePoints[curvePoints.length - 20][1] - 14);
 
-      // 4. Motocross Rider Silhouette on the Line
+      // 4. Motocross Rider on the Probability Curve
       bikeProgress = (bikeProgress + 0.0022) % 0.94;
       const targetIdx = Math.floor(bikeProgress * (curvePoints.length - 1));
       const [bx, by] = curvePoints[targetIdx] ?? [100, 100];
@@ -107,16 +106,16 @@ export default function HeroSection({
   }, []);
 
   return (
-    <section className="w-full max-w-5xl mx-auto pt-14 pb-8 px-4 flex flex-col items-center text-center select-none">
+    <section className="w-full max-w-5xl mx-auto pt-14 pb-8 px-4 flex flex-col items-center text-center select-none font-sans">
       
-      {/* ── Subtitle Tagline (StonkRider Image 1) ── */}
+      {/* ── Subtitle Tagline ── */}
       <span className="font-mono text-[11px] font-bold tracking-[0.26em] text-[#00df81] uppercase mb-3">
-        MOTOCROSS MEETS PREDICTION MARKETS
+        PREDICTION MARKETS MEETS MOTOCROSS
       </span>
 
-      {/* ── Main Clean Headline (Sentence Case, Not AI-Slop) ── */}
+      {/* ── Main Clean Headline ── */}
       <h1 className="font-display font-bold text-4xl sm:text-6xl text-white tracking-tight">
-        Ride any stock chart.
+        Ride any Polymarket odds.
       </h1>
 
       {/* ── Animated Chart Canvas ── */}
@@ -129,7 +128,7 @@ export default function HeroSection({
         />
       </div>
 
-      {/* ── Global 3 Stats (Exact StonkRider Image 1 Layout) ── */}
+      {/* ── Global 3 Stats (Polymarket Probability Telemetry) ── */}
       <div className="w-full max-w-2xl grid grid-cols-3 gap-4 mt-6 pt-4 font-mono">
         <div className="flex flex-col items-center">
           <span className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
@@ -145,7 +144,7 @@ export default function HeroSection({
             {stats.volume}
           </span>
           <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
-            virtual dollars traded
+            probability volume
           </span>
         </div>
 
@@ -154,29 +153,36 @@ export default function HeroSection({
             {stats.crashes}
           </span>
           <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
-            total crashes
+            total wipeouts
           </span>
         </div>
       </div>
 
-      {/* ── Category Pill Toggle (StonkRider: [ STOCKS ] [ STARTUPS ]) ── */}
-      <div className="flex items-center gap-2 mt-8 p-1 bg-[#12151b] border border-[#1f242d] rounded-lg">
-        {['ALL', 'CRYPTO', 'POLITICS', 'MACRO'].map((cat) => (
+      {/* ── Polymarket Category Pill Switcher ── */}
+      <div className="flex flex-wrap items-center justify-center gap-2 mt-8 p-1 bg-[#12151b] border border-[#1f242d] rounded-xl">
+        {[
+          { id: 'ALL', label: 'ALL MARKETS' },
+          { id: 'POLITICS', label: 'POLITICS' },
+          { id: 'CRYPTO', label: 'CRYPTO' },
+          { id: 'MACRO', label: 'MACRO / FED' },
+          { id: 'TECH', label: 'TECH / AI' },
+          { id: 'LEGENDARY', label: '💀 LEGENDARY' },
+        ].map((cat) => (
           <button
-            key={cat}
-            onClick={() => onSelectCategory(cat)}
-            className={`px-4 py-1.5 font-mono text-xs font-bold uppercase rounded transition-all cursor-pointer ${
-              activeCategory === cat
+            key={cat.id}
+            onClick={() => onSelectCategory(cat.id)}
+            className={`px-4 py-1.5 font-mono text-xs font-bold uppercase rounded-lg transition-all cursor-pointer ${
+              activeCategory === cat.id
                 ? 'bg-[#00df81]/20 text-[#00df81] border border-[#00df81]/40'
                 : 'text-[#7c7f86] hover:text-white'
             }`}
           >
-            {cat === 'ALL' ? 'MARKETS' : cat}
+            {cat.label}
           </button>
         ))}
       </div>
 
-      {/* ── Clean Search Bar (StonkRider Image 1) ── */}
+      {/* ── Search Bar ── */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -186,7 +192,7 @@ export default function HeroSection({
       >
         <input
           type="text"
-          placeholder="Search any ticker or market... (BTC, ETH, Fed, ...)"
+          placeholder="Search any Polymarket question... (Bitcoin, Trump, Fed, OpenAI...)"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full bg-[#12151b] border border-[#1f242d] rounded-xl px-4 py-3 text-sm text-white placeholder-[#525866] focus:border-[#00df81] focus:outline-none transition-all pr-24 font-sans"

@@ -30,6 +30,7 @@ export class RideScene extends Phaser.Scene {
   private terrain: Terrain | null = null;
   private flatGround: MatterJS.BodyType | null = null;
   private flatGfx: Phaser.GameObjects.Graphics | null = null;
+  private groundBodies: MatterJS.BodyType[] = [];
   private startGate!: Gate;
   private finishFx: FinishCelebration | null = null;
   private resultTimer: Phaser.Time.TimerEvent | null = null;
@@ -157,13 +158,19 @@ export class RideScene extends Phaser.Scene {
       this.flatGfx.destroy();
       this.flatGfx = null;
     }
+    // Remove all previous terrain ground bodies from physics world
+    for (const b of this.groundBodies) {
+      this.matter.world.remove(b);
+    }
+    this.groundBodies = [];
+
     for (const seg of terrain.segments) {
       const len = Math.hypot(seg.bx - seg.ax, seg.by - seg.ay);
       if (len < 1) continue;
       const ang = Math.atan2(seg.by - seg.ay, seg.bx - seg.ax);
       const cx = (seg.ax + seg.bx) / 2 - (SEGMENT_THICKNESS / 2) * Math.sin(ang);
       const cy = (seg.ay + seg.by) / 2 + (SEGMENT_THICKNESS / 2) * Math.cos(ang);
-      this.matter.add.rectangle(cx, cy, len, SEGMENT_THICKNESS, {
+      const body = this.matter.add.rectangle(cx, cy, len, SEGMENT_THICKNESS, {
         isStatic: true,
         angle: ang,
         friction: 1,
@@ -171,6 +178,7 @@ export class RideScene extends Phaser.Scene {
         restitution: 0,
         label: 'ground',
       });
+      this.groundBodies.push(body);
     }
     const spawnX = WORLD.spawnX + 450;
     const spawnY = WORLD.groundTopY - WORLD.spawnDy;

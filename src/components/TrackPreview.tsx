@@ -15,7 +15,7 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const deltaUp = market.probDelta >= 0;
-  const ticker = market.slug.toUpperCase().slice(0, 8);
+  const probPct = Math.round(market.currentProb * 100);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -27,31 +27,36 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // 1. Draw subtle price level guides (StonkRider Image 5)
+    // 1. Draw Polymarket Probability Grid Guides (100%, 75%, 50%, 25%, 0%)
     ctx.strokeStyle = '#1a1f29';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#4b5563';
     ctx.font = '10px Geist Mono, monospace';
 
-    const priceLabels = deltaUp ? ['$143', '$141', '$138'] : ['95¢', '60¢', '10¢'];
-    [30, H / 2, H - 30].forEach((y, idx) => {
+    const levels = [
+      { y: 30, label: '100% YES' },
+      { y: H / 2, label: '50%' },
+      { y: H - 30, label: '0% NO' },
+    ];
+
+    for (const lvl of levels) {
       ctx.beginPath();
-      ctx.moveTo(30, y);
-      ctx.lineTo(W - 60, y);
+      ctx.moveTo(30, lvl.y);
+      ctx.lineTo(W - 70, lvl.y);
       ctx.stroke();
-      ctx.fillText(priceLabels[idx] ?? '', W - 45, y + 3);
-    });
+      ctx.fillText(lvl.label, W - 60, lvl.y + 3);
+    }
 
     // 2. Generate elevation points
     const basePts = market.sparkline;
     const plotPts: Array<[number, number]> = [];
     for (let i = 0; i < basePts.length; i++) {
-      const x = 40 + (i / (basePts.length - 1)) * (W - 120);
+      const x = 40 + (i / (basePts.length - 1)) * (W - 130);
       const y = 30 + (1 - basePts[i]) * (H - 70);
       plotPts.push([x, y]);
     }
 
-    // 3. Draw smooth curve (StonkRider style)
+    // 3. Draw smooth probability curve
     ctx.beginPath();
     for (let i = 0; i < plotPts.length; i++) {
       const [x, y] = plotPts[i];
@@ -59,19 +64,16 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
       else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = deltaUp ? GREEN : RED;
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // 4. Start marker with "START W" keycap
+    // 4. Start marker
     const [sx, sy] = plotPts[0];
     ctx.fillStyle = '#6b7280';
     ctx.font = 'bold 9px Geist Mono, monospace';
-    ctx.fillText('START', sx - 10, sy - 20);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Geist Mono, monospace';
-    ctx.fillText('W', sx - 3, sy - 6);
+    ctx.fillText('START (W)', sx - 12, sy - 16);
 
     // 5. Finish flag
     const [fx, fy] = plotPts[plotPts.length - 1];
@@ -95,49 +97,61 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-8 select-none font-sans">
       
-      {/* ── 1. Breadcrumb (StonkRider Image 5) ── */}
+      {/* ── 1. Breadcrumb ── */}
       <nav className="flex items-center gap-2 font-mono text-xs text-[#7c7f86] mb-6">
         <button onClick={onBack} className="hover:text-white cursor-pointer">
-          Home
+          Markets
         </button>
         <span>/</span>
         <span className="uppercase">{market.category}</span>
         <span>/</span>
-        <span className="text-white">{ticker}</span>
+        <span className="text-white truncate max-w-md">{market.question}</span>
       </nav>
 
-      {/* ── 2. Header: Ticker + Live Badge + Delta ── */}
-      <div className="flex items-center justify-between pb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="font-display font-black text-3xl text-white">
-            {ticker}
-          </h1>
-          <span className="text-sm text-[#7c7f86]">
-            {market.question}
-          </span>
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#00df81]/15 text-[#00df81] font-mono text-[10px] font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00df81] animate-pulse" />
-            <span>LIVE</span>
+      {/* ── 2. Header: Polymarket Question + Live Chance + Delta ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6">
+        <div className="flex items-start gap-3">
+          <span className="text-3xl">{market.iconEmoji}</span>
+          <div className="flex flex-col gap-1">
+            <h1 className="font-display font-bold text-2xl text-white leading-snug">
+              {market.question}
+            </h1>
+            <div className="flex items-center gap-3 text-xs font-mono text-[#7c7f86]">
+              <span>RESOLVES: {market.resolutionDate}</span>
+              <span>•</span>
+              <span>VOLUME: {market.volumeFormatted}</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-sm">
-          <span className={`font-bold ${deltaUp ? 'text-[#00df81]' : 'text-[#ff4455]'}`}>
-            {deltaUp ? '+' : ''}{(market.probDelta * 100).toFixed(1)}%
-          </span>
-          <span className="text-xs text-[#7c7f86] border border-[#1b202a] rounded px-2 py-0.5">
+        <div className="flex items-center gap-3 font-mono">
+          <div className="flex flex-col items-end">
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-black text-white">
+                {probPct}%
+              </span>
+              <span className="font-sans text-xs font-bold text-[#00df81]">
+                YES
+              </span>
+            </div>
+            <span className={`text-xs font-bold ${deltaUp ? 'text-[#00df81]' : 'text-[#ff4455]'}`}>
+              {deltaUp ? '↑ +' : '↓ '}{(market.probDelta * 100).toFixed(1)}% 24H
+            </span>
+          </div>
+
+          <span className="text-xs text-[#7c7f86] border border-[#1b202a] rounded-lg px-2.5 py-1 uppercase">
             {market.difficulty}
           </span>
         </div>
       </div>
 
-      {/* ── 3. High-Res Track Card (StonkRider Image 5) ── */}
+      {/* ── 3. High-Res Track Card (Polymarket Probability Topography) ── */}
       <div className="border border-[#1b202a] bg-[#111317] rounded-2xl p-6 shadow-2xl">
         
         {/* Timeframe Selectors */}
         <div className="flex items-center justify-between pb-4 border-b border-[#181d26]">
           <div className="flex items-center gap-1.5 font-mono text-xs">
-            {['LIVE', '15 MIN', '30 MIN', 'ALL'].map((tf) => (
+            {['LIVE', '24H', '7D', 'ALL'].map((tf) => (
               <button
                 key={tf}
                 onClick={() => setTimeframe(tf)}
@@ -152,8 +166,8 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
             ))}
           </div>
 
-          <span className="text-xs text-[#7c7f86] border border-[#1b202a] px-3 py-1 rounded-lg">
-            Smooth
+          <span className="text-xs text-[#7c7f86] border border-[#1b202a] px-3 py-1 rounded-lg font-mono">
+            {market.volatilityLabel}
           </span>
         </div>
 
@@ -167,45 +181,45 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
           />
         </div>
 
-        {/* ── 4. Stats Breakdown Bar (Exact StonkRider Image 5: 157 POINTS, easy VOLATILITY, 1° MAX SLOPE, 5m INTERVAL) ── */}
+        {/* ── 4. Stats Breakdown Bar ── */}
         <div className="grid grid-cols-4 gap-4 pt-6 border-t border-[#181d26] text-center font-mono">
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-white">157</span>
-            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">POINTS</span>
+            <span className="text-lg font-bold text-white">120</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">PROBABILITY NODES</span>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-[#00df81] lowercase">{market.difficulty}</span>
-            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">VOLATILITY</span>
+            <span className="text-lg font-bold text-[#00df81] uppercase">{market.difficulty}</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">TRACK VOLATILITY</span>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-white">28°</span>
-            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">MAX SLOPE</span>
+            <span className="text-lg font-bold text-white">32°</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">MAX SLOPE ANGLE</span>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-white">5m</span>
-            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">INTERVAL</span>
+            <span className="text-lg font-bold text-white">24,000 PX</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">RACE DISTANCE</span>
           </div>
         </div>
 
       </div>
 
-      {/* ── 5. Big Mint Action Button (StonkRider Image 5) ── */}
+      {/* ── 5. Big Action Button ── */}
       <div className="mt-6 flex flex-col gap-3">
         <button
           onClick={() => onLaunchRide(market)}
           className="w-full py-4 bg-[#00df81] text-[#0a0a0b] font-display font-bold text-base rounded-2xl hover:bg-[#00f58d] transition-all shadow-[0_0_24px_rgba(0,223,129,0.35)] cursor-pointer text-center"
         >
-          Ride this chart
+          Ride these odds (Press Space) 🏍️
         </button>
 
         <button
           onClick={onBack}
           className="w-full py-2 font-mono text-xs text-[#7c7f86] hover:text-white transition-colors cursor-pointer text-center"
         >
-          ← Return to all tracks
+          ← Return to prediction feed
         </button>
       </div>
 
