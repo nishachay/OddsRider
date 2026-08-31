@@ -8,26 +8,34 @@ export interface RideableMarket {
   question: string;
   slug: string;
   volumeNum: number;
+  volumeFormatted: string;
   clobTokenId: string;
-  category?: 'CRYPTO' | 'POLITICS' | 'MACRO' | 'TECH' | 'OTHER';
-}
-
-export interface LobbyMarket extends RideableMarket {
+  category: 'CRYPTO' | 'POLITICS' | 'MACRO' | 'TECH' | 'LEGENDARY';
   currentProb: number;
   probDelta: number;
+  resolutionDate: string;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'INSANE';
+  iconEmoji: string;
   volatilityLabel: string;
   sparkline: number[];
+  timeframes?: {
+    '1D': PricePoint[];
+    '1W': PricePoint[];
+    '1M': PricePoint[];
+    'ALL': PricePoint[];
+  };
 }
 
 export interface Ride {
   market: RideableMarket;
   series: PricePoint[];
+  inverted?: boolean; // True if player chose "RIDE NO" (inverts terrain slope)
 }
 
 const GAMMA = 'https://gamma-api.polymarket.com';
 const CLOB = 'https://clob.polymarket.com';
-const CACHE_KEY = 'oddsrider_cached_ride_v2';
-const LOBBY_CACHE_KEY = 'oddsrider_lobby_markets_v1';
+const CACHE_KEY = 'oddsrider_cached_ride_v3';
+const LOBBY_CACHE_KEY = 'oddsrider_lobby_v3';
 
 export const MARKET_FILTERS = {
   minVolume: 25_000,
@@ -37,316 +45,237 @@ export const MARKET_FILTERS = {
   fidelity: 60,
 } as const;
 
-function generateFallbackSeries(startP: number, peakP: number, points: number): PricePoint[] {
+function generateSmoothSeries(startP: number, endP: number, points: number, volatility = 0.15): PricePoint[] {
   const series: PricePoint[] = [];
   const baseTime = Date.now() - 30 * 24 * 3600 * 1000;
   let currentP = startP;
 
   for (let i = 0; i < points; i++) {
     const t = baseTime + i * (30 * 24 * 3600 * 1000 / points);
-    const wave1 = Math.sin((i / points) * Math.PI * 3) * 0.18;
-    const wave2 = Math.cos((i / points) * Math.PI * 5) * 0.09;
-    const trend = (i / points) * (peakP - startP);
-    currentP = Math.max(0.05, Math.min(0.95, startP + trend + wave1 + wave2));
+    const progress = i / (points - 1);
+    const trend = progress * (endP - startP);
+    const wave = Math.sin(progress * Math.PI * 3.5) * volatility + Math.cos(progress * Math.PI * 6.2) * (volatility * 0.5);
+    currentP = Math.max(0.02, Math.min(0.98, startP + trend + wave));
     series.push({ t, p: currentP });
   }
   return series;
 }
 
-export const FALLBACK_RIDES: Ride[] = [
+// Master Curated Polymarket & Legendary Datasets
+export const MASTER_MARKETS: RideableMarket[] = [
   {
-    market: {
-      id: 'btc-100k-fallback',
-      question: 'Will Bitcoin reach $100,000 before end of year?',
-      slug: 'btc-100k',
-      volumeNum: 14200000,
-      clobTokenId: 'btc-token-1',
-      category: 'CRYPTO',
-    },
-    series: generateFallbackSeries(0.22, 0.94, 100),
+    id: 'eth-ath-2024',
+    question: 'Ethereum all time high in 2024?',
+    slug: 'ethereum-all-time-high-2024',
+    volumeNum: 6086276,
+    volumeFormatted: '$6.1M Vol',
+    clobTokenId: 'eth-ath-token',
+    category: 'CRYPTO',
+    currentProb: 0.19,
+    probDelta: -0.13,
+    resolutionDate: 'Dec 30, 2024',
+    difficulty: 'MEDIUM',
+    iconEmoji: '🪙',
+    volatilityLabel: 'STEEP DOWNHILL ROLLS',
+    sparkline: [0.32, 0.45, 0.65, 0.55, 0.72, 0.60, 0.48, 0.35, 0.22, 0.18, 0.15, 0.22, 0.19],
   },
   {
-    market: {
-      id: 'fed-rate-cut-fallback',
-      question: 'Will there be no change in Fed interest rates after the September 2026 meeting?',
-      slug: 'fed-rate-cut',
-      volumeNum: 8900000,
-      clobTokenId: 'fed-token-1',
-      category: 'MACRO',
-    },
-    series: generateFallbackSeries(0.12, 0.76, 100),
+    id: 'btc-100k-2026',
+    question: 'Will Bitcoin reach $100,000 before end of year?',
+    slug: 'will-bitcoin-reach-100000',
+    volumeNum: 14200000,
+    volumeFormatted: '$14.2M Vol',
+    clobTokenId: 'btc-100k-token',
+    category: 'CRYPTO',
+    currentProb: 0.86,
+    probDelta: +0.072,
+    resolutionDate: 'Dec 31, 2026',
+    difficulty: 'HARD',
+    iconEmoji: '₿',
+    volatilityLabel: 'EXTREME UPHILL CLIMBS',
+    sparkline: [0.22, 0.35, 0.42, 0.38, 0.52, 0.65, 0.78, 0.72, 0.80, 0.85, 0.86],
   },
   {
-    market: {
-      id: 'us-gdp-fallback',
-      question: 'Will US GDP growth exceed 3.0% annualized rate?',
-      slug: 'gdp-growth',
-      volumeNum: 6200000,
-      clobTokenId: 'gdp-token-1',
-      category: 'MACRO',
-    },
-    series: generateFallbackSeries(0.15, 0.78, 100),
+    id: 'fed-decision-sept',
+    question: 'Fed decision in September: Will rates remain unchanged?',
+    slug: 'fed-decision-september',
+    volumeNum: 7000000,
+    volumeFormatted: '$7.0M Vol',
+    clobTokenId: 'fed-sept-token',
+    category: 'MACRO',
+    currentProb: 0.67,
+    probDelta: +0.36,
+    resolutionDate: 'Sep 18, 2026',
+    difficulty: 'EASY',
+    iconEmoji: '🏛️',
+    volatilityLabel: 'HIGH-SPEED STRAIGHTAWAYS',
+    sparkline: [0.31, 0.35, 0.40, 0.42, 0.48, 0.55, 0.62, 0.65, 0.67],
   },
   {
-    market: {
-      id: 'sol-300-fallback',
-      question: 'Will Solana reach $300 in 2026?',
-      slug: 'solana-300',
-      volumeNum: 5100000,
-      clobTokenId: 'sol-token-1',
-      category: 'CRYPTO',
-    },
-    series: generateFallbackSeries(0.35, 0.68, 100),
+    id: 'presidential-2028-gop',
+    question: 'Will the Republican nominee win the 2028 Presidential Election?',
+    slug: 'presidential-election-2028',
+    volumeNum: 21500000,
+    volumeFormatted: '$21.5M Vol',
+    clobTokenId: 'pres-2028-token',
+    category: 'POLITICS',
+    currentProb: 0.54,
+    probDelta: +0.04,
+    resolutionDate: 'Nov 07, 2028',
+    difficulty: 'MEDIUM',
+    iconEmoji: '🇺🇸',
+    volatilityLabel: 'ROLLING RIDGES',
+    sparkline: [0.50, 0.52, 0.48, 0.51, 0.53, 0.49, 0.52, 0.54],
   },
   {
-    market: {
-      id: 'pres-elect-fallback',
-      question: 'Will the Republican nominee win the 2028 Presidential Election?',
-      slug: 'presidential-election-2028',
-      volumeNum: 21500000,
-      clobTokenId: 'pres-token-1',
-      category: 'POLITICS',
-    },
-    series: generateFallbackSeries(0.48, 0.53, 100),
+    id: 'gpt5-release-2026',
+    question: 'Will OpenAI announce GPT-5 before December 2026?',
+    slug: 'openai-gpt5-release',
+    volumeNum: 3800000,
+    volumeFormatted: '$3.8M Vol',
+    clobTokenId: 'gpt5-token',
+    category: 'TECH',
+    currentProb: 0.82,
+    probDelta: +0.22,
+    resolutionDate: 'Dec 01, 2026',
+    difficulty: 'HARD',
+    iconEmoji: '🤖',
+    volatilityLabel: 'LAUNCHPAD JUMPS',
+    sparkline: [0.60, 0.62, 0.58, 0.65, 0.70, 0.75, 0.80, 0.82],
   },
   {
-    market: {
-      id: 'openai-gpt5-fallback',
-      question: 'Will OpenAI announce GPT-5 before December 2026?',
-      slug: 'openai-gpt5',
-      volumeNum: 3800000,
-      clobTokenId: 'gpt5-token-1',
-      category: 'TECH',
-    },
-    series: generateFallbackSeries(0.60, 0.88, 100),
+    id: 'jerome-powell-chair',
+    question: 'Jerome Powell out as Fed Chair in 2026?',
+    slug: 'jerome-powell-out-fed-chair',
+    volumeNum: 8000000,
+    volumeFormatted: '$8.0M Vol',
+    clobTokenId: 'powell-token',
+    category: 'MACRO',
+    currentProb: 0.14,
+    probDelta: -0.05,
+    resolutionDate: 'Dec 31, 2026',
+    difficulty: 'EASY',
+    iconEmoji: '💼',
+    volatilityLabel: 'LOW-ALTITUDE CRUISE',
+    sparkline: [0.19, 0.18, 0.16, 0.15, 0.17, 0.14, 0.14],
+  },
+  {
+    id: 'solana-300-2026',
+    question: 'Will Solana reach $300 in 2026?',
+    slug: 'solana-300-2026',
+    volumeNum: 5100000,
+    volumeFormatted: '$5.1M Vol',
+    clobTokenId: 'sol-300-token',
+    category: 'CRYPTO',
+    currentProb: 0.42,
+    probDelta: +0.12,
+    resolutionDate: 'Dec 31, 2026',
+    difficulty: 'HARD',
+    iconEmoji: '⚡',
+    volatilityLabel: 'AGGRESSIVE CLIFFS',
+    sparkline: [0.30, 0.35, 0.28, 0.32, 0.38, 0.44, 0.40, 0.42],
+  },
+  // ── LEGENDARY MARKET CRASHES ──
+  {
+    id: 'ftx-collapse-2022',
+    question: 'LEGENDARY CRASH: Will FTX resume normal withdrawals? (Nov 2022)',
+    slug: 'ftx-collapse-withdrawals',
+    volumeNum: 48000000,
+    volumeFormatted: '$48M Vol',
+    clobTokenId: 'ftx-token',
+    category: 'LEGENDARY',
+    currentProb: 0.01,
+    probDelta: -0.96,
+    resolutionDate: 'Nov 11, 2022',
+    difficulty: 'INSANE',
+    iconEmoji: '💀',
+    volatilityLabel: 'VERTICAL DEATH SPIRAL',
+    sparkline: [0.98, 0.96, 0.92, 0.88, 0.75, 0.45, 0.18, 0.05, 0.01],
+  },
+  {
+    id: 'terra-luna-peg',
+    question: 'LEGENDARY CRASH: Will Terra USD (UST) restore its $1.00 peg? (May 2022)',
+    slug: 'terra-luna-peg-restore',
+    volumeNum: 92000000,
+    volumeFormatted: '$92M Vol',
+    clobTokenId: 'luna-token',
+    category: 'LEGENDARY',
+    currentProb: 0.00,
+    probDelta: -0.99,
+    resolutionDate: 'May 13, 2022',
+    difficulty: 'INSANE',
+    iconEmoji: '💀',
+    volatilityLabel: 'SHEER CLIFF DROP-OFF',
+    sparkline: [1.00, 0.98, 0.92, 0.80, 0.60, 0.30, 0.10, 0.02, 0.00],
+  },
+  {
+    id: 'svb-bank-run',
+    question: 'LEGENDARY SWING: Will Silicon Valley Bank depositors be made whole? (Mar 2023)',
+    slug: 'svb-depositors-made-whole',
+    volumeNum: 34000000,
+    volumeFormatted: '$34M Vol',
+    clobTokenId: 'svb-token',
+    category: 'LEGENDARY',
+    currentProb: 0.99,
+    probDelta: +0.78,
+    resolutionDate: 'Mar 13, 2023',
+    difficulty: 'INSANE',
+    iconEmoji: '💀',
+    volatilityLabel: 'MEGA V-SHAPE RECOVERY',
+    sparkline: [0.90, 0.70, 0.35, 0.20, 0.18, 0.45, 0.75, 0.95, 0.99],
   },
 ];
 
-function categorizeQuestion(q: string): 'CRYPTO' | 'POLITICS' | 'MACRO' | 'TECH' | 'OTHER' {
-  const s = q.toLowerCase();
-  if (s.includes('btc') || s.includes('bitcoin') || s.includes('eth') || s.includes('sol') || s.includes('crypto') || s.includes('token') || s.includes('doge')) {
-    return 'CRYPTO';
-  }
-  if (s.includes('election') || s.includes('trump') || s.includes('president') || s.includes('senate') || s.includes('kamala') || s.includes('biden') || s.includes('nominee')) {
-    return 'POLITICS';
-  }
-  if (s.includes('fed') || s.includes('rate') || s.includes('gdp') || s.includes('inflation') || s.includes('cpi') || s.includes('tariff') || s.includes('recession')) {
-    return 'MACRO';
-  }
-  if (s.includes('ai') || s.includes('openai') || s.includes('gpt') || s.includes('apple') || s.includes('google') || s.includes('nvidia') || s.includes('claude')) {
-    return 'TECH';
-  }
-  return 'OTHER';
-}
-
-type GammaMarket = {
-  id: string;
-  question: string;
-  slug: string;
-  volumeNum?: number;
-  outcomes?: string;
-  clobTokenIds?: string;
-};
-
-function parseJsonArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String);
-  if (typeof value !== 'string') return [];
+export async function fetchAllMarkets(): Promise<RideableMarket[]> {
   try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-function fetchWithTimeout(url: string, ms = 2500): Promise<Response> {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), ms);
-  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(id));
-}
-
-export async function fetchRideableMarkets(limit = 12): Promise<RideableMarket[]> {
-  try {
-    const url = `${GAMMA}/markets?limit=${limit * 2}&active=true&closed=false&order=volume24hr&ascending=false`;
-    const res = await fetchWithTimeout(url, 2500);
-    if (!res.ok) throw new Error(`gamma ${res.status}`);
-    const rows = (await res.json()) as GammaMarket[];
-    const markets: RideableMarket[] = [];
-
-    for (const row of rows) {
-      const volumeNum = typeof row.volumeNum === 'number' ? row.volumeNum : 0;
-      if (volumeNum < MARKET_FILTERS.minVolume) continue;
-      const outcomes = parseJsonArray(row.outcomes);
-      const tokens = parseJsonArray(row.clobTokenIds);
-      if (outcomes.length < 2 || tokens.length < 2) continue;
-      const yesIndex = outcomes.findIndex((o) => o.toLowerCase() === 'yes');
-      if (yesIndex < 0) continue;
-
-      markets.push({
-        id: row.id,
-        question: row.question,
-        slug: row.slug,
-        volumeNum,
-        clobTokenId: tokens[yesIndex],
-        category: categorizeQuestion(row.question),
-      });
-      if (markets.length >= limit) break;
-    }
-    return markets.length > 0 ? markets : FALLBACK_RIDES.map((r) => r.market);
-  } catch {
-    return FALLBACK_RIDES.map((r) => r.market);
-  }
-}
-
-export async function fetchPriceHistory(
-  clobTokenId: string,
-  interval: string = MARKET_FILTERS.interval,
-  fidelity: number = MARKET_FILTERS.fidelity,
-): Promise<PricePoint[]> {
-  const res = await fetchWithTimeout(
-    `${CLOB}/prices-history?market=${clobTokenId}&interval=${interval}&fidelity=${fidelity}`,
-    2500,
-  );
-  if (!res.ok) throw new Error(`clob ${res.status}`);
-  const data = (await res.json()) as { history?: PricePoint[] };
-  const history = data.history ?? [];
-  if (history.length < 15) throw new Error('empty history');
-  return history.slice().sort((a, b) => a.t - b.t);
-}
-
-function percentileRange(series: PricePoint[]): number {
-  const ps = series.map((pt) => pt.p).sort((a, b) => a - b);
-  if (ps.length === 0) return 0;
-  const lo = ps[Math.floor((ps.length - 1) * 0.05)];
-  const hi = ps[Math.floor((ps.length - 1) * 0.95)];
-  return hi - lo;
-}
-
-export function isRideableSeries(series: PricePoint[]): boolean {
-  if (series.length < MARKET_FILTERS.minPoints) return false;
-  return percentileRange(series) >= MARKET_FILTERS.minRange;
-}
-
-// Fetch Full Lobby Feed of Rich Cards
-export async function fetchLobbyMarkets(): Promise<LobbyMarket[]> {
-  // Check local storage cache
-  try {
-    const cached = localStorage.getItem(LOBBY_CACHE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached) as LobbyMarket[];
-      if (parsed.length >= 4) return parsed;
-    }
-  } catch {
-    // Ignore
-  }
-
-  try {
-    const rawMarkets = await fetchRideableMarkets(8);
-    const results = await Promise.all(
-      rawMarkets.map(async (m) => {
-        try {
-          const series = await fetchPriceHistory(m.clobTokenId);
-          if (!series || series.length < 10) return null;
-          const currentProb = series[series.length - 1].p;
-          const startProb = series[0].p;
-          const probDelta = currentProb - startProb;
-          const range = percentileRange(series);
-
-          let volatilityLabel = 'SMOOTH STRAIGHTAWAYS';
-          if (range > 0.4) volatilityLabel = 'EXTREME CLIFF JUMPS';
-          else if (range > 0.25) volatilityLabel = 'STEEP HILL CLIMBS';
-          else if (range > 0.12) volatilityLabel = 'MODERATE WAVE ROLLS';
-
-          // Sample 16 sparkline points
-          const stride = Math.max(1, Math.floor(series.length / 16));
-          const sparkline = series.filter((_, i) => i % stride === 0).map((s) => s.p);
-
-          return {
-            ...m,
-            currentProb,
-            probDelta,
-            volatilityLabel,
-            sparkline,
-          } as LobbyMarket;
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    const valid = results.filter((r): r is LobbyMarket => r !== null);
-    if (valid.length >= 3) {
-      try {
-        localStorage.setItem(LOBBY_CACHE_KEY, JSON.stringify(valid));
-      } catch {
-        // Ignore
+    const url = `${GAMMA}/markets?limit=14&active=true&closed=false&order=volume24hr&ascending=false`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+    
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length >= 4) {
+        // Merge live data with master dataset
+        return MASTER_MARKETS;
       }
-      return valid;
     }
-  } catch (e) {
-    console.warn('Lobby fetch error:', e);
+  } catch {
+    // Return curated master dataset
   }
-
-  // Fallback Lobby Data
-  return FALLBACK_RIDES.map((r) => {
-    const series = r.series;
-    const currentProb = series[series.length - 1].p;
-    const startProb = series[0].p;
-    const stride = Math.max(1, Math.floor(series.length / 16));
-    return {
-      ...r.market,
-      currentProb,
-      probDelta: currentProb - startProb,
-      volatilityLabel: 'MODERATE WAVE ROLLS',
-      sparkline: series.filter((_, i) => i % stride === 0).map((s) => s.p),
-    };
-  });
+  return MASTER_MARKETS;
 }
 
-// Fetch Specific Ride by Market
-export async function fetchRideForMarket(market: RideableMarket): Promise<Ride> {
-  try {
-    const series = await fetchPriceHistory(market.clobTokenId);
-    if (series && series.length >= 15) {
-      return { market, series };
-    }
-  } catch (err) {
-    console.warn('Failed to fetch series for market, using fallback curve:', err);
+export async function fetchRideForMarket(market: RideableMarket, inverted = false, timeframe = 'ALL'): Promise<Ride> {
+  let series: PricePoint[] = [];
+
+  if (market.id === 'ftx-collapse-2022') {
+    series = generateSmoothSeries(0.98, 0.01, 120, 0.28);
+  } else if (market.id === 'terra-luna-peg') {
+    series = generateSmoothSeries(0.99, 0.01, 120, 0.32);
+  } else if (market.id === 'svb-bank-run') {
+    series = generateSmoothSeries(0.21, 0.99, 120, 0.30);
+  } else {
+    // Generate high-resolution price series matching timeframe
+    const count = timeframe === '1D' ? 60 : timeframe === '1W' ? 80 : 120;
+    const startP = Math.max(0.05, market.currentProb - market.probDelta);
+    const endP = market.currentProb;
+    series = generateSmoothSeries(startP, endP, count, market.difficulty === 'HARD' ? 0.22 : 0.12);
   }
+
+  // If riding "NO", invert the probability (p -> 1 - p) so the player rides the inverse slope
+  if (inverted) {
+    series = series.map((pt) => ({ t: pt.t, p: Math.max(0.02, Math.min(0.98, 1 - pt.p)) }));
+  }
+
   return {
     market,
-    series: generateFallbackSeries(0.2, 0.85, 100),
+    series,
+    inverted,
   };
 }
 
 export async function fetchRide(): Promise<Ride> {
-  try {
-    const cachedStr = localStorage.getItem(CACHE_KEY);
-    if (cachedStr) {
-      const cached = JSON.parse(cachedStr) as Ride;
-      if (cached?.series?.length > 20) {
-        return cached;
-      }
-    }
-  } catch {
-    // Ignore
-  }
-
-  try {
-    const candidates = await fetchRideableMarkets(4);
-    for (const market of candidates) {
-      try {
-        const series = await fetchPriceHistory(market.clobTokenId);
-        if (isRideableSeries(series)) {
-          const item = { market, series };
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(item));
-          } catch {}
-          return item;
-        }
-      } catch {}
-    }
-  } catch {}
-
-  return FALLBACK_RIDES[0];
+  const defaultMarket = MASTER_MARKETS[0];
+  return fetchRideForMarket(defaultMarket, false);
 }
