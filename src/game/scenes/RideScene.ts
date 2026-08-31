@@ -71,8 +71,10 @@ export class RideScene extends Phaser.Scene {
     // Store handle so we can remove it on shutdown — prevents duplicate listeners on hot reload
     if (this.offRestart) this.offRestart();
     this.offRestart = bus.on(EV.RESTART, () => this.doReset(true));
+    const offLoadMarket = bus.on<Ride>(EV.LOAD_MARKET, (ride) => this.applyRide(ride));
     this.events.once('shutdown', () => {
       if (this.offRestart) { this.offRestart(); this.offRestart = null; }
+      offLoadMarket();
     });
 
     const cam = this.cameras.main;
@@ -80,6 +82,30 @@ export class RideScene extends Phaser.Scene {
 
     void this.loadRide();
     this.exposeDebug();
+  }
+
+  private applyRide(ride: Ride): void {
+    const terrain = buildTerrain(ride.series);
+    this.terrain = terrain;
+    this.trackRenderer.setTerrain(terrain);
+    this.swapToTerrain(terrain);
+
+    const course = terrain.points.filter((pt) => pt.x >= WORLD.spawnX - 1 && pt.x <= WORLD.finishX + 1);
+    const stride = Math.max(1, Math.floor(course.length / 110));
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i < course.length; i += stride) pts.push([course[i].x, course[i].y]);
+    const lastPt = course[course.length - 1];
+    if (lastPt && pts[pts.length - 1] !== undefined && pts[pts.length - 1][0] !== lastPt.x) {
+      pts.push([lastPt.x, lastPt.y]);
+    }
+    bus.emit(EV.TRACK, { pts });
+
+    const series = ride.series;
+    const probNow = series[series.length - 1]?.p ?? 0.5;
+    const probDelta = probNow - (series[0]?.p ?? probNow);
+    bus.emit(EV.MARKET, { question: ride.market.question, probNow, probDelta });
+    this.doReset(true);
+    this.matter.world.resume();
   }
 
   private exposeDebug(): void {
@@ -114,27 +140,7 @@ export class RideScene extends Phaser.Scene {
   private async loadRide(): Promise<void> {
     try {
       const ride = await fetchRide();
-      const terrain = buildTerrain(ride.series);
-      this.terrain = terrain;
-      this.trackRenderer.setTerrain(terrain);
-      this.swapToTerrain(terrain);
-
-      const course = terrain.points.filter((pt) => pt.x >= WORLD.spawnX - 1 && pt.x <= WORLD.finishX + 1);
-      const stride = Math.max(1, Math.floor(course.length / 110));
-      const pts: Array<[number, number]> = [];
-      for (let i = 0; i < course.length; i += stride) pts.push([course[i].x, course[i].y]);
-      const lastPt = course[course.length - 1];
-      if (lastPt && pts[pts.length - 1] !== undefined && pts[pts.length - 1][0] !== lastPt.x) {
-        pts.push([lastPt.x, lastPt.y]);
-      }
-      bus.emit(EV.TRACK, { pts });
-
-      const series = ride.series;
-      const probNow = series[series.length - 1]?.p ?? 0.5;
-      const probDelta = probNow - (series[0]?.p ?? probNow);
-      bus.emit(EV.MARKET, { question: ride.market.question, probNow, probDelta });
-      
-      this.matter.world.resume();
+      this.applyRide(ride);
     } catch (err) {
       console.warn('loadRide failed', err);
       bus.emit(EV.MARKET, null);

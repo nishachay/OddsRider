@@ -41,4 +41,6 @@ export const EV = {
   STUDIO_UPDATE: 'studio:update',
   RESTART: 'game:restart',
   GROUNDED: 'hud:grounded',
+  LOAD_MARKET: 'game:load-market',
+  OPEN_LOBBY: 'game:open-lobby',
 } as const;

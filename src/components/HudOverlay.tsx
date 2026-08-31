@@ -110,7 +110,11 @@ interface ScorePayload { total: number; timeMs: number; finished: boolean; }
 interface MarketPayload { question: string; probNow: number; probDelta: number; }
 interface ResultPayload { finished: boolean; score: number; timeMs: number; }
 
-export default function HudOverlay() {
+interface HudOverlayProps {
+  onOpenLobby?: () => void;
+}
+
+export default function HudOverlay({ onOpenLobby }: HudOverlayProps) {
   const [speed, setSpeed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [nitro, setNitro] = useState(1);
@@ -189,10 +193,22 @@ export default function HudOverlay() {
       {/* ── TOP DECK: FOCUS & TACTICAL SPARKLINE ── */}
       <div className="flex items-start justify-between w-full">
         
-        {/* Top-Left: Brand Identity */}
-        <div className="flex items-baseline tracking-[0.24em] uppercase font-display font-black text-sm sm:text-base">
-          <span className="text-ink">Odds</span>
-          <span style={{ color: TOXIC }}>Rider</span>
+        {/* Top-Left: Brand Identity & Lobby Switcher */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-baseline tracking-[0.24em] uppercase font-display font-black text-sm sm:text-base">
+            <span className="text-ink">Odds</span>
+            <span style={{ color: TOXIC }}>Rider</span>
+          </div>
+
+          {onOpenLobby && (
+            <button
+              onClick={onOpenLobby}
+              className="pointer-events-auto cursor-pointer font-mono text-[9px] font-bold tracking-widest uppercase border border-[#232529] bg-[#12141a] px-2 py-1 text-dim hover:text-toxic hover:border-toxic/50 transition-all"
+              title="Return to Market Lobby"
+            >
+              [ MARKETS ]
+            </button>
+          )}
         </div>
 
         {/* Top-Center: Precision Race Clock */}
@@ -376,6 +392,7 @@ export default function HudOverlay() {
           trackPts: track,
         } : null}
         onRetry={rideAgain}
+        onOpenLobby={onOpenLobby}
       />
 
     </div>

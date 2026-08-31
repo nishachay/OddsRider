@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadShareCardImage, shareToTwitter } from '../utils/shareCard';
 
 interface ResultModalProps {
@@ -12,6 +12,7 @@ interface ResultModalProps {
     trackPts?: Array<[number, number]> | null;
   } | null;
   onRetry: () => void;
+  onOpenLobby?: () => void;
 }
 
 function formatTime(ms: number): { main: string; ms: string } {
@@ -283,8 +284,8 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </button>
         </div>
 
-        {/* ── 5. PRIMARY RESTART BUTTON ── */}
-        <div className="pt-3">
+        {/* ── 5. PRIMARY RESTART & LOBBY BUTTONS ── */}
+        <div className="pt-3 flex flex-col gap-2">
           <button
             onClick={onRetry}
             className={`w-full flex items-center justify-center gap-2 py-3 font-mono text-xs font-bold tracking-[0.2em] uppercase border transition-all duration-150 cursor-pointer ${
@@ -298,6 +299,15 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
               (PRESS R)
             </span>
           </button>
+
+          {onOpenLobby && (
+            <button
+              onClick={onOpenLobby}
+              className="w-full py-2 font-mono text-[10px] font-bold tracking-[0.18em] uppercase border border-[#232529] bg-[#12141a] text-dim hover:text-ink hover:border-[#333a48] transition-all cursor-pointer text-center"
+            >
+              [ BROWSE ALL MARKETS ]
+            </button>
+          )}
         </div>
 
       </div>
