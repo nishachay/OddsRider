@@ -12,12 +12,15 @@ interface ResultModalProps {
   onRetry: () => void;
 }
 
-function formatTime(ms: number): string {
+function formatTime(ms: number): { main: string; ms: string } {
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
   const secs = s % 60;
   const tenths = Math.floor((ms % 1000) / 100);
-  return `${m.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
+  return {
+    main: `${m.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`,
+    ms: `.${tenths}`
+  };
 }
 
 export default function ResultModal({ isOpen, result, onRetry }: ResultModalProps) {
@@ -37,74 +40,116 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
 
   const isSuccess = result.finished;
   const probPercent = result.finalProb !== undefined ? (result.finalProb * 100).toFixed(1) : null;
+  const timeObj = formatTime(result.timeMs);
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0b]/85 backdrop-blur-sm select-none animate-in fade-in duration-200 font-sans">
-      <div className="w-full max-w-lg border border-line bg-bg p-6 shadow-2xl">
-        {/* Header Status */}
-        <div className="flex items-center justify-between border-b border-line pb-4">
-          <div>
-            <div className="text-[8px] font-extrabold tracking-[0.24em] text-dim uppercase">ODDSRIDER TELEMETRY</div>
-            <div
-              className={`mt-1 font-display text-lg font-black tracking-wider uppercase ${
+    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0b]/80 backdrop-blur-md select-none animate-in fade-in duration-200 font-sans p-4">
+      <div className="relative w-full max-w-md bg-[#0e1014] border border-[#1f242d] p-6 sm:p-7 shadow-[0_16px_48px_rgba(0,0,0,0.85)]">
+        
+        {/* Tactical Corner Reticles */}
+        <span className="absolute -top-1 -left-1 text-[10px] text-[#3b414f] font-mono leading-none select-none">+</span>
+        <span className="absolute -top-1 -right-1 text-[10px] text-[#3b414f] font-mono leading-none select-none">+</span>
+        <span className="absolute -bottom-1 -left-1 text-[10px] text-[#3b414f] font-mono leading-none select-none">+</span>
+        <span className="absolute -bottom-1 -right-1 text-[10px] text-[#3b414f] font-mono leading-none select-none">+</span>
+
+        {/* ── 1. HEADER: SETTLEMENT STATUS ── */}
+        <div className="flex items-start justify-between pb-5 border-b border-[#1f242d]">
+          <div className="flex flex-col gap-1">
+            <span className="text-[8px] font-extrabold tracking-[0.24em] text-dim uppercase">
+              ODDSRIDER // {isSuccess ? 'SETTLEMENT RECEIPT' : 'TELEMETRY DUMP'}
+            </span>
+            <span
+              className={`font-display font-black text-xl tracking-wide uppercase ${
                 isSuccess ? 'text-toxic' : 'text-crimson'
               }`}
+              style={{ textShadow: isSuccess ? '0 0 14px rgba(182,255,0,0.4)' : '0 0 14px rgba(255,51,85,0.4)' }}
             >
-              {isSuccess ? 'MARKET CONQUERED' : 'CRASHED - PROBABILITY OVERLOAD'}
-            </div>
+              {isSuccess ? 'MARKET CONQUERED' : 'WRECKED // CRASHED'}
+            </span>
           </div>
+
           <div
-            className={`border px-2.5 py-1 font-mono text-xs font-bold tracking-widest ${
-              isSuccess ? 'border-toxic/40 bg-toxic/10 text-toxic' : 'border-crimson/40 bg-crimson/10 text-crimson'
+            className={`px-2 py-0.5 font-mono text-[9px] font-bold tracking-widest uppercase border ${
+              isSuccess 
+                ? 'border-toxic/30 bg-toxic/8 text-toxic' 
+                : 'border-crimson/30 bg-crimson/8 text-crimson'
             }`}
           >
-            {isSuccess ? 'FINISH 100%' : 'WRECKED'}
+            {isSuccess ? '100% RESOLVED' : 'FATAL'}
           </div>
         </div>
 
-        {/* Market Event Box */}
+        {/* ── 2. CONTRACT SPECIFICATION (NO NESTED BOXES) ── */}
         {result.marketQuestion && (
-          <div className="mt-4 border border-line bg-surface/50 p-3.5">
-            <div className="text-[8px] font-bold tracking-[0.22em] text-dim uppercase">LIVE EVENT</div>
-            <div className="mt-1 text-xs font-medium leading-snug text-ink/90">
+          <div className="py-4 border-b border-[#1f242d] flex flex-col gap-2">
+            <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
+              SETTLED CONTRACT
+            </span>
+            <span className="text-[13px] font-medium leading-[1.4] text-ink/90">
               {result.marketQuestion}
-            </div>
+            </span>
+            
             {probPercent !== null && (
-              <div className="mt-2.5 flex items-center gap-2 font-mono text-xs">
-                <span className="text-[9px] font-bold text-dim tracking-wider uppercase">FINAL ODDS:</span>
-                <span className={`font-bold ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>{probPercent}% YES</span>
+              <div className="flex items-baseline gap-2 pt-1 font-mono">
+                <span className="text-[8px] font-sans font-extrabold tracking-[0.2em] text-dim uppercase">
+                  FINAL ODDS:
+                </span>
+                <span className={`text-sm font-black tabular-nums ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>
+                  {probPercent}%
+                </span>
+                <span className="font-sans text-[9px] font-extrabold tracking-widest text-ink">
+                  YES
+                </span>
               </div>
             )}
           </div>
         )}
 
-        {/* Performance Metrics Grid */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="border border-line bg-bg p-3.5">
-            <div className="text-[8px] font-bold tracking-[0.22em] text-dim uppercase">FINAL SCORE</div>
-            <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-ink">
+        {/* ── 3. PERFORMANCE TELEMETRY GRID (CLEAN COLUMNS) ── */}
+        <div className="grid grid-cols-2 py-4 border-b border-[#1f242d]">
+          {/* Final Score */}
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
+              FINAL SCORE
+            </span>
+            <span className="font-mono text-2xl font-bold tabular-nums text-ink tracking-tight">
               {result.score.toLocaleString()}
-            </div>
+            </span>
           </div>
-          <div className="border border-line bg-bg p-3.5">
-            <div className="text-[8px] font-bold tracking-[0.22em] text-dim uppercase">TIME ELAPSED</div>
-            <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-ink">
-              {formatTime(result.timeMs)}
+
+          {/* Time Elapsed */}
+          <div className="flex flex-col gap-0.5 pl-4 border-l border-[#1f242d]">
+            <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
+              SESSION TIME
+            </span>
+            <div className="flex items-baseline font-mono tabular-nums">
+              <span className="text-2xl font-bold text-ink tracking-tight">
+                {timeObj.main}
+              </span>
+              <span className={`text-base font-bold ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>
+                {timeObj.ms}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="mt-6 flex items-center gap-3">
+        {/* ── 4. PRIMARY ACTION BUTTON ── */}
+        <div className="pt-5">
           <button
             onClick={onRetry}
-            className={`flex-1 border py-3 font-mono text-xs font-bold tracking-widest transition-all cursor-pointer ${
-              isSuccess ? 'border-toxic bg-toxic/10 text-toxic hover:bg-toxic hover:text-bg' : 'border-crimson bg-crimson/10 text-crimson hover:bg-crimson hover:text-bg'
+            className={`w-full flex items-center justify-center gap-2 py-3 font-mono text-xs font-bold tracking-[0.2em] uppercase border transition-all duration-150 cursor-pointer ${
+              isSuccess
+                ? 'border-toxic bg-toxic/10 text-toxic hover:bg-toxic hover:text-bg hover:shadow-[0_0_20px_rgba(182,255,0,0.5)]'
+                : 'border-crimson bg-crimson/10 text-crimson hover:bg-crimson hover:text-bg hover:shadow-[0_0_20px_rgba(255,51,85,0.5)]'
             }`}
           >
-            [ RIDE AGAIN ] <span className="text-[10px] opacity-75 font-sans">(PRESS R)</span>
+            <span>[ RIDE AGAIN ]</span>
+            <span className="font-sans text-[8px] font-extrabold opacity-75 tracking-normal">
+              (PRESS R)
+            </span>
           </button>
         </div>
+
       </div>
     </div>
   );
