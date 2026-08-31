@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 
 interface ResultModalProps {
   isOpen: boolean;
@@ -24,6 +24,8 @@ function formatTime(ms: number): { main: string; ms: string } {
 }
 
 export default function ResultModal({ isOpen, result, onRetry }: ResultModalProps) {
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -35,6 +37,27 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onRetry]);
+
+  const handleShare = useCallback(() => {
+    if (!result) return;
+    const timeObj = formatTime(result.timeMs);
+    const probStr = result.finalProb !== undefined ? `${(result.finalProb * 100).toFixed(1)}% YES` : 'N/A';
+    const statusStr = result.finished ? 'MARKET CONQUERED (100% RESOLVED)' : 'CRASHED // FATAL';
+    
+    const text = [
+      `ODDSRIDER // ${statusStr}`,
+      `Market: ${result.marketQuestion ?? 'Polymarket Event'}`,
+      `Time: ${timeObj.main}${timeObj.ms} | Score: ${result.score.toLocaleString()} | Final Odds: ${probStr}`,
+      `Ride the odds: https://oddsrider.com`
+    ].join('\n');
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
+  }, [result]);
 
   if (!isOpen || !result) return null;
 
@@ -105,7 +128,7 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </div>
         )}
 
-        {/* ── 3. PERFORMANCE TELEMETRY GRID (CLEAN COLUMNS) ── */}
+        {/* ── 3. PERFORMANCE TELEMETRY GRID ── */}
         <div className="grid grid-cols-2 py-4 border-b border-[#1f242d]">
           {/* Final Score */}
           <div className="flex flex-col gap-0.5">
@@ -133,11 +156,11 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </div>
         </div>
 
-        {/* ── 4. PRIMARY ACTION BUTTON ── */}
-        <div className="pt-5">
+        {/* ── 4. ACTION BUTTONS: RETRY + SHARE ── */}
+        <div className="pt-5 flex items-center gap-3">
           <button
             onClick={onRetry}
-            className={`w-full flex items-center justify-center gap-2 py-3 font-mono text-xs font-bold tracking-[0.2em] uppercase border transition-all duration-150 cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-2 py-3 font-mono text-xs font-bold tracking-[0.2em] uppercase border transition-all duration-150 cursor-pointer ${
               isSuccess
                 ? 'border-toxic bg-toxic/10 text-toxic hover:bg-toxic hover:text-bg hover:shadow-[0_0_20px_rgba(182,255,0,0.5)]'
                 : 'border-crimson bg-crimson/10 text-crimson hover:bg-crimson hover:text-bg hover:shadow-[0_0_20px_rgba(255,51,85,0.5)]'
@@ -145,8 +168,16 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           >
             <span>[ RIDE AGAIN ]</span>
             <span className="font-sans text-[8px] font-extrabold opacity-75 tracking-normal">
-              (PRESS R)
+              (R)
             </span>
+          </button>
+
+          <button
+            onClick={handleShare}
+            className="px-4 py-3 font-mono text-xs font-bold tracking-[0.18em] uppercase border border-[#232529] bg-[#14161d] text-ink hover:border-toxic/60 hover:text-toxic transition-all duration-150 cursor-pointer"
+            title="Copy run summary receipt to clipboard"
+          >
+            {copied ? '[ COPIED! ]' : '[ SHARE ]'}
           </button>
         </div>
 
