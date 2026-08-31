@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadShareCardImage, shareToTwitter } from '../utils/shareCard';
 
 interface ResultModalProps {
@@ -23,6 +23,90 @@ function formatTime(ms: number): { main: string; ms: string } {
     main: `${m.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`,
     ms: `.${tenths}`
   };
+}
+
+const TOXIC = '#b6ff00';
+const CRIMSON = '#ff3355';
+
+// Inline Settlement Chart Graphic Component (Visual Twin of Share Card)
+function SettlementChartCanvas({ pts, isSuccess }: { pts: Array<[number, number]> | null; isSuccess: boolean }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  const CW = 420, CH = 110, CP = 8;
+  const accent = isSuccess ? TOXIC : CRIMSON;
+
+  const geo = useMemo(() => {
+    if (!pts || pts.length < 2) return null;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [x, y] of pts) {
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+      y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+    return { x0, x1, y0, y1 };
+  }, [pts]);
+
+  useEffect(() => {
+    const c = ref.current; if (!c || !pts || !geo) return;
+    const ctx = c.getContext('2d'); if (!ctx) return;
+    const sx = (CW - CP * 2) / Math.max(1, geo.x1 - geo.x0);
+    const sy = (CH - CP * 2 - 16) / Math.max(1, geo.y1 - geo.y0);
+    const px = (x: number) => CP + (x - geo.x0) * sx;
+    const py = (y: number) => CP + 8 + (y - geo.y0) * sy;
+
+    ctx.clearRect(0, 0, CW, CH);
+
+    // Area fill under track line
+    ctx.beginPath();
+    ctx.moveTo(px(pts[0][0]), CH);
+    ctx.lineTo(px(pts[0][0]), py(pts[0][1]));
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(px(pts[i][0]), py(pts[i][1]));
+    }
+    ctx.lineTo(px(pts[pts.length - 1][0]), CH);
+    const grad = ctx.createLinearGradient(0, 0, 0, CH);
+    grad.addColorStop(0, isSuccess ? 'rgba(182, 255, 0, 0.22)' : 'rgba(255, 51, 85, 0.22)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Track line segments
+    ctx.lineWidth = 2.5;
+    for (let i = 1; i < pts.length; i++) {
+      ctx.strokeStyle = pts[i][1] <= pts[i - 1][1] ? TOXIC : CRIMSON;
+      ctx.beginPath();
+      ctx.moveTo(px(pts[i - 1][0]), py(pts[i - 1][1]));
+      ctx.lineTo(px(pts[i][0]), py(pts[i][1]));
+      ctx.stroke();
+    }
+
+    // Finish / Crash Marker Beacon
+    const lastX = px(pts[pts.length - 1][0]);
+    const lastY = py(pts[pts.length - 1][1]);
+
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }, [pts, geo, isSuccess, accent]);
+
+  if (!pts || pts.length < 2) return null;
+
+  return (
+    <div className="relative w-full h-[110px] overflow-hidden my-2 border border-[#1f242d] bg-[#0a0a0b]/60">
+      <canvas ref={ref} width={CW} height={CH} className="w-full h-full" />
+      <span className="absolute bottom-1 right-2 font-mono text-[8px] font-bold tracking-widest text-dim uppercase">
+        {isSuccess ? 'SETTLED AT FINISH' : 'FATAL OVERLOAD POINT'}
+      </span>
+    </div>
+  );
 }
 
 export default function ResultModal({ isOpen, result, onRetry }: ResultModalProps) {
@@ -78,8 +162,8 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
   const timeObj = formatTime(result.timeMs);
 
   return (
-    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0b]/80 backdrop-blur-md select-none animate-in fade-in duration-200 font-sans p-4">
-      <div className="relative w-full max-w-md bg-[#0e1014] border border-[#1f242d] p-6 sm:p-7 shadow-[0_16px_48px_rgba(0,0,0,0.85)]">
+    <div className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center bg-[#0a0a0b]/85 backdrop-blur-md select-none animate-in fade-in duration-200 font-sans p-4">
+      <div className="relative w-full max-w-lg bg-[#0e1014] border border-[#1f242d] p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.9)]">
         
         {/* Tactical Corner Reticles */}
         <span className="absolute -top-1 -left-1 text-[10px] text-[#3b414f] font-mono leading-none select-none">+</span>
@@ -88,7 +172,7 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
         <span className="absolute -bottom-1 -right-1 text-[10px] text-[#3b414f] font-mono leading-none select-none">+</span>
 
         {/* ── 1. HEADER: SETTLEMENT STATUS ── */}
-        <div className="flex items-start justify-between pb-5 border-b border-[#1f242d]">
+        <div className="flex items-start justify-between pb-4 border-b border-[#1f242d]">
           <div className="flex flex-col gap-1">
             <span className="text-[8px] font-extrabold tracking-[0.24em] text-dim uppercase">
               ODDSRIDER // {isSuccess ? 'SETTLEMENT RECEIPT' : 'TELEMETRY DUMP'}
@@ -114,31 +198,32 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </div>
         </div>
 
-        {/* ── 2. CONTRACT SPECIFICATION ── */}
-        {result.marketQuestion && (
-          <div className="py-4 border-b border-[#1f242d] flex flex-col gap-2">
-            <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
-              SETTLED CONTRACT
-            </span>
-            <span className="text-[13px] font-medium leading-[1.4] text-ink/90">
-              {result.marketQuestion}
-            </span>
-            
-            {probPercent !== null && (
-              <div className="flex items-baseline gap-2 pt-1 font-mono">
-                <span className="text-[8px] font-sans font-extrabold tracking-[0.2em] text-dim uppercase">
-                  FINAL ODDS:
-                </span>
-                <span className={`text-sm font-black tabular-nums ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>
-                  {probPercent}%
-                </span>
-                <span className="font-sans text-[9px] font-extrabold tracking-widest text-ink">
-                  YES
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        {/* ── 2. CONTRACT QUESTION & SETTLEMENT CHART ── */}
+        <div className="py-3 border-b border-[#1f242d] flex flex-col gap-1">
+          <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
+            SETTLED CONTRACT
+          </span>
+          <span className="text-[13px] font-medium leading-[1.38] text-ink/90">
+            {result.marketQuestion ?? 'Polymarket Event'}
+          </span>
+
+          {/* Hero Neon Chart in Modal */}
+          <SettlementChartCanvas pts={result.trackPts ?? null} isSuccess={isSuccess} />
+          
+          {probPercent !== null && (
+            <div className="flex items-baseline gap-2 pt-0.5 font-mono">
+              <span className="text-[8px] font-sans font-extrabold tracking-[0.2em] text-dim uppercase">
+                SETTLEMENT ODDS:
+              </span>
+              <span className={`text-sm font-black tabular-nums ${isSuccess ? 'text-toxic' : 'text-crimson'}`}>
+                {probPercent}%
+              </span>
+              <span className="font-sans text-[9px] font-extrabold tracking-widest text-ink">
+                YES
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* ── 3. PERFORMANCE TELEMETRY GRID ── */}
         <div className="grid grid-cols-2 py-4 border-b border-[#1f242d]">
@@ -168,31 +253,31 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </div>
         </div>
 
-        {/* ── 4. VIRAL SOCIAL SHARE ACTION ROW ── */}
+        {/* ── 4. SOCIAL SHARE ACTIONS ROW ── */}
         <div className="pt-4 flex items-center gap-2">
-          {/* Share on X / Twitter */}
+          {/* Share on X */}
           <button
             onClick={handleTwitterShare}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 font-mono text-[10px] font-bold tracking-[0.16em] uppercase border border-[#232529] bg-[#12141c] text-ink hover:border-[#1d9bf0]/60 hover:text-[#1d9bf0] transition-all cursor-pointer"
-            title="Post your run to X (Twitter)"
+            title="Post to X (Twitter)"
           >
             <span>𝕏 SHARE ON X</span>
           </button>
 
-          {/* Download 1200x675 Image */}
+          {/* Save PNG Card */}
           <button
             onClick={handleDownloadImage}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 font-mono text-[10px] font-bold tracking-[0.16em] uppercase border border-[#232529] bg-[#12141c] text-ink hover:border-toxic/60 hover:text-toxic transition-all cursor-pointer"
-            title="Download high-res social image card"
+            title="Download 1200x675 Card PNG"
           >
             <span>SAVE CARD (PNG)</span>
           </button>
 
-          {/* Copy Receipt Text */}
+          {/* Copy Receipt */}
           <button
             onClick={handleCopyLink}
             className="px-3 py-2.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase border border-[#232529] bg-[#12141c] text-dim hover:text-ink transition-all cursor-pointer"
-            title="Copy text receipt"
+            title="Copy text"
           >
             {copied ? 'COPIED!' : 'COPY'}
           </button>

@@ -1,4 +1,4 @@
-interface SharePayload {
+﻿interface SharePayload {
   finished: boolean;
   score: number;
   timeMs: number;
@@ -15,7 +15,18 @@ function fmtTime(ms: number): string {
   return `${m.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
 }
 
-export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
+// Preload image helper
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(img);
+    img.src = src;
+  });
+}
+
+export async function generateShareCard(payload: SharePayload): Promise<HTMLCanvasElement> {
   const W = 1200;
   const H = 675; // Standard 16:9 Twitter/OG card aspect ratio
   const canvas = document.createElement('canvas');
@@ -33,40 +44,31 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   const isSuccess = payload.finished;
   const accent = isSuccess ? TOXIC : CRIMSON;
 
-  // 1. Background Fill
+  // Preload bike/rider/ragdoll assets
+  const [bikeImg, riderImg, wheelImg, ragdollImg] = await Promise.all([
+    loadImage('/assets/game/bike.png'),
+    loadImage('/assets/game/rider.png'),
+    loadImage('/assets/game/wheel.png'),
+    loadImage('/assets/game/ragdoll.png'),
+  ]);
+
+  // 1. Pure Velvet Dark Background (No distracting graph grid)
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, W, H);
 
-  // 2. Subtle Dark Tactical Grid
-  ctx.strokeStyle = '#12141a';
-  ctx.lineWidth = 1;
-  const GRID_SIZE = 40;
-  for (let x = 0; x < W; x += GRID_SIZE) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, H);
-    ctx.stroke();
-  }
-  for (let y = 0; y < H; y += GRID_SIZE) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-    ctx.stroke();
-  }
-
-  // 3. Outer Machined Border with Corner Crosshairs
+  // 2. Outer Machined Border with Corner Crosshairs
   ctx.strokeStyle = LINE;
   ctx.lineWidth = 2;
   ctx.strokeRect(32, 32, W - 64, H - 64);
 
-  ctx.fillStyle = DIM;
+  ctx.fillStyle = '#3b414f';
   ctx.font = '700 14px monospace';
   ctx.fillText('+', 30, 36);
   ctx.fillText('+', W - 38, 36);
   ctx.fillText('+', 30, H - 30);
   ctx.fillText('+', W - 38, H - 30);
 
-  // 4. Header: Brand Wordmark (Flush Lockup) + Status Badge
+  // 3. Header: Brand Wordmark + Status Badge
   ctx.font = '900 24px "Space Grotesk", sans-serif';
   ctx.fillStyle = INK;
   ctx.fillText('ODDS', 64, 80);
@@ -100,7 +102,7 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   ctx.lineTo(W - 64, 110);
   ctx.stroke();
 
-  // 5. Market Question (Full Text)
+  // 4. Market Question (Full Text)
   ctx.fillStyle = DIM;
   ctx.font = '800 11px "Space Grotesk", sans-serif';
   ctx.fillText('SETTLED POLYMARKET CONTRACT:', 64, 145);
@@ -108,7 +110,6 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   ctx.fillStyle = INK;
   ctx.font = '600 20px "Space Grotesk", sans-serif';
   const question = payload.marketQuestion ?? 'Polymarket Probability Race';
-  // Wrap text
   const maxWidth = W - 128;
   const words = question.split(' ');
   let line = '';
@@ -126,13 +127,13 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   }
   ctx.fillText(line, 64, lineY);
 
-  // 6. Terrain Curve Sparkline with Finish Rider Beacon
+  // 5. Terrain Curve with Rider Asset Composited on Curve
   const pts = payload.trackPts;
   if (pts && pts.length > 2) {
     const chartX = 64;
     const chartY = lineY + 30;
     const chartW = W - 128;
-    const chartH = 130;
+    const chartH = 140;
 
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     for (const [x, y] of pts) {
@@ -140,9 +141,9 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
       y0 = Math.min(y0, y); y1 = Math.max(y1, y);
     }
     const sx = chartW / Math.max(1, x1 - x0);
-    const sy = (chartH - 24) / Math.max(1, y1 - y0);
+    const sy = (chartH - 30) / Math.max(1, y1 - y0);
 
-    // Gradient area fill
+    // Gradient area fill under probability line
     ctx.beginPath();
     ctx.moveTo(chartX, chartY + chartH);
     ctx.lineTo(chartX, chartY + (pts[0][1] - y0) * sy);
@@ -156,7 +157,7 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Track stroke
+    // High-contrast glowing track stroke
     ctx.lineWidth = 3.5;
     for (let i = 1; i < pts.length; i++) {
       ctx.strokeStyle = pts[i][1] <= pts[i - 1][1] ? TOXIC : CRIMSON;
@@ -166,43 +167,65 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
       ctx.stroke();
     }
 
-    // ── Glowing Rider Finish Beacon ──
+    // Draw Rider / Ragdoll Asset at Finish or Crash Endpoint
     const lastPt = pts[pts.length - 1];
+    const prevPt = pts[Math.max(0, pts.length - 3)];
     const lastX = chartX + (lastPt[0] - x0) * sx;
     const lastY = chartY + (lastPt[1] - y0) * sy;
+    
+    // Calculate slope angle
+    const slopeAngle = Math.atan2((lastPt[1] - prevPt[1]) * sy, (lastPt[0] - prevPt[0]) * sx);
 
-    // Glowing Dot
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.save();
+    ctx.translate(lastX, lastY);
 
-    // Outer Target Reticle Ring
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(lastX, lastY, 11, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+    if (isSuccess && bikeImg.complete && riderImg.complete && wheelImg.complete) {
+      ctx.rotate(slopeAngle);
+      // Scale factor for share card
+      const bikeScale = 0.35;
+      
+      // Draw Wheels
+      const rearWheelX = -26;
+      const frontWheelX = 26;
+      const wheelY = -12;
+      const wheelSize = 28;
+      ctx.drawImage(wheelImg, rearWheelX - wheelSize / 2, wheelY - wheelSize / 2, wheelSize, wheelSize);
+      ctx.drawImage(wheelImg, frontWheelX - wheelSize / 2, wheelY - wheelSize / 2, wheelSize, wheelSize);
 
-    // Tactical Finish Waypoint Label
+      // Draw Bike Chassis
+      const bikeW = 300 * bikeScale * 0.45;
+      const bikeH = 162 * bikeScale * 0.45;
+      ctx.drawImage(bikeImg, -bikeW / 2 + 2, wheelY - bikeH / 2 - 2, bikeW, bikeH);
+
+      // Draw Rider
+      const riderW = 63 * bikeScale * 0.55;
+      const riderH = 84 * bikeScale * 0.55;
+      ctx.drawImage(riderImg, -riderW / 2 - 4, wheelY - bikeH - 2, riderW, riderH);
+    } else if (!isSuccess && ragdollImg.complete) {
+      // Draw Ejected Ragdoll
+      const ragW = 121 * 0.28;
+      const ragH = 92 * 0.28;
+      ctx.drawImage(ragdollImg, -ragW / 2, -ragH - 8, ragW, ragH);
+    }
+
+    ctx.restore();
+
+    // Tactical Finish Beacon Tag
     const tagText = isSuccess ? 'RIDER FINISH' : 'IMPACT POINT';
     ctx.fillStyle = '#12141c';
-    ctx.fillRect(lastX - 44, lastY - 28, 88, 18);
+    ctx.fillRect(lastX - 44, lastY - 48, 88, 18);
     ctx.strokeStyle = accent;
     ctx.lineWidth = 1;
-    ctx.strokeRect(lastX - 44, lastY - 28, 88, 18);
+    ctx.strokeRect(lastX - 44, lastY - 48, 88, 18);
 
     ctx.fillStyle = accent;
     ctx.font = '800 8.5px "Geist Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(tagText, lastX, lastY - 16);
+    ctx.fillText(tagText, lastX, lastY - 36);
     ctx.textAlign = 'left';
   }
 
-  // 7. Telemetry Stats Deck (Bottom)
+  // 6. Telemetry Stats Deck (Bottom)
   const statsY = H - 150;
   ctx.strokeStyle = LINE;
   ctx.beginPath();
@@ -247,8 +270,8 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   return canvas;
 }
 
-export function downloadShareCardImage(payload: SharePayload): void {
-  const canvas = generateShareCard(payload);
+export async function downloadShareCardImage(payload: SharePayload): Promise<void> {
+  const canvas = await generateShareCard(payload);
   canvas.toBlob((blob) => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
