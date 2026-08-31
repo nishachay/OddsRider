@@ -177,8 +177,7 @@ export default function HudOverlay() {
   const rideAgain = useCallback(() => {
     setResult(null);
     setHasStarted(false);
-    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyR" }));
-    window.dispatchEvent(new KeyboardEvent("keyup", { code: "KeyR" }));
+    bus.emit(EV.RESTART);
   }, []);
 
   const timeObj = fmtTime(score.timeMs);

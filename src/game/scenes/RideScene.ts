@@ -347,5 +347,8 @@ export class RideScene extends Phaser.Scene {
     this.acc = 0;
     const cam = this.cameras.main;
     cam.centerOn(this.bike.x, this.bike.y - 40);
+    bus.emit(EV.RESULT, null);
+    bus.emit(EV.SCORE, { total: this.score.total, timeMs: this.score.timeMs, finished: this.score.finished });
+    bus.emit(EV.SPEED, 0);
   }
 }
