@@ -447,10 +447,15 @@ export class Bike {
   reset(): void {
     const B = this.scene.matter.body;
     const place = (b: Body, ox: number, oy: number): void => {
-      B.setPosition(b, { x: this.spawnX + ox, y: this.spawnY + oy });
+      const tx = this.spawnX + ox;
+      const ty = this.spawnY + oy;
+      B.setPosition(b, { x: tx, y: ty });
+      b.positionPrev.x = tx;
+      b.positionPrev.y = ty;
       B.setVelocity(b, { x: 0, y: 0 });
       B.setAngularVelocity(b, 0);
       B.setAngle(b, 0);
+      b.anglePrev = 0;
     };
     place(this.chassis, 0, 0);
     place(this.rearWheel, BIKE.backDx, BIKE.wheelDy);

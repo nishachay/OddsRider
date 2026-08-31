@@ -345,8 +345,12 @@ export class RideScene extends Phaser.Scene {
     if (full) this.score.fullReset();
     this.bike.reset();
     this.acc = 0;
+    this.crashCamX = this.bike.x;
+    this.crashCamY = this.bike.y;
     const cam = this.cameras.main;
     cam.centerOn(this.bike.x, this.bike.y - 40);
+    cam.scrollX = this.bike.x - cam.width / 2;
+    cam.scrollY = this.bike.y - 40 - cam.height / 2;
     bus.emit(EV.RESULT, null);
     bus.emit(EV.SCORE, { total: this.score.total, timeMs: this.score.timeMs, finished: this.score.finished });
     bus.emit(EV.SPEED, 0);
