@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bus, EV } from "../game/bus";
 import ResultModal from "./ResultModal";
 
@@ -374,6 +374,7 @@ export default function HudOverlay() {
         result={result ? {
           finished: result.finished, score: result.score, timeMs: result.timeMs,
           marketQuestion: market?.question, finalProb: prob ?? undefined,
+          trackPts: track,
         } : null}
         onRetry={rideAgain}
       />

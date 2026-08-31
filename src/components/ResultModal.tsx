@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from 'react';
+import { downloadShareCardImage, shareToTwitter } from '../utils/shareCard';
 
 interface ResultModalProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface ResultModalProps {
     timeMs: number;
     marketQuestion?: string;
     finalProb?: number;
+    trackPts?: Array<[number, number]> | null;
   } | null;
   onRetry: () => void;
 }
@@ -38,17 +40,17 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onRetry]);
 
-  const handleShare = useCallback(() => {
+  const handleCopyLink = useCallback(() => {
     if (!result) return;
     const timeObj = formatTime(result.timeMs);
     const probStr = result.finalProb !== undefined ? `${(result.finalProb * 100).toFixed(1)}% YES` : 'N/A';
-    const statusStr = result.finished ? 'MARKET CONQUERED (100% RESOLVED)' : 'CRASHED // FATAL';
+    const statusStr = result.finished ? 'MARKET CONQUERED' : 'CRASHED';
     
     const text = [
       `ODDSRIDER // ${statusStr}`,
       `Market: ${result.marketQuestion ?? 'Polymarket Event'}`,
-      `Time: ${timeObj.main}${timeObj.ms} | Score: ${result.score.toLocaleString()} | Final Odds: ${probStr}`,
-      `Ride the odds: https://oddsrider.com`
+      `Time: ${timeObj.main}${timeObj.ms} | Score: ${result.score.toLocaleString()} | Odds: ${probStr}`,
+      `https://oddsrider.com`
     ].join('\n');
 
     if (navigator.clipboard) {
@@ -57,6 +59,16 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
         setTimeout(() => setCopied(false), 2000);
       });
     }
+  }, [result]);
+
+  const handleTwitterShare = useCallback(() => {
+    if (!result) return;
+    shareToTwitter(result);
+  }, [result]);
+
+  const handleDownloadImage = useCallback(() => {
+    if (!result) return;
+    downloadShareCardImage(result);
   }, [result]);
 
   if (!isOpen || !result) return null;
@@ -102,7 +114,7 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </div>
         </div>
 
-        {/* ── 2. CONTRACT SPECIFICATION (NO NESTED BOXES) ── */}
+        {/* ── 2. CONTRACT SPECIFICATION ── */}
         {result.marketQuestion && (
           <div className="py-4 border-b border-[#1f242d] flex flex-col gap-2">
             <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
@@ -156,11 +168,41 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           </div>
         </div>
 
-        {/* ── 4. ACTION BUTTONS: RETRY + SHARE ── */}
-        <div className="pt-5 flex items-center gap-3">
+        {/* ── 4. VIRAL SOCIAL SHARE ACTION ROW ── */}
+        <div className="pt-4 flex items-center gap-2">
+          {/* Share on X / Twitter */}
+          <button
+            onClick={handleTwitterShare}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 font-mono text-[10px] font-bold tracking-[0.16em] uppercase border border-[#232529] bg-[#12141c] text-ink hover:border-[#1d9bf0]/60 hover:text-[#1d9bf0] transition-all cursor-pointer"
+            title="Post your run to X (Twitter)"
+          >
+            <span>𝕏 SHARE ON X</span>
+          </button>
+
+          {/* Download 1200x675 Image */}
+          <button
+            onClick={handleDownloadImage}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 font-mono text-[10px] font-bold tracking-[0.16em] uppercase border border-[#232529] bg-[#12141c] text-ink hover:border-toxic/60 hover:text-toxic transition-all cursor-pointer"
+            title="Download high-res social image card"
+          >
+            <span>SAVE CARD (PNG)</span>
+          </button>
+
+          {/* Copy Receipt Text */}
+          <button
+            onClick={handleCopyLink}
+            className="px-3 py-2.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase border border-[#232529] bg-[#12141c] text-dim hover:text-ink transition-all cursor-pointer"
+            title="Copy text receipt"
+          >
+            {copied ? 'COPIED!' : 'COPY'}
+          </button>
+        </div>
+
+        {/* ── 5. PRIMARY RESTART BUTTON ── */}
+        <div className="pt-3">
           <button
             onClick={onRetry}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 font-mono text-xs font-bold tracking-[0.2em] uppercase border transition-all duration-150 cursor-pointer ${
+            className={`w-full flex items-center justify-center gap-2 py-3 font-mono text-xs font-bold tracking-[0.2em] uppercase border transition-all duration-150 cursor-pointer ${
               isSuccess
                 ? 'border-toxic bg-toxic/10 text-toxic hover:bg-toxic hover:text-bg hover:shadow-[0_0_20px_rgba(182,255,0,0.5)]'
                 : 'border-crimson bg-crimson/10 text-crimson hover:bg-crimson hover:text-bg hover:shadow-[0_0_20px_rgba(255,51,85,0.5)]'
@@ -168,16 +210,8 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
           >
             <span>[ RIDE AGAIN ]</span>
             <span className="font-sans text-[8px] font-extrabold opacity-75 tracking-normal">
-              (R)
+              (PRESS R)
             </span>
-          </button>
-
-          <button
-            onClick={handleShare}
-            className="px-4 py-3 font-mono text-xs font-bold tracking-[0.18em] uppercase border border-[#232529] bg-[#14161d] text-ink hover:border-toxic/60 hover:text-toxic transition-all duration-150 cursor-pointer"
-            title="Copy run summary receipt to clipboard"
-          >
-            {copied ? '[ COPIED! ]' : '[ SHARE ]'}
           </button>
         </div>
 
