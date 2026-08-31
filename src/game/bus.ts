@@ -26,6 +26,8 @@ class Emitter {
 
 export const bus = new Emitter();
 
+export let activeRideStore: { current: unknown } = { current: null };
+
 export const EV = {
   SPEED: 'hud:speed',
   MUTE: 'hud:mute',

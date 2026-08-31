@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { bus, EV } from '../bus';
+import { bus, EV, activeRideStore } from '../bus';
 import { PALETTE, WORLD, STEP_MS, MAX_STEPS_PER_FRAME, SPRITE, TERRAIN } from '../constants';
 import { Bike } from '../bike/Bike';
 import type { DriveInput } from '../bike/Bike';
 import { BikeRenderer } from '../bike/BikeRenderer';
 import { InputManager } from '../input/InputManager';
 import { fetchRide } from '../../data/polymarket';
+import type { Ride } from '../../data/polymarket';
 import { buildTerrain, probabilityAt } from '../terrain';
 import type { Terrain } from '../terrain';
 import { TrackRenderer } from '../track/TrackRenderer';
@@ -81,7 +82,11 @@ export class RideScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.centerOn(this.bike.x, this.bike.y - 40);
 
-    void this.loadRide();
+    if (activeRideStore.current) {
+      this.applyRide(activeRideStore.current as Ride);
+    } else {
+      void this.loadRide();
+    }
     this.exposeDebug();
   }
 

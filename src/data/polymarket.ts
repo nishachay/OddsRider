@@ -1,4 +1,6 @@
-﻿export interface PricePoint {
+﻿import { activeRideStore } from '../game/bus';
+
+export interface PricePoint {
   t: number;
   p: number;
 }
@@ -28,7 +30,7 @@ export interface Ride {
 
 const GAMMA = 'https://gamma-api.polymarket.com';
 const CLOB = 'https://clob.polymarket.com';
-const CACHE_KEY = 'oddsrider_live_markets_v5';
+const CACHE_KEY = 'oddsrider_live_markets_v6';
 
 function categorize(q: string): 'POLITICS' | 'CRYPTO' | 'MACRO' | 'TECH' {
   const s = q.toLowerCase();
@@ -55,23 +57,42 @@ function parseJsonArray(value: unknown): string[] {
   }
 }
 
-function generateSmoothSeries(startP: number, endP: number, points: number, volatility = 0.15): PricePoint[] {
-  const series: PricePoint[] = [];
+// Convert the exact distinct sparkline points into high-density 120-node smooth physical terrain
+export function sparklineToSeries(sparkline: number[]): PricePoint[] {
+  const pts: PricePoint[] = [];
   const baseTime = Date.now() - 30 * 24 * 3600 * 1000;
-  let currentP = startP;
+  const timeSpan = 30 * 24 * 3600 * 1000;
+  const totalNodes = 120;
+  const len = sparkline.length;
 
-  for (let i = 0; i < points; i++) {
-    const t = baseTime + i * (30 * 24 * 3600 * 1000 / points);
-    const progress = i / (points - 1);
-    const trend = progress * (endP - startP);
-    const wave = Math.sin(progress * Math.PI * 3.5) * volatility + Math.cos(progress * Math.PI * 6.2) * (volatility * 0.5);
-    currentP = Math.max(0.02, Math.min(0.98, startP + trend + wave));
-    series.push({ t, p: currentP });
+  if (len < 2) {
+    const p = sparkline[0] ?? 0.5;
+    for (let i = 0; i < totalNodes; i++) {
+      pts.push({ t: baseTime + (i / totalNodes) * timeSpan, p });
+    }
+    return pts;
   }
-  return series;
+
+  for (let i = 0; i < totalNodes; i++) {
+    const progress = i / (totalNodes - 1);
+    const rawIdx = progress * (len - 1);
+    const i0 = Math.floor(rawIdx);
+    const i1 = Math.min(len - 1, i0 + 1);
+    const frac = rawIdx - i0;
+
+    // Smooth cubic cosine interpolation between exact contract data points
+    const smoothT = (1 - Math.cos(frac * Math.PI)) / 2;
+    const interpolatedProb = sparkline[i0] * (1 - smoothT) + sparkline[i1] * smoothT;
+
+    pts.push({
+      t: baseTime + progress * timeSpan,
+      p: Math.max(0.01, Math.min(0.99, interpolatedProb)),
+    });
+  }
+  return pts;
 }
 
-// Master Curated Polymarket Markets matching the real Polymarket home feed
+// Master Curated Polymarket Markets with distinct topological profiles
 export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
   {
     id: 'btc-100k-2026',
@@ -87,7 +108,23 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     difficulty: 'HARD',
     iconEmoji: '🪙',
     volatilityLabel: 'EXTREME UPHILL CLIMBS',
-    sparkline: [0.22, 0.35, 0.42, 0.38, 0.52, 0.65, 0.78, 0.72, 0.80, 0.85, 0.86],
+    sparkline: [0.22, 0.28, 0.35, 0.42, 0.38, 0.52, 0.65, 0.78, 0.72, 0.80, 0.85, 0.86],
+  },
+  {
+    id: 'eth-ath-2024',
+    question: 'Ethereum all time high in 2024?',
+    slug: 'ethereum-all-time-high-2024',
+    volumeNum: 6086276,
+    volumeFormatted: '$6.1M Vol',
+    clobTokenId: 'eth-ath-token',
+    category: 'CRYPTO',
+    currentProb: 0.19,
+    probDelta: -0.13,
+    resolutionDate: 'Dec 30, 2024',
+    difficulty: 'MEDIUM',
+    iconEmoji: '🪙',
+    volatilityLabel: 'ROLLERCOASTER DOWNHILL',
+    sparkline: [0.32, 0.45, 0.65, 0.72, 0.68, 0.55, 0.42, 0.35, 0.22, 0.18, 0.15, 0.19],
   },
   {
     id: 'fed-decision-sept',
@@ -104,22 +141,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     iconEmoji: '🏛️',
     volatilityLabel: 'HIGH-SPEED STRAIGHTAWAYS',
     sparkline: [0.31, 0.35, 0.40, 0.42, 0.48, 0.55, 0.62, 0.65, 0.67],
-  },
-  {
-    id: 'eth-ath-2024',
-    question: 'Ethereum all time high in 2024?',
-    slug: 'ethereum-all-time-high-2024',
-    volumeNum: 6086276,
-    volumeFormatted: '$6.1M Vol',
-    clobTokenId: 'eth-ath-token',
-    category: 'CRYPTO',
-    currentProb: 0.19,
-    probDelta: -0.13,
-    resolutionDate: 'Dec 30, 2024',
-    difficulty: 'MEDIUM',
-    iconEmoji: '🪙',
-    volatilityLabel: 'STEEP DOWNHILL ROLLS',
-    sparkline: [0.32, 0.45, 0.65, 0.55, 0.72, 0.60, 0.48, 0.35, 0.22, 0.18, 0.15, 0.22, 0.19],
   },
   {
     id: 'presidential-2028-gop',
@@ -150,7 +171,7 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     resolutionDate: 'Dec 31, 2026',
     difficulty: 'EASY',
     iconEmoji: '🏛️',
-    volatilityLabel: 'LOW-ALTITUDE CRUISE',
+    volatilityLabel: 'LOW-ALTITUDE HIGHWAY',
     sparkline: [0.19, 0.18, 0.16, 0.15, 0.17, 0.14, 0.14],
   },
   {
@@ -201,7 +222,7 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     volatilityLabel: 'AGGRESSIVE CLIFFS',
     sparkline: [0.30, 0.35, 0.28, 0.32, 0.38, 0.44, 0.40, 0.42],
   },
-  // ── LEGENDARY MARKET CRASHES ──
+  // ── LEGENDARY MARKET CRASHES (EXTREME TOPOLOGY) ──
   {
     id: 'ftx-collapse-2022',
     question: 'LEGENDARY CRASH: Will FTX resume normal withdrawals? (Nov 2022)',
@@ -252,7 +273,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
   },
 ];
 
-// Fetch Real Live Polymarket Gamma Markets with Parallel Fallback
 export async function fetchAllMarkets(): Promise<RideableMarket[]> {
   try {
     const url = `${GAMMA}/markets?limit=18&active=true&closed=false&order=volume24hr&ascending=false`;
@@ -320,13 +340,13 @@ export async function fetchAllMarkets(): Promise<RideableMarket[]> {
       }
     }
   } catch (err) {
-    console.warn('Live Polymarket Gamma fetch engaged fallback:', err);
+    console.warn('Live Polymarket Gamma fetch fallback:', err);
   }
 
   return CURATED_POLYMARKET_FEED;
 }
 
-// Fetch Price Series for Specific Ride
+// Generate the authentic unique track for any chosen Polymarket market
 export async function fetchRideForMarket(market: RideableMarket, inverted = false): Promise<Ride> {
   let series: PricePoint[] = [];
 
@@ -347,29 +367,24 @@ export async function fetchRideForMarket(market: RideableMarket, inverted = fals
     }
   }
 
+  // Convert the market's specific distinct sparkline points into high-resolution terrain
   if (series.length < 15) {
-    if (market.id === 'ftx-collapse-2022') {
-      series = generateSmoothSeries(0.98, 0.01, 120, 0.28);
-    } else if (market.id === 'terra-luna-peg') {
-      series = generateSmoothSeries(0.99, 0.01, 120, 0.32);
-    } else if (market.id === 'svb-bank-run') {
-      series = generateSmoothSeries(0.21, 0.99, 120, 0.30);
-    } else {
-      const startP = Math.max(0.05, market.currentProb - market.probDelta);
-      const endP = market.currentProb;
-      series = generateSmoothSeries(startP, endP, 120, market.difficulty === 'HARD' ? 0.22 : 0.12);
-    }
+    series = sparklineToSeries(market.sparkline);
   }
 
+  // If riding "NO", invert the probability (1 - p) so the track slopes inversely
   if (inverted) {
     series = series.map((pt) => ({ t: pt.t, p: Math.max(0.02, Math.min(0.98, 1 - pt.p)) }));
   }
 
-  return {
+  const ride: Ride = {
     market,
     series,
     inverted,
   };
+
+  activeRideStore.current = ride;
+  return ride;
 }
 
 export async function fetchRide(): Promise<Ride> {
