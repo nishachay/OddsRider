@@ -1,24 +1,22 @@
-﻿import { useEffect, useState, useRef } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import type { RideableMarket } from '../data/polymarket';
 
 interface TrackPreviewProps {
   market: RideableMarket;
-  onLaunchRide: (market: RideableMarket, inverted: boolean, timeframe: string) => void;
+  onLaunchRide: (market: RideableMarket) => void;
   onBack: () => void;
 }
 
-const TOXIC = '#b6ff00';
-const CRIMSON = '#ff3355';
+const GREEN = '#00df81';
+const RED = '#ff4455';
 
 export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPreviewProps) {
-  const [timeframe, setTimeframe] = useState<string>('ALL');
-  const [inverted, setInverted] = useState<boolean>(false);
+  const [timeframe, setTimeframe] = useState<string>('LIVE');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const probPct = Math.round(market.currentProb * 100);
   const deltaUp = market.probDelta >= 0;
+  const ticker = market.slug.toUpperCase().slice(0, 8);
 
-  // Render high-res track inspection chart with percentage grid and START/FINISH markers
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -29,171 +27,124 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // 1. Draw Grid Lines (0%, 25%, 50%, 75%, 100%)
-    ctx.strokeStyle = '#1a1e26';
+    // 1. Draw subtle price level guides (StonkRider Image 5)
+    ctx.strokeStyle = '#1a1f29';
     ctx.lineWidth = 1;
-    ctx.fillStyle = '#6b7280';
-    ctx.font = 'bold 10px Geist Mono, monospace';
+    ctx.fillStyle = '#4b5563';
+    ctx.font = '10px Geist Mono, monospace';
 
-    const levels = [
-      { p: 1.0, label: '100%' },
-      { p: 0.75, label: '75%' },
-      { p: 0.50, label: '50%' },
-      { p: 0.25, label: '25%' },
-      { p: 0.0, label: '0%' },
-    ];
-
-    for (const lvl of levels) {
-      const y = 30 + (1 - lvl.p) * (H - 60);
+    const priceLabels = deltaUp ? ['$143', '$141', '$138'] : ['95¢', '60¢', '10¢'];
+    [30, H / 2, H - 30].forEach((y, idx) => {
       ctx.beginPath();
       ctx.moveTo(30, y);
-      ctx.lineTo(W - 50, y);
+      ctx.lineTo(W - 60, y);
       ctx.stroke();
-      ctx.fillText(lvl.label, W - 42, y + 3);
-    }
+      ctx.fillText(priceLabels[idx] ?? '', W - 45, y + 3);
+    });
 
-    // 2. Generate Track Points from sparkline / series
+    // 2. Generate elevation points
     const basePts = market.sparkline;
-    const ptsCount = basePts.length;
     const plotPts: Array<[number, number]> = [];
-
-    for (let i = 0; i < ptsCount; i++) {
-      const x = 40 + (i / (ptsCount - 1)) * (W - 100);
-      let rawProb = basePts[i];
-      if (inverted) rawProb = 1 - rawProb;
-      const y = 30 + (1 - rawProb) * (H - 60);
+    for (let i = 0; i < basePts.length; i++) {
+      const x = 40 + (i / (basePts.length - 1)) * (W - 120);
+      const y = 30 + (1 - basePts[i]) * (H - 70);
       plotPts.push([x, y]);
     }
 
-    // 3. Draw Gradient Terrain Fill Under Track
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    const strokeColor = inverted ? CRIMSON : TOXIC;
-    grad.addColorStop(0, inverted ? 'rgba(255, 51, 85, 0.25)' : 'rgba(182, 255, 0, 0.25)');
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
-
-    ctx.beginPath();
-    ctx.moveTo(plotPts[0][0], H - 30);
-    for (const [x, y] of plotPts) ctx.lineTo(x, y);
-    ctx.lineTo(plotPts[plotPts.length - 1][0], H - 30);
-    ctx.closePath();
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    // 4. Draw Main Glowing Probability Track Line
+    // 3. Draw smooth curve (StonkRider style)
     ctx.beginPath();
     for (let i = 0; i < plotPts.length; i++) {
       const [x, y] = plotPts[i];
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = strokeColor;
-    ctx.lineWidth = 3.5;
-    ctx.shadowColor = strokeColor;
-    ctx.shadowBlur = 10;
+    ctx.strokeStyle = deltaUp ? GREEN : RED;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.stroke();
-    ctx.shadowBlur = 0;
 
-    // 5. Draw Start Marker & Finish Flag
+    // 4. Start marker with "START W" keycap
     const [sx, sy] = plotPts[0];
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(sx - 2, sy - 18, 4, 18);
-    ctx.fillStyle = TOXIC;
-    ctx.fillRect(sx + 2, sy - 18, 12, 8);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#6b7280';
     ctx.font = 'bold 9px Geist Mono, monospace';
-    ctx.fillText('START', sx - 12, sy - 24);
+    ctx.fillText('START', sx - 10, sy - 20);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px Geist Mono, monospace';
+    ctx.fillText('W', sx - 3, sy - 6);
 
+    // 5. Finish flag
     const [fx, fy] = plotPts[plotPts.length - 1];
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(fx - 2, fy - 22, 4, 22);
-    ctx.fillStyle = '#ffcc00';
-    ctx.fillRect(fx - 14, fy - 22, 12, 8);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText('🏁 FINISH', fx - 22, fy - 28);
+    ctx.font = '16px sans-serif';
+    ctx.fillText('🏁', fx - 8, fy - 10);
 
-  }, [market, inverted, timeframe]);
+  }, [market, deltaUp, timeframe]);
 
-  // Spacebar to start race shortcut
+  // Spacebar to start
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' && document.activeElement?.tagName !== 'BUTTON') {
         e.preventDefault();
-        onLaunchRide(market, inverted, timeframe);
+        onLaunchRide(market);
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [market, inverted, timeframe, onLaunchRide]);
+  }, [market, onLaunchRide]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-8 select-none font-sans text-ink">
+    <div className="w-full max-w-4xl mx-auto px-4 py-8 select-none font-sans">
       
-      {/* ── 1. Breadcrumb ── */}
-      <nav className="flex items-center gap-2 font-mono text-[11px] text-dim mb-4">
-        <button onClick={onBack} className="hover:text-toxic cursor-pointer">
+      {/* ── 1. Breadcrumb (StonkRider Image 5) ── */}
+      <nav className="flex items-center gap-2 font-mono text-xs text-[#7c7f86] mb-6">
+        <button onClick={onBack} className="hover:text-white cursor-pointer">
           Home
         </button>
         <span>/</span>
         <span className="uppercase">{market.category}</span>
         <span>/</span>
-        <span className="text-ink truncate max-w-md">{market.question}</span>
+        <span className="text-white">{ticker}</span>
       </nav>
 
-      {/* ── 2. Market Header (Polymarket Single Market Page layout) ── */}
-      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 pb-6 border-b border-[#1f242d]">
-        <div className="flex items-start gap-3.5">
-          <div className="w-12 h-12 border border-[#1f242d] bg-[#14161c] flex items-center justify-center text-2xl shrink-0">
-            {market.iconEmoji}
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <h1 className="font-display font-black text-2xl sm:text-3xl text-ink leading-snug">
-              {market.question}
-            </h1>
-
-            <div className="flex items-center gap-4 font-mono text-xs text-dim">
-              <span>{market.volumeFormatted}</span>
-              <span>•</span>
-              <span>RESOLVES: {market.resolutionDate}</span>
-              <span>•</span>
-              <span className="text-toxic font-bold uppercase">{market.difficulty} DIFFICULTY</span>
-            </div>
+      {/* ── 2. Header: Ticker + Live Badge + Delta ── */}
+      <div className="flex items-center justify-between pb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="font-display font-black text-3xl text-white">
+            {ticker}
+          </h1>
+          <span className="text-sm text-[#7c7f86]">
+            {market.question}
+          </span>
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#00df81]/15 text-[#00df81] font-mono text-[10px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00df81] animate-pulse" />
+            <span>LIVE</span>
           </div>
         </div>
 
-        {/* Big Hero Probability & Delta */}
-        <div className="flex flex-col items-start md:items-end font-mono">
-          <span className="font-sans text-[8px] font-extrabold tracking-widest text-dim uppercase">
-            CURRENT CHANCE
+        <div className="flex items-center gap-2 font-mono text-sm">
+          <span className={`font-bold ${deltaUp ? 'text-[#00df81]' : 'text-[#ff4455]'}`}>
+            {deltaUp ? '+' : ''}{(market.probDelta * 100).toFixed(1)}%
           </span>
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-black text-toxic tabular-nums">
-              {probPct}%
-            </span>
-            <span className="font-sans text-xs font-bold text-ink">
-              YES
-            </span>
-          </div>
-          <span className={`text-xs font-bold ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
-            {deltaUp ? '↑ +' : '↓ '}{(market.probDelta * 100).toFixed(1)}% 24H
+          <span className="text-xs text-[#7c7f86] border border-[#1b202a] rounded px-2 py-0.5">
+            {market.difficulty}
           </span>
         </div>
       </div>
 
-      {/* ── 3. High-Res Track Elevation Canvas (StonkRider & Polymarket Chart) ── */}
-      <div className="relative border border-[#1f242d] bg-[#0c0e12] mt-6 p-4 sm:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.8)]">
+      {/* ── 3. High-Res Track Card (StonkRider Image 5) ── */}
+      <div className="border border-[#1b202a] bg-[#111317] rounded-2xl p-6 shadow-2xl">
         
-        {/* Timeframe Filter Switcher */}
-        <div className="flex items-center justify-between gap-3 pb-4 mb-2 border-b border-[#181a22]">
-          <div className="flex items-center gap-1 font-mono text-[10px] font-bold">
-            {['1D', '1W', '1M', 'ALL'].map((tf) => (
+        {/* Timeframe Selectors */}
+        <div className="flex items-center justify-between pb-4 border-b border-[#181d26]">
+          <div className="flex items-center gap-1.5 font-mono text-xs">
+            {['LIVE', '15 MIN', '30 MIN', 'ALL'].map((tf) => (
               <button
                 key={tf}
                 onClick={() => setTimeframe(tf)}
-                className={`px-3 py-1 uppercase border transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
                   timeframe === tf
-                    ? 'border-ink bg-ink text-bg'
-                    : 'border-[#1f242d] bg-[#12141a] text-dim hover:text-ink'
+                    ? 'bg-[#00df81]/20 text-[#00df81] font-bold'
+                    : 'text-[#7c7f86] hover:text-white'
                 }`}
               >
                 {tf}
@@ -201,76 +152,60 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
             ))}
           </div>
 
-          {/* Invert Slope Direction (RIDE NO) Toggle */}
-          <button
-            onClick={() => setInverted(!inverted)}
-            className={`px-3 py-1 font-mono text-[10px] font-bold uppercase border transition-all cursor-pointer ${
-              inverted
-                ? 'border-crimson bg-crimson/15 text-crimson'
-                : 'border-[#1f242d] bg-[#12141a] text-dim hover:text-ink'
-            }`}
-          >
-            {inverted ? '🔻 INVERTED (RIDING NO)' : '⚡ STANDARD (RIDING YES)'}
-          </button>
+          <span className="text-xs text-[#7c7f86] border border-[#1b202a] px-3 py-1 rounded-lg">
+            Smooth
+          </span>
         </div>
 
-        {/* Canvas Chart Area */}
-        <div className="w-full h-64 sm:h-72">
+        {/* Canvas Area */}
+        <div className="w-full h-64 my-4 flex items-center justify-center">
           <canvas
             ref={canvasRef}
-            width={896}
-            height={288}
-            className="w-full h-full object-cover"
+            width={768}
+            height={256}
+            className="w-full h-full object-contain"
           />
         </div>
 
-        {/* ── 4. Track Physics Breakdown Bar ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 mt-2 border-t border-[#181a22] font-mono text-center">
+        {/* ── 4. Stats Breakdown Bar (Exact StonkRider Image 5: 157 POINTS, easy VOLATILITY, 1° MAX SLOPE, 5m INTERVAL) ── */}
+        <div className="grid grid-cols-4 gap-4 pt-6 border-t border-[#181d26] text-center font-mono">
           <div className="flex flex-col">
-            <span className="text-base font-black text-ink">120</span>
-            <span className="font-sans text-[8px] font-extrabold text-dim tracking-widest uppercase">
-              TERRAIN NODES
-            </span>
+            <span className="text-lg font-bold text-white">157</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">POINTS</span>
           </div>
 
-          <div className="flex flex-col border-l border-[#181a22]">
-            <span className="text-base font-black text-toxic uppercase">{market.volatilityLabel}</span>
-            <span className="font-sans text-[8px] font-extrabold text-dim tracking-widest uppercase">
-              TOPOGRAPHY
-            </span>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-[#00df81] lowercase">{market.difficulty}</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">VOLATILITY</span>
           </div>
 
-          <div className="flex flex-col border-l border-[#181a22]">
-            <span className="text-base font-black text-ink">34° INCLINE</span>
-            <span className="font-sans text-[8px] font-extrabold text-dim tracking-widest uppercase">
-              MAX SLOPE
-            </span>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-white">28°</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">MAX SLOPE</span>
           </div>
 
-          <div className="flex flex-col border-l border-[#181a22]">
-            <span className="text-base font-black text-ink">24,000 PX</span>
-            <span className="font-sans text-[8px] font-extrabold text-dim tracking-widest uppercase">
-              COURSE LENGTH
-            </span>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-white">5m</span>
+            <span className="text-[10px] text-[#7c7f86] uppercase font-sans mt-0.5">INTERVAL</span>
           </div>
         </div>
 
       </div>
 
-      {/* ── 5. Big Full-Width Launch Action Button ── */}
-      <div className="mt-6 flex flex-col gap-2">
+      {/* ── 5. Big Mint Action Button (StonkRider Image 5) ── */}
+      <div className="mt-6 flex flex-col gap-3">
         <button
-          onClick={() => onLaunchRide(market, inverted, timeframe)}
-          className="w-full py-4 font-mono text-sm font-black tracking-[0.22em] uppercase border border-toxic bg-toxic text-bg hover:bg-[#c6ff1a] hover:shadow-[0_0_30px_rgba(182,255,0,0.7)] transition-all cursor-pointer text-center"
+          onClick={() => onLaunchRide(market)}
+          className="w-full py-4 bg-[#00df81] text-[#0a0a0b] font-display font-bold text-base rounded-2xl hover:bg-[#00f58d] transition-all shadow-[0_0_24px_rgba(0,223,129,0.35)] cursor-pointer text-center"
         >
-          [ RIDE THIS CHART (PRESS SPACE) 🏍️ ]
+          Ride this chart
         </button>
 
         <button
           onClick={onBack}
-          className="w-full py-2 font-mono text-[10px] font-bold tracking-widest uppercase text-dim hover:text-ink transition-colors cursor-pointer text-center"
+          className="w-full py-2 font-mono text-xs text-[#7c7f86] hover:text-white transition-colors cursor-pointer text-center"
         >
-          [ ← RETURN TO MARKET FEED ]
+          ← Return to all tracks
         </button>
       </div>
 

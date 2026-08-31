@@ -3,62 +3,50 @@
 interface DailyChallengeProps {
   market: RideableMarket;
   onRide: (market: RideableMarket) => void;
-  onPreview: (market: RideableMarket) => void;
 }
 
-export default function DailyChallenge({ market, onRide, onPreview }: DailyChallengeProps) {
-  const probPct = (market.currentProb * 100).toFixed(0);
-
+export default function DailyChallenge({ market, onRide }: DailyChallengeProps) {
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 my-4 select-none">
-      <div className="relative border border-[#2d281a] bg-[#12100a] p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
-        {/* Tactical Corner Marks */}
-        <span className="absolute -top-1 -left-1 text-[10px] text-amber-500/60 font-mono leading-none">+</span>
-        <span className="absolute -top-1 -right-1 text-[10px] text-amber-500/60 font-mono leading-none">+</span>
-        <span className="absolute -bottom-1 -left-1 text-[10px] text-amber-500/60 font-mono leading-none">+</span>
-        <span className="absolute -bottom-1 -right-1 text-[10px] text-amber-500/60 font-mono leading-none">+</span>
-
+    <div className="w-full max-w-2xl mx-auto px-4 my-6 select-none">
+      <div className="border border-[#382b14] bg-[#14110b] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        
         {/* Left: Info */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-[9px] font-black tracking-[0.24em] text-amber-400 uppercase px-2 py-0.5 border border-amber-500/40 bg-amber-500/10">
-              ⚡ DAILY CHALLENGE TRACK
-            </span>
-            <span className="font-mono text-[9px] font-bold text-dim tracking-wider uppercase border border-[#1f242d] px-2 py-0.5">
-              {market.category}
-            </span>
-            <span className="font-mono text-[9px] font-bold text-amber-400 tracking-wider uppercase">
-              • {market.difficulty}
+            <span className="text-xs text-[#f59e0b]">⚡</span>
+            <span className="font-mono text-[10px] font-bold tracking-[0.2em] text-[#f59e0b] uppercase">
+              DAILY CHALLENGE
             </span>
           </div>
 
-          <h2 className="font-display font-bold text-lg sm:text-xl text-ink leading-snug">
-            {market.question}
-          </h2>
-
-          <div className="flex items-center gap-4 font-mono text-xs text-dim">
-            <span>ODDS: <strong className="text-amber-400 font-black">{probPct}% YES</strong></span>
-            <span>VOLUME: <strong className="text-ink">{market.volumeFormatted}</strong></span>
-            <span>TERRAIN: <strong className="text-ink">{market.volatilityLabel}</strong></span>
+          <div className="flex items-baseline gap-2">
+            <h2 className="font-display font-bold text-xl text-white">
+              {market.slug.toUpperCase().slice(0, 10)} • ALL
+            </h2>
           </div>
+
+          <p className="text-xs text-[#8c8270] font-mono">
+            Best 184,290 — PRO RIDER • 28 riders
+          </p>
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => onPreview(market)}
-            className="px-4 py-2.5 font-mono text-[10px] font-bold tracking-[0.16em] uppercase border border-[#232529] bg-[#14161c] text-dim hover:text-ink hover:border-[#333a48] transition-all cursor-pointer"
+            onClick={() => onRide(market)}
+            className="px-4 py-2 font-mono text-xs text-[#a89d88] border border-[#2d2416] bg-[#1a1610] rounded-xl hover:text-white transition-colors cursor-pointer"
           >
-            [ PREVIEW TRACK ]
+            Leaderboard
           </button>
 
           <button
             onClick={() => onRide(market)}
-            className="px-6 py-2.5 font-mono text-xs font-black tracking-[0.18em] uppercase border border-amber-400 bg-amber-400 text-bg hover:bg-amber-300 hover:shadow-[0_0_20px_rgba(251,191,36,0.6)] transition-all cursor-pointer"
+            className="px-5 py-2 font-mono text-xs font-bold text-[#0a0a0b] bg-[#f59e0b] rounded-xl hover:bg-[#fbbf24] transition-colors cursor-pointer shadow-[0_0_16px_rgba(245,158,11,0.3)]"
           >
-            [ RIDE TODAY'S CHALLENGE ⚡ ]
+            Ride today's challenge
           </button>
         </div>
+
       </div>
     </div>
   );

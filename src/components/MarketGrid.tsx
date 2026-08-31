@@ -1,95 +1,105 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useMemo } from 'react';
 import type { RideableMarket } from '../data/polymarket';
 import MarketCard from './MarketCard';
 
 interface MarketGridProps {
   markets: RideableMarket[];
   activeCategory: string;
-  onSelectCategory: (cat: string) => void;
   searchQuery: string;
-  onRideYes: (market: RideableMarket) => void;
-  onRideNo: (market: RideableMarket) => void;
-  onPreview: (market: RideableMarket) => void;
+  onSelectMarket: (market: RideableMarket) => void;
 }
 
 export default function MarketGrid({
   markets,
   activeCategory,
-  onSelectCategory,
   searchQuery,
-  onRideYes,
-  onRideNo,
-  onPreview,
+  onSelectMarket,
 }: MarketGridProps) {
-  const [filterDifficulty, setFilterDifficulty] = useState<string>('ALL');
-
-  const filteredMarkets = useMemo(() => {
+  const trendingMarkets = useMemo(() => {
     return markets.filter((m) => {
+      const isLeg = m.category === 'LEGENDARY';
       const matchCat =
-        activeCategory === 'ALL' ||
-        (activeCategory === 'LEGENDARY' ? m.category === 'LEGENDARY' : m.category === activeCategory);
-      const matchDiff = filterDifficulty === 'ALL' || m.difficulty === filterDifficulty;
+        activeCategory === 'ALL'
+          ? !isLeg
+          : activeCategory === 'LEGENDARY'
+          ? isLeg
+          : m.category === activeCategory;
       const matchQuery =
         !searchQuery ||
         m.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.category.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchDiff && matchQuery;
+        m.slug.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCat && matchQuery;
     });
-  }, [markets, activeCategory, filterDifficulty, searchQuery]);
+  }, [markets, activeCategory, searchQuery]);
+
+  const legendaryMarkets = useMemo(() => {
+    return markets.filter((m) => m.category === 'LEGENDARY');
+  }, [markets]);
+
+  const liveFeatured = markets[0];
 
   return (
-    <section className="w-full max-w-6xl mx-auto px-4 my-6 select-none">
+    <div className="w-full max-w-6xl mx-auto px-4 my-8 select-none flex flex-col gap-12">
       
-      {/* ── Section Header & Filters ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1f242d]">
-        <div className="flex items-baseline gap-3">
-          <h2 className="font-display font-black text-xl text-ink uppercase tracking-wider">
-            {activeCategory === 'LEGENDARY' ? '💀 LEGENDARY MARKET CRASHES' : 'TRENDING RACETRACKS'}
-          </h2>
-          <span className="font-mono text-xs text-dim">
-            ({filteredMarkets.length} AVAILABLE)
+      {/* ── 1. LIVE MARKET SPOTLIGHT (StonkRider Image 2 "LIVE IPO") ── */}
+      {activeCategory === 'ALL' && !searchQuery && liveFeatured && (
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 font-mono text-xs text-[#7c7f86] uppercase tracking-wider">
+            <span>LIVE MARKETS</span>
+            <span className="w-2 h-2 rounded-full bg-[#00df81] animate-pulse" />
+          </div>
+
+          <div className="max-w-md">
+            <MarketCard market={liveFeatured} onSelect={onSelectMarket} />
+          </div>
+        </section>
+      )}
+
+      {/* ── 2. TRENDING TRACKS GRID (StonkRider Image 2 & 3) ── */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between font-mono text-xs text-[#7c7f86] uppercase tracking-wider">
+          <span>
+            {activeCategory === 'LEGENDARY' ? 'LEGENDARY CRASHES 💀' : 'TRENDING TRACKS'} • {trendingMarkets.length}
           </span>
         </div>
 
-        {/* Difficulty Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 font-mono text-[9.5px] font-bold">
-          {['ALL', 'EASY', 'MEDIUM', 'HARD', 'INSANE'].map((diff) => (
-            <button
-              key={diff}
-              onClick={() => setFilterDifficulty(diff)}
-              className={`px-2.5 py-1 uppercase border transition-all cursor-pointer ${
-                filterDifficulty === diff
-                  ? 'border-toxic bg-toxic/15 text-toxic'
-                  : 'border-[#1f242d] bg-[#12141a] text-dim hover:text-ink'
-              }`}
-            >
-              {diff}
-            </button>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {trendingMarkets.length === 0 ? (
+            <div className="col-span-full py-16 text-center text-sm text-[#7c7f86] border border-[#1b202a] rounded-2xl bg-[#111317]">
+              No matching tracks found. Try searching another market or ticker.
+            </div>
+          ) : (
+            trendingMarkets.map((market) => (
+              <MarketCard
+                key={market.id}
+                market={market}
+                onSelect={onSelectMarket}
+              />
+            ))
+          )}
         </div>
-      </div>
+      </section>
 
-      {/* ── 3-Column Market Cards Grid ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-        {filteredMarkets.length === 0 ? (
-          <div className="col-span-full py-16 flex flex-col items-center justify-center border border-[#1f242d] bg-[#0e1014]">
-            <span className="font-mono text-xs text-dim uppercase tracking-widest">
-              NO MATCHING PREDICTION MARKETS FOUND
-            </span>
+      {/* ── 3. LEGENDARY CRASHES SECTION (StonkRider Image 3 & 4) ── */}
+      {activeCategory === 'ALL' && !searchQuery && (
+        <section className="flex flex-col gap-4 pt-4 border-t border-[#1b202a]">
+          <div className="flex items-center justify-between font-mono text-xs text-[#7c7f86] uppercase tracking-wider">
+            <span>LEGENDARY CRASHES 💀 • {legendaryMarkets.length}</span>
+            <span className="text-[#525866] text-[10px]">...HISTORICAL COLLAPSES</span>
           </div>
-        ) : (
-          filteredMarkets.map((market) => (
-            <MarketCard
-              key={market.id}
-              market={market}
-              onRideYes={onRideYes}
-              onRideNo={onRideNo}
-              onPreview={onPreview}
-            />
-          ))
-        )}
-      </div>
 
-    </section>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {legendaryMarkets.map((market) => (
+              <MarketCard
+                key={market.id}
+                market={market}
+                onSelect={onSelectMarket}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+    </div>
   );
 }

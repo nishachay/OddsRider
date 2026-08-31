@@ -1,64 +1,56 @@
 ﻿export default function Footer() {
   return (
-    <footer className="w-full bg-[#0a0a0b] border-t border-[#1f242d] mt-20 py-12 select-none">
-      <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
+    <footer className="w-full bg-[#0a0a0b] border-t border-[#181d26] mt-24 py-16 select-none font-sans">
+      <div className="max-w-5xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
         
-        {/* Brand Column */}
+        {/* Brand */}
         <div className="flex flex-col gap-3 md:col-span-2">
-          <div className="flex items-baseline tracking-[0.22em] uppercase font-display font-black text-xl">
-            <span className="text-ink">ODDS</span>
-            <span className="text-toxic">RIDER</span>
-          </div>
-          <p className="text-xs text-dim max-w-sm leading-relaxed">
-            Real prediction market orderbooks and live Polymarket probabilities turned into 2D physics motocross tracks you can ride and conquer.
+          <span className="font-display font-black text-xl tracking-[0.16em] uppercase text-[#00df81]">
+            ODDSRIDER
+          </span>
+          <p className="text-xs text-[#7c7f86] max-w-xs leading-relaxed">
+            Real market & prediction data turned into motocross tracks you can ride.
           </p>
           <div className="flex items-center gap-3 pt-2">
-            <a
-              href="https://x.com"
-              target="_blank"
-              rel="noreferrer"
-              className="w-8 h-8 border border-[#1f242d] bg-[#12141a] flex items-center justify-center text-xs text-dim hover:text-toxic hover:border-toxic/40 transition-colors"
-            >
+            <span className="w-7 h-7 rounded-full bg-[#141820] border border-[#1f242d] flex items-center justify-center text-xs text-[#7c7f86] hover:text-white cursor-pointer">
               𝕏
-            </a>
-            <a
-              href="https://polymarket.com"
-              target="_blank"
-              rel="noreferrer"
-              className="px-2.5 h-8 border border-[#1f242d] bg-[#12141a] flex items-center justify-center font-mono text-[9.5px] font-bold text-dim hover:text-toxic hover:border-toxic/40 transition-colors"
-            >
-              POLYMARKET API
-            </a>
+            </span>
+            <span className="w-7 h-7 rounded-full bg-[#141820] border border-[#1f242d] flex items-center justify-center text-xs text-[#7c7f86] hover:text-white cursor-pointer">
+              in
+            </span>
+            <span className="w-7 h-7 rounded-full bg-[#141820] border border-[#1f242d] flex items-center justify-center text-xs text-[#7c7f86] hover:text-white cursor-pointer">
+              ☕
+            </span>
           </div>
         </div>
 
-        {/* Play Links */}
-        <div className="flex flex-col gap-2 font-mono text-xs">
-          <span className="text-[10px] font-extrabold tracking-widest text-ink uppercase mb-1">
-            RACE
+        {/* Play */}
+        <div className="flex flex-col gap-2.5 text-xs text-[#7c7f86]">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-white mb-1">
+            PLAY
           </span>
-          <span className="text-dim hover:text-toxic cursor-pointer">Live Markets</span>
-          <span className="text-dim hover:text-toxic cursor-pointer">Daily Challenge</span>
-          <span className="text-dim hover:text-toxic cursor-pointer">Legendary Crashes</span>
-          <span className="text-dim hover:text-toxic cursor-pointer">Global Leaderboard</span>
+          <span className="hover:text-white cursor-pointer">Prediction markets</span>
+          <span className="hover:text-white cursor-pointer">Crypto charts</span>
+          <span className="hover:text-white cursor-pointer">Daily challenge & leaderboard</span>
+          <span className="hover:text-white cursor-pointer">Legendary crashes</span>
         </div>
 
-        {/* Company & Legal */}
-        <div className="flex flex-col gap-2 font-mono text-xs">
-          <span className="text-[10px] font-extrabold tracking-widest text-ink uppercase mb-1">
-            PROJECT
+        {/* Company */}
+        <div className="flex flex-col gap-2.5 text-xs text-[#7c7f86]">
+          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-white mb-1">
+            COMPANY
           </span>
-          <span className="text-dim hover:text-toxic cursor-pointer">About OddsRider</span>
-          <span className="text-dim hover:text-toxic cursor-pointer">How It Works</span>
-          <span className="text-dim hover:text-toxic cursor-pointer">Physics Derivation</span>
-          <span className="text-dim hover:text-toxic cursor-pointer">Source Code</span>
+          <span className="hover:text-white cursor-pointer">About OddsRider</span>
+          <span className="hover:text-white cursor-pointer">Contact</span>
+          <span className="hover:text-white cursor-pointer">Privacy</span>
+          <span className="hover:text-white cursor-pointer">Terms</span>
+          <span className="hover:text-white cursor-pointer">Legal</span>
         </div>
 
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 mt-10 pt-6 border-t border-[#181a22] flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[10px] text-dim">
-        <span>Built with real Polymarket prediction data • For entertainment only • Not financial advice</span>
-        <span>ODDSRIDER v2.0 • PRODUCTION</span>
+      <div className="max-w-5xl mx-auto px-4 mt-12 pt-6 border-t border-[#141820] text-center font-mono text-[11px] text-[#525866]">
+        Built with real market & prediction data • Not financial advice
       </div>
     </footer>
   );

@@ -28,7 +28,6 @@ export default function App() {
   useEffect(() => {
     fetchAllMarkets().then((data) => setMarkets(data));
 
-    // Read initial URL params
     const params = new URLSearchParams(window.location.search);
     const mId = params.get('market');
     const v = params.get('view');
@@ -43,7 +42,6 @@ export default function App() {
     }
   }, []);
 
-  // Sync view & market to URL params so refresh & share links work
   const syncUrl = useCallback((newView: string, marketId?: string) => {
     const url = new URL(window.location.href);
     url.searchParams.set('view', newView);
@@ -51,7 +49,7 @@ export default function App() {
     window.history.replaceState({}, '', url.toString());
   }, []);
 
-  // Listen for game finish / crash results to persist player stats
+  // Listen for finish / crash results
   useEffect(() => {
     const offResult = bus.on<{ finished: boolean; score: number; timeMs: number } | null>(
       EV.RESULT,
@@ -64,7 +62,6 @@ export default function App() {
     return () => offResult();
   }, [selectedMarket]);
 
-  // Actions
   const handleSelectCategory = (cat: string) => {
     setActiveCategory(cat);
     if (view !== 'home') {
@@ -80,13 +77,13 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLaunchRide = async (market: RideableMarket, inverted = false, timeframe = 'ALL') => {
+  const handleLaunchRide = async (market: RideableMarket) => {
     setSelectedMarket(market);
     setView('game');
     syncUrl('game', market.id);
 
     try {
-      const ride: Ride = await fetchRideForMarket(market, inverted, timeframe);
+      const ride: Ride = await fetchRideForMarket(market);
       setTimeout(() => {
         bus.emit(EV.LOAD_MARKET, ride);
       }, 60);
@@ -101,66 +98,58 @@ export default function App() {
   };
 
   return (
-    <main className="min-h-screen bg-[#0a0a0b] text-ink font-sans">
+    <div className="min-h-screen bg-[#0a0a0b] text-[#f0f0f2] font-sans antialiased">
       
       {/* ── 1. ACTIVE GAME SIMULATION VIEW ── */}
       {view === 'game' ? (
-        <div className="fixed inset-0 overflow-hidden bg-bg">
+        <div className="fixed inset-0 overflow-hidden bg-bg z-50">
           <PhaserGame />
           <HudOverlay onOpenLobby={handleGoHome} />
         </div>
       ) : (
-        /* ── 2. FULL HOME & TRACK INSPECTION WEB VIEWS ── */
+        /* ── 2. STONKRIDER-STYLE FULL WEBPAGE VIEW (NATURAL SCROLL) ── */
         <div className="w-full flex flex-col min-h-screen">
-          {/* Universal Sticky Top Nav */}
           <Navbar
-            activeTab={activeCategory}
-            onSelectTab={handleSelectCategory}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
             onGoHome={handleGoHome}
+            onSelectTab={handleSelectCategory}
           />
 
           {view === 'preview' ? (
-            /* Dedicated Track Inspection Stage (Polymarket Single Market + StonkRider Preview) */
-            <div className="flex-1">
+            <main className="flex-1">
               <TrackPreview
                 market={selectedMarket}
-                onLaunchRide={(m, inv, tf) => handleLaunchRide(m, inv, tf)}
+                onLaunchRide={(m) => handleLaunchRide(m)}
                 onBack={handleGoHome}
               />
-            </div>
+            </main>
           ) : (
-            /* Main Home Landing Page Feed */
-            <div className="flex-1 flex flex-col">
-              {/* StonkRider Hero Section */}
-              <HeroSection onExploreClick={() => {}} />
-
-              {/* Daily Challenge Spotlight Banner */}
-              <DailyChallenge
-                market={MASTER_MARKETS[1]}
-                onRide={(m) => handleLaunchRide(m, false)}
-                onPreview={handlePreviewMarket}
+            <main className="flex-1 flex flex-col">
+              <HeroSection
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                activeCategory={activeCategory}
+                onSelectCategory={setActiveCategory}
+                onSearchSubmit={() => {}}
               />
 
-              {/* Polymarket-Style Live Racetracks Feed Grid */}
+              <DailyChallenge
+                market={MASTER_MARKETS[1]}
+                onRide={(m) => handleLaunchRide(m)}
+              />
+
               <MarketGrid
                 markets={markets}
                 activeCategory={activeCategory}
-                onSelectCategory={setActiveCategory}
                 searchQuery={searchQuery}
-                onRideYes={(m) => handleLaunchRide(m, false)}
-                onRideNo={(m) => handleLaunchRide(m, true)}
-                onPreview={handlePreviewMarket}
+                onSelectMarket={handlePreviewMarket}
               />
-            </div>
+            </main>
           )}
 
-          {/* Production Footer */}
           <Footer />
         </div>
       )}
 
-    </main>
+    </div>
   );
 }

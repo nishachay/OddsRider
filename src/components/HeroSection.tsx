@@ -1,15 +1,25 @@
-﻿import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { getGlobalPlatformStats, getPlayerStats } from '../data/playerStorage';
 
 interface HeroSectionProps {
-  onExploreClick: () => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  activeCategory: string;
+  onSelectCategory: (cat: string) => void;
+  onSearchSubmit: () => void;
 }
 
-export default function HeroSection({ onExploreClick }: HeroSectionProps) {
+export default function HeroSection({
+  searchQuery,
+  onSearchChange,
+  activeCategory,
+  onSelectCategory,
+  onSearchSubmit,
+}: HeroSectionProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stats = getGlobalPlatformStats(getPlayerStats());
 
-  // Animated Dirt Bike riding across live neon curve (StonkRider style)
+  // Animated Dirt Bike riding across sleek line (StonkRider Image 1 match)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -17,28 +27,29 @@ export default function HeroSection({ onExploreClick }: HeroSectionProps) {
     if (!ctx) return;
 
     let animId: number;
-    let bikeProgress = 0.15;
+    let bikeProgress = 0.22;
     const W = canvas.width;
     const H = canvas.height;
 
+    // StonkRider curve topography
     const curvePoints: Array<[number, number]> = [];
-    for (let x = 0; x <= W; x += 4) {
+    for (let x = 0; x <= W; x += 3) {
       const p = x / W;
       const y =
-        H * 0.55 +
-        Math.sin(p * Math.PI * 3.2) * (H * 0.22) +
-        Math.cos(p * Math.PI * 6.5) * (H * 0.12) -
-        (p - 0.5) * (H * 0.18);
+        H * 0.58 +
+        Math.sin(p * Math.PI * 3.4) * (H * 0.22) +
+        Math.cos(p * Math.PI * 7.1) * (H * 0.12) -
+        (p - 0.5) * (H * 0.15);
       curvePoints.push([x, y]);
     }
 
     const render = () => {
       ctx.clearRect(0, 0, W, H);
 
-      // 1. Draw glowing gradient fill under track
+      // 1. Subtle terrain gradient fill
       const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, 'rgba(182, 255, 0, 0.15)');
-      grad.addColorStop(1, 'rgba(182, 255, 0, 0.0)');
+      grad.addColorStop(0, 'rgba(0, 223, 129, 0.10)');
+      grad.addColorStop(1, 'rgba(0, 223, 129, 0.0)');
       ctx.beginPath();
       ctx.moveTo(curvePoints[0][0], H);
       for (const [x, y] of curvePoints) ctx.lineTo(x, y);
@@ -47,28 +58,27 @@ export default function HeroSection({ onExploreClick }: HeroSectionProps) {
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // 2. Draw glowing neon track line
+      // 2. Clean Mint Line (StonkRider style)
       ctx.beginPath();
       for (let i = 0; i < curvePoints.length; i++) {
         const [x, y] = curvePoints[i];
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
-      ctx.strokeStyle = '#b6ff00';
+      ctx.strokeStyle = '#00df81';
       ctx.lineWidth = 3;
-      ctx.shadowColor = '#b6ff00';
-      ctx.shadowBlur = 12;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.stroke();
-      ctx.shadowBlur = 0;
 
-      // 3. Draw Start & Finish Markers
-      ctx.fillStyle = '#7c7f86';
-      ctx.font = 'bold 9px Geist Mono, monospace';
-      ctx.fillText('START', curvePoints[8][0], curvePoints[8][1] - 12);
-      ctx.fillText('🏁 FINISH', curvePoints[curvePoints.length - 15][0] - 30, curvePoints[curvePoints.length - 15][1] - 12);
+      // 3. Start & Finish Labels
+      ctx.fillStyle = '#6b7280';
+      ctx.font = 'bold 10px Geist Mono, monospace';
+      ctx.fillText('START', curvePoints[10][0], curvePoints[10][1] - 12);
+      ctx.fillText('🏁', curvePoints[curvePoints.length - 16][0] - 8, curvePoints[curvePoints.length - 16][1] - 14);
 
-      // 4. Update & Draw Motocross Rider Dot / Icon
-      bikeProgress = (bikeProgress + 0.0025) % 0.92;
+      // 4. Motocross Rider Silhouette on the Line
+      bikeProgress = (bikeProgress + 0.0022) % 0.94;
       const targetIdx = Math.floor(bikeProgress * (curvePoints.length - 1));
       const [bx, by] = curvePoints[targetIdx] ?? [100, 100];
       const nextIdx = Math.min(curvePoints.length - 1, targetIdx + 2);
@@ -79,15 +89,13 @@ export default function HeroSection({ onExploreClick }: HeroSectionProps) {
       ctx.translate(bx, by);
       ctx.rotate(angle);
 
-      // Draw stylized dirt bike neon marker
-      ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 8;
-      ctx.fillRect(-6, -14, 12, 10);
-      ctx.fillStyle = '#b6ff00';
+      // Draw rider & bike chassis
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(-4, -14, 8, 10);
+      ctx.fillStyle = '#00df81';
       ctx.beginPath();
-      ctx.arc(-5, -3, 3.5, 0, Math.PI * 2);
-      ctx.arc(5, -3, 3.5, 0, Math.PI * 2);
+      ctx.arc(-5, -2, 3, 0, Math.PI * 2);
+      ctx.arc(5, -2, 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
 
@@ -99,64 +107,103 @@ export default function HeroSection({ onExploreClick }: HeroSectionProps) {
   }, []);
 
   return (
-    <section className="w-full max-w-6xl mx-auto pt-10 pb-8 px-4 flex flex-col items-center text-center select-none">
-      {/* ── Sub-Badge ── */}
-      <div className="inline-flex items-center gap-2 px-3 py-1 border border-toxic/30 bg-toxic/5 mb-4">
-        <span className="w-1.5 h-1.5 bg-toxic animate-ping" />
-        <span className="font-mono text-[10px] font-extrabold tracking-[0.24em] text-toxic uppercase">
-          MOTOCROSS MEETS PREDICTION MARKETS
-        </span>
-      </div>
+    <section className="w-full max-w-5xl mx-auto pt-14 pb-8 px-4 flex flex-col items-center text-center select-none">
+      
+      {/* ── Subtitle Tagline (StonkRider Image 1) ── */}
+      <span className="font-mono text-[11px] font-bold tracking-[0.26em] text-[#00df81] uppercase mb-3">
+        MOTOCROSS MEETS PREDICTION MARKETS
+      </span>
 
-      {/* ── Headline ── */}
-      <h1 className="font-display font-black text-4xl sm:text-6xl text-ink tracking-tight uppercase max-w-3xl leading-tight">
-        Ride any <span className="text-toxic">Polymarket</span> chart.
+      {/* ── Main Clean Headline (Sentence Case, Not AI-Slop) ── */}
+      <h1 className="font-display font-bold text-4xl sm:text-6xl text-white tracking-tight">
+        Ride any stock chart.
       </h1>
 
-      {/* ── Subtitle ── */}
-      <p className="mt-3 text-sm sm:text-base text-dim max-w-2xl leading-relaxed">
-        Real Polymarket orderbooks converted into playable 2D motocross tracks. Ride the probability slopes, hit nitro on surges, and finish without wrecking.
-      </p>
-
-      {/* ── Live Animated Dirt Bike Chart (StonkRider Hero) ── */}
-      <div className="w-full max-w-3xl h-44 sm:h-52 relative mt-6 border border-[#1f242d] bg-[#0c0e12] flex items-center justify-center overflow-hidden">
+      {/* ── Animated Chart Canvas ── */}
+      <div className="w-full max-w-2xl h-44 sm:h-52 relative mt-8 flex items-center justify-center">
         <canvas
           ref={canvasRef}
-          width={768}
+          width={672}
           height={208}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
       </div>
 
-      {/* ── Global Platform Telemetry Counters ── */}
-      <div className="w-full max-w-3xl grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-[#1f242d] font-mono">
+      {/* ── Global 3 Stats (Exact StonkRider Image 1 Layout) ── */}
+      <div className="w-full max-w-2xl grid grid-cols-3 gap-4 mt-6 pt-4 font-mono">
         <div className="flex flex-col items-center">
-          <span className="text-xl sm:text-2xl font-black text-ink tabular-nums">
+          <span className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
             {stats.rides}
           </span>
-          <span className="font-sans text-[8.5px] font-extrabold tracking-[0.18em] text-dim uppercase mt-0.5">
-            RIDES COMPLETED
-          </span>
-        </div>
-
-        <div className="flex flex-col items-center border-x border-[#1f242d]">
-          <span className="text-xl sm:text-2xl font-black text-toxic tabular-nums">
-            {stats.volume}
-          </span>
-          <span className="font-sans text-[8.5px] font-extrabold tracking-[0.18em] text-dim uppercase mt-0.5">
-            PROBABILITY VOLUME
+          <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
+            rides completed
           </span>
         </div>
 
         <div className="flex flex-col items-center">
-          <span className="text-xl sm:text-2xl font-black text-crimson tabular-nums">
+          <span className="text-2xl sm:text-3xl font-bold text-[#00df81] tabular-nums">
+            {stats.volume}
+          </span>
+          <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
+            virtual dollars traded
+          </span>
+        </div>
+
+        <div className="flex flex-col items-center">
+          <span className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
             {stats.crashes}
           </span>
-          <span className="font-sans text-[8.5px] font-extrabold tracking-[0.18em] text-dim uppercase mt-0.5">
-            FATAL CRASHES
+          <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
+            total crashes
           </span>
         </div>
       </div>
+
+      {/* ── Category Pill Toggle (StonkRider: [ STOCKS ] [ STARTUPS ]) ── */}
+      <div className="flex items-center gap-2 mt-8 p-1 bg-[#12151b] border border-[#1f242d] rounded-lg">
+        {['ALL', 'CRYPTO', 'POLITICS', 'MACRO'].map((cat) => (
+          <button
+            key={cat}
+            onClick={() => onSelectCategory(cat)}
+            className={`px-4 py-1.5 font-mono text-xs font-bold uppercase rounded transition-all cursor-pointer ${
+              activeCategory === cat
+                ? 'bg-[#00df81]/20 text-[#00df81] border border-[#00df81]/40'
+                : 'text-[#7c7f86] hover:text-white'
+            }`}
+          >
+            {cat === 'ALL' ? 'MARKETS' : cat}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Clean Search Bar (StonkRider Image 1) ── */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSearchSubmit();
+        }}
+        className="w-full max-w-lg mt-4 relative flex items-center"
+      >
+        <input
+          type="text"
+          placeholder="Search any ticker or market... (BTC, ETH, Fed, ...)"
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="w-full bg-[#12151b] border border-[#1f242d] rounded-xl px-4 py-3 text-sm text-white placeholder-[#525866] focus:border-[#00df81] focus:outline-none transition-all pr-24 font-sans"
+        />
+        <div className="absolute right-2 flex items-center gap-2">
+          <span className="font-mono text-[10px] text-[#525866] border border-[#232834] rounded px-1.5 py-0.5 select-none hidden sm:inline-block">
+            /
+          </span>
+          <button
+            type="submit"
+            className="px-4 py-1.5 bg-[#00df81] text-[#0a0a0b] font-mono text-xs font-bold rounded-lg hover:bg-[#00f58d] transition-colors cursor-pointer"
+          >
+            Ride
+          </button>
+        </div>
+      </form>
+
     </section>
   );
 }

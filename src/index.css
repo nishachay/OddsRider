@@ -3,10 +3,10 @@
 @theme {
   --color-bg: #0a0a0b;
   --color-surface: #101113;
-  --color-line: #232529;
+  --color-line: #1f242d;
   --color-ink: #f0f0f2;
   --color-dim: #7c7f86;
-  --color-toxic: #b6ff00;
+  --color-toxic: #00df81;
   --color-crimson: #ff3355;
   --font-sans: "Space Grotesk", -apple-system, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
@@ -16,13 +16,14 @@
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
   margin: 0;
-  background: var(--color-bg);
-  color: var(--color-ink);
-  overflow: hidden;
+  background: #0a0a0b;
+  color: #f0f0f2;
   font-family: var(--font-sans);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
