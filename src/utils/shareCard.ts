@@ -1,4 +1,4 @@
-﻿interface SharePayload {
+interface SharePayload {
   finished: boolean;
   score: number;
   timeMs: number;
@@ -66,16 +66,18 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   ctx.fillText('+', 30, H - 30);
   ctx.fillText('+', W - 38, H - 30);
 
-  // 4. Header: Brand Wordmark + Status Badge
-  ctx.fillStyle = INK;
+  // 4. Header: Brand Wordmark (Flush Lockup) + Status Badge
   ctx.font = '900 24px "Space Grotesk", sans-serif';
+  ctx.fillStyle = INK;
   ctx.fillText('ODDS', 64, 80);
+  const oddsWidth = ctx.measureText('ODDS').width;
   ctx.fillStyle = TOXIC;
-  ctx.fillText('RIDER', 132, 80);
+  ctx.fillText('RIDER', 64 + oddsWidth, 80);
+  const riderWidth = ctx.measureText('RIDER').width;
 
   ctx.fillStyle = DIM;
   ctx.font = '700 11px "Space Grotesk", sans-serif';
-  ctx.fillText('// TELEMETRY SETTLEMENT RECEIPT', 220, 78);
+  ctx.fillText('// TELEMETRY SETTLEMENT RECEIPT', 64 + oddsWidth + riderWidth + 18, 78);
 
   // Status Pill (Top-Right)
   const statusText = isSuccess ? 'MARKET CONQUERED (100% RESOLVED)' : 'FATAL CRASH // OVERLOAD';
@@ -124,7 +126,7 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   }
   ctx.fillText(line, 64, lineY);
 
-  // 6. Terrain Curve Sparkline Background Graphic
+  // 6. Terrain Curve Sparkline with Finish Rider Beacon
   const pts = payload.trackPts;
   if (pts && pts.length > 2) {
     const chartX = 64;
@@ -138,7 +140,7 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
       y0 = Math.min(y0, y); y1 = Math.max(y1, y);
     }
     const sx = chartW / Math.max(1, x1 - x0);
-    const sy = (chartH - 20) / Math.max(1, y1 - y0);
+    const sy = (chartH - 24) / Math.max(1, y1 - y0);
 
     // Gradient area fill
     ctx.beginPath();
@@ -149,13 +151,13 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
     }
     ctx.lineTo(chartX + chartW, chartY + chartH);
     const grad = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
-    grad.addColorStop(0, isSuccess ? 'rgba(182, 255, 0, 0.25)' : 'rgba(255, 51, 85, 0.25)');
+    grad.addColorStop(0, isSuccess ? 'rgba(182, 255, 0, 0.22)' : 'rgba(255, 51, 85, 0.22)');
     grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
     ctx.fillStyle = grad;
     ctx.fill();
 
     // Track stroke
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3.5;
     for (let i = 1; i < pts.length; i++) {
       ctx.strokeStyle = pts[i][1] <= pts[i - 1][1] ? TOXIC : CRIMSON;
       ctx.beginPath();
@@ -163,6 +165,41 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
       ctx.lineTo(chartX + (pts[i][0] - x0) * sx, chartY + (pts[i][1] - y0) * sy);
       ctx.stroke();
     }
+
+    // ── Glowing Rider Finish Beacon ──
+    const lastPt = pts[pts.length - 1];
+    const lastX = chartX + (lastPt[0] - x0) * sx;
+    const lastY = chartY + (lastPt[1] - y0) * sy;
+
+    // Glowing Dot
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = accent;
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer Target Reticle Ring
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(lastX, lastY, 11, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Tactical Finish Waypoint Label
+    const tagText = isSuccess ? 'RIDER FINISH' : 'IMPACT POINT';
+    ctx.fillStyle = '#12141c';
+    ctx.fillRect(lastX - 44, lastY - 28, 88, 18);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lastX - 44, lastY - 28, 88, 18);
+
+    ctx.fillStyle = accent;
+    ctx.font = '800 8.5px "Geist Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(tagText, lastX, lastY - 16);
+    ctx.textAlign = 'left';
   }
 
   // 7. Telemetry Stats Deck (Bottom)
