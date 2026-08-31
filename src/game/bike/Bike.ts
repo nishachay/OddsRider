@@ -438,10 +438,12 @@ export class Bike {
 
   park(): void {
     const B = this.scene.matter.body;
-    for (const b of this.parts) {
+    for (const b of [this.chassis, this.rearWheel, this.frontWheel, this.head]) {
       B.setVelocity(b, { x: 0, y: 0 });
-      B.setAngularVelocity(b, 0);
     }
+    B.setAngularVelocity(this.rearWheel, 0);
+    B.setAngularVelocity(this.frontWheel, 0);
+    B.setAngularVelocity(this.chassis, 0);
   }
 
   reset(): void {
