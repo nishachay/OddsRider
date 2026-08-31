@@ -15,17 +15,7 @@ function fmtTime(ms: number): string {
   return `${m.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${tenths}`;
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(img);
-    img.src = src;
-  });
-}
-
-export async function generateShareCard(payload: SharePayload): Promise<HTMLCanvasElement> {
+export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   const W = 1200;
   const H = 675; // Standard 16:9 Twitter/OG card aspect ratio
   const canvas = document.createElement('canvas');
@@ -42,14 +32,6 @@ export async function generateShareCard(payload: SharePayload): Promise<HTMLCanv
   const DIM = '#7c7f86';
   const isSuccess = payload.finished;
   const accent = isSuccess ? TOXIC : CRIMSON;
-
-  // Preload bike/rider/ragdoll assets
-  const [bikeImg, riderImg, wheelImg, ragdollImg] = await Promise.all([
-    loadImage('/assets/game/bike.png'),
-    loadImage('/assets/game/rider.png'),
-    loadImage('/assets/game/wheel.png'),
-    loadImage('/assets/game/ragdoll.png'),
-  ]);
 
   // 1. Pure Velvet Dark Background (No gridlines)
   ctx.fillStyle = BG;
@@ -126,7 +108,7 @@ export async function generateShareCard(payload: SharePayload): Promise<HTMLCanv
   }
   ctx.fillText(line, 64, lineY);
 
-  // 5. Terrain Curve with True Bike & Rider Assets
+  // 5. Clean Hero Terrain Curve (The Visual Hero)
   const pts = payload.trackPts;
   if (pts && pts.length > 2) {
     const chartX = 64;
@@ -140,7 +122,7 @@ export async function generateShareCard(payload: SharePayload): Promise<HTMLCanv
       y0 = Math.min(y0, y); y1 = Math.max(y1, y);
     }
     const sx = chartW / Math.max(1, x1 - x0);
-    const sy = (chartH - 36) / Math.max(1, y1 - y0);
+    const sy = (chartH - 24) / Math.max(1, y1 - y0);
 
     // Gradient area fill under probability line
     ctx.beginPath();
@@ -165,76 +147,6 @@ export async function generateShareCard(payload: SharePayload): Promise<HTMLCanv
       ctx.lineTo(chartX + (pts[i][0] - x0) * sx, chartY + (pts[i][1] - y0) * sy);
       ctx.stroke();
     }
-
-    // Calculate rider position along the finish segment
-    const targetIdx = isSuccess ? pts.length - 1 : Math.floor(pts.length * 0.7);
-    const prevIdx = Math.max(0, targetIdx - 3);
-    const lastPt = pts[targetIdx];
-    const prevPt = pts[prevIdx];
-    const riderX = chartX + (lastPt[0] - x0) * sx;
-    const riderY = chartY + (lastPt[1] - y0) * sy;
-    
-    // Smooth angle
-    const slopeAngle = Math.atan2((lastPt[1] - prevPt[1]) * sy, (lastPt[0] - prevPt[0]) * sx);
-
-    // Render Exact Math-Locked Bike + Rider Asset
-    ctx.save();
-    ctx.translate(riderX, riderY);
-    ctx.rotate(slopeAngle);
-
-    const S = 0.62; // Crispy high-definition scale
-
-    if (isSuccess && bikeImg.complete && riderImg.complete && wheelImg.complete) {
-      // 1. REAR WHEEL
-      const rwSize = 80 * 0.52 * S;
-      const rwX = 0;
-      const rwY = -25 * S;
-      ctx.drawImage(wheelImg, rwX - rwSize / 2, rwY - rwSize / 2, rwSize, rwSize);
-
-      // 2. FRONT WHEEL
-      const fwSize = 80 * 0.52 * S;
-      const fwX = 112.2 * S;
-      const fwY = (-25 + 0.7) * S;
-      ctx.drawImage(wheelImg, fwX - fwSize / 2, fwY - fwSize / 2, fwSize, fwSize);
-
-      // 3. BIKE CHASSIS
-      const bikeW = 300 * 0.33 * S;
-      const bikeH = 162 * 0.33 * S;
-      const bikeX = 55.2 * S;
-      const bikeY = (-25 - 9.5) * S;
-      ctx.drawImage(bikeImg, bikeX - bikeW * 0.5, bikeY - bikeH * 0.76, bikeW, bikeH);
-
-      // 4. RIDER IN ATTACK POSITION
-      ctx.save();
-      const riderW = 63 * 0.4 * S;
-      const riderH = 84 * 0.4 * S;
-      const rX = 55.2 * S;
-      const rY = (-25 - 24.8) * S;
-      ctx.translate(rX, rY);
-      ctx.rotate(-9.5 * Math.PI / 180);
-      ctx.drawImage(riderImg, -riderW * 0.5, -riderH * 0.85, riderW, riderH);
-      ctx.restore();
-    } else if (!isSuccess && ragdollImg.complete) {
-      const ragW = 121 * 0.45 * S;
-      const ragH = 92 * 0.45 * S;
-      ctx.drawImage(ragdollImg, -ragW / 2, -ragH - 12, ragW, ragH);
-    }
-
-    ctx.restore();
-
-    // Tactical Finish Beacon Tag (Safely above the rider's helmet)
-    const tagText = isSuccess ? 'RIDER FINISH' : 'IMPACT POINT';
-    ctx.fillStyle = '#12141c';
-    ctx.fillRect(riderX - 44, riderY - 72, 88, 18);
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(riderX - 44, riderY - 72, 88, 18);
-
-    ctx.fillStyle = accent;
-    ctx.font = '800 8.5px "Geist Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(tagText, riderX, riderY - 60);
-    ctx.textAlign = 'left';
   }
 
   // 6. Telemetry Stats Deck (Bottom)
@@ -282,8 +194,8 @@ export async function generateShareCard(payload: SharePayload): Promise<HTMLCanv
   return canvas;
 }
 
-export async function downloadShareCardImage(payload: SharePayload): Promise<void> {
-  const canvas = await generateShareCard(payload);
+export function downloadShareCardImage(payload: SharePayload): void {
+  const canvas = generateShareCard(payload);
   canvas.toBlob((blob) => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
