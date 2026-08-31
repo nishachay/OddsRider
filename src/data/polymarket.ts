@@ -10,7 +10,7 @@ export interface RideableMarket {
   volumeNum: number;
   volumeFormatted: string;
   clobTokenId: string;
-  category: 'CRYPTO' | 'POLITICS' | 'MACRO' | 'TECH' | 'LEGENDARY';
+  category: 'POLITICS' | 'CRYPTO' | 'MACRO' | 'TECH' | 'LEGENDARY';
   currentProb: number;
   probDelta: number;
   resolutionDate: string;
@@ -28,15 +28,15 @@ export interface Ride {
 
 const GAMMA = 'https://gamma-api.polymarket.com';
 const CLOB = 'https://clob.polymarket.com';
-const CACHE_KEY = 'oddsrider_live_markets_v4';
+const CACHE_KEY = 'oddsrider_live_markets_v5';
 
-function categorize(q: string): 'CRYPTO' | 'POLITICS' | 'MACRO' | 'TECH' {
+function categorize(q: string): 'POLITICS' | 'CRYPTO' | 'MACRO' | 'TECH' {
   const s = q.toLowerCase();
+  if (s.includes('election') || s.includes('trump') || s.includes('president') || s.includes('senate') || s.includes('kamala') || s.includes('biden') || s.includes('governor') || s.includes('vote') || s.includes('ceasefire') || s.includes('mayor')) {
+    return 'POLITICS';
+  }
   if (s.includes('btc') || s.includes('bitcoin') || s.includes('eth') || s.includes('sol') || s.includes('crypto') || s.includes('token') || s.includes('coin')) {
     return 'CRYPTO';
-  }
-  if (s.includes('election') || s.includes('trump') || s.includes('president') || s.includes('senate') || s.includes('kamala') || s.includes('biden') || s.includes('governor') || s.includes('vote') || s.includes('ceasefire')) {
-    return 'POLITICS';
   }
   if (s.includes('fed') || s.includes('rate') || s.includes('gdp') || s.includes('inflation') || s.includes('cpi') || s.includes('recession') || s.includes('tariff') || s.includes('powell')) {
     return 'MACRO';
@@ -71,7 +71,137 @@ function generateSmoothSeries(startP: number, endP: number, points: number, vola
   return series;
 }
 
-export const LEGENDARY_MARKETS: RideableMarket[] = [
+// Master Curated Polymarket Markets matching the real Polymarket home feed
+export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
+  {
+    id: 'btc-100k-2026',
+    question: 'Will Bitcoin reach $100,000 before end of year?',
+    slug: 'will-bitcoin-reach-100000',
+    volumeNum: 14200000,
+    volumeFormatted: '$14.2M Vol',
+    clobTokenId: 'btc-100k-token',
+    category: 'CRYPTO',
+    currentProb: 0.86,
+    probDelta: +0.072,
+    resolutionDate: 'Dec 31, 2026',
+    difficulty: 'HARD',
+    iconEmoji: '🪙',
+    volatilityLabel: 'EXTREME UPHILL CLIMBS',
+    sparkline: [0.22, 0.35, 0.42, 0.38, 0.52, 0.65, 0.78, 0.72, 0.80, 0.85, 0.86],
+  },
+  {
+    id: 'fed-decision-sept',
+    question: 'Fed decision in September: Will rates remain unchanged?',
+    slug: 'fed-decision-september',
+    volumeNum: 7000000,
+    volumeFormatted: '$7.0M Vol',
+    clobTokenId: 'fed-sept-token',
+    category: 'MACRO',
+    currentProb: 0.67,
+    probDelta: +0.36,
+    resolutionDate: 'Sep 18, 2026',
+    difficulty: 'EASY',
+    iconEmoji: '🏛️',
+    volatilityLabel: 'HIGH-SPEED STRAIGHTAWAYS',
+    sparkline: [0.31, 0.35, 0.40, 0.42, 0.48, 0.55, 0.62, 0.65, 0.67],
+  },
+  {
+    id: 'eth-ath-2024',
+    question: 'Ethereum all time high in 2024?',
+    slug: 'ethereum-all-time-high-2024',
+    volumeNum: 6086276,
+    volumeFormatted: '$6.1M Vol',
+    clobTokenId: 'eth-ath-token',
+    category: 'CRYPTO',
+    currentProb: 0.19,
+    probDelta: -0.13,
+    resolutionDate: 'Dec 30, 2024',
+    difficulty: 'MEDIUM',
+    iconEmoji: '🪙',
+    volatilityLabel: 'STEEP DOWNHILL ROLLS',
+    sparkline: [0.32, 0.45, 0.65, 0.55, 0.72, 0.60, 0.48, 0.35, 0.22, 0.18, 0.15, 0.22, 0.19],
+  },
+  {
+    id: 'presidential-2028-gop',
+    question: 'Presidential Election Winner 2028: Will Republican nominee win?',
+    slug: 'presidential-election-2028',
+    volumeNum: 21500000,
+    volumeFormatted: '$21.5M Vol',
+    clobTokenId: 'pres-2028-token',
+    category: 'POLITICS',
+    currentProb: 0.54,
+    probDelta: +0.04,
+    resolutionDate: 'Nov 07, 2028',
+    difficulty: 'MEDIUM',
+    iconEmoji: '🏛️',
+    volatilityLabel: 'ROLLING RIDGES',
+    sparkline: [0.50, 0.52, 0.48, 0.51, 0.53, 0.49, 0.52, 0.54],
+  },
+  {
+    id: 'jerome-powell-out-2026',
+    question: 'Jerome Powell out as Fed Chair in 2026?',
+    slug: 'jerome-powell-out-fed-chair',
+    volumeNum: 8000000,
+    volumeFormatted: '$8.0M Vol',
+    clobTokenId: 'powell-token',
+    category: 'MACRO',
+    currentProb: 0.14,
+    probDelta: -0.05,
+    resolutionDate: 'Dec 31, 2026',
+    difficulty: 'EASY',
+    iconEmoji: '🏛️',
+    volatilityLabel: 'LOW-ALTITUDE CRUISE',
+    sparkline: [0.19, 0.18, 0.16, 0.15, 0.17, 0.14, 0.14],
+  },
+  {
+    id: 'gpt5-release-2026',
+    question: 'Will OpenAI announce GPT-5 before December 2026?',
+    slug: 'openai-gpt5-release',
+    volumeNum: 3800000,
+    volumeFormatted: '$3.8M Vol',
+    clobTokenId: 'gpt5-token',
+    category: 'TECH',
+    currentProb: 0.82,
+    probDelta: +0.22,
+    resolutionDate: 'Dec 01, 2026',
+    difficulty: 'HARD',
+    iconEmoji: '🤖',
+    volatilityLabel: 'LAUNCHPAD JUMPS',
+    sparkline: [0.60, 0.62, 0.58, 0.65, 0.70, 0.75, 0.80, 0.82],
+  },
+  {
+    id: 'nyc-mayor-election',
+    question: 'New York City Mayoral Election Winner 2025?',
+    slug: 'nyc-mayoral-election-2025',
+    volumeNum: 40000000,
+    volumeFormatted: '$40.0M Vol',
+    clobTokenId: 'nyc-mayor-token',
+    category: 'POLITICS',
+    currentProb: 0.80,
+    probDelta: +0.18,
+    resolutionDate: 'Nov 04, 2025',
+    difficulty: 'HARD',
+    iconEmoji: '🏛️',
+    volatilityLabel: 'ASCENDING PEAKS',
+    sparkline: [0.45, 0.55, 0.60, 0.72, 0.75, 0.78, 0.80],
+  },
+  {
+    id: 'solana-300-2026',
+    question: 'Will Solana reach $300 in 2026?',
+    slug: 'solana-300-2026',
+    volumeNum: 5100000,
+    volumeFormatted: '$5.1M Vol',
+    clobTokenId: 'sol-300-token',
+    category: 'CRYPTO',
+    currentProb: 0.42,
+    probDelta: +0.12,
+    resolutionDate: 'Dec 31, 2026',
+    difficulty: 'HARD',
+    iconEmoji: '🪙',
+    volatilityLabel: 'AGGRESSIVE CLIFFS',
+    sparkline: [0.30, 0.35, 0.28, 0.32, 0.38, 0.44, 0.40, 0.42],
+  },
+  // ── LEGENDARY MARKET CRASHES ──
   {
     id: 'ftx-collapse-2022',
     question: 'LEGENDARY CRASH: Will FTX resume normal withdrawals? (Nov 2022)',
@@ -122,78 +252,10 @@ export const LEGENDARY_MARKETS: RideableMarket[] = [
   },
 ];
 
-export const FALLBACK_MARKETS: RideableMarket[] = [
-  {
-    id: 'btc-100k-2026',
-    question: 'Will Bitcoin reach $100,000 before end of year?',
-    slug: 'will-bitcoin-reach-100000',
-    volumeNum: 14200000,
-    volumeFormatted: '$14.2M Vol',
-    clobTokenId: 'btc-100k-token',
-    category: 'CRYPTO',
-    currentProb: 0.86,
-    probDelta: +0.072,
-    resolutionDate: 'Dec 31, 2026',
-    difficulty: 'HARD',
-    iconEmoji: '₿',
-    volatilityLabel: 'EXTREME UPHILL CLIMBS',
-    sparkline: [0.22, 0.35, 0.42, 0.38, 0.52, 0.65, 0.78, 0.72, 0.80, 0.85, 0.86],
-  },
-  {
-    id: 'fed-decision-sept',
-    question: 'Fed decision in September: Will rates remain unchanged?',
-    slug: 'fed-decision-september',
-    volumeNum: 7000000,
-    volumeFormatted: '$7.0M Vol',
-    clobTokenId: 'fed-sept-token',
-    category: 'MACRO',
-    currentProb: 0.67,
-    probDelta: +0.36,
-    resolutionDate: 'Sep 18, 2026',
-    difficulty: 'EASY',
-    iconEmoji: '🏛️',
-    volatilityLabel: 'HIGH-SPEED STRAIGHTAWAYS',
-    sparkline: [0.31, 0.35, 0.40, 0.42, 0.48, 0.55, 0.62, 0.65, 0.67],
-  },
-  {
-    id: 'presidential-2028-gop',
-    question: 'Will the Republican nominee win the 2028 Presidential Election?',
-    slug: 'presidential-election-2028',
-    volumeNum: 21500000,
-    volumeFormatted: '$21.5M Vol',
-    clobTokenId: 'pres-2028-token',
-    category: 'POLITICS',
-    currentProb: 0.54,
-    probDelta: +0.04,
-    resolutionDate: 'Nov 07, 2028',
-    difficulty: 'MEDIUM',
-    iconEmoji: '🇺🇸',
-    volatilityLabel: 'ROLLING RIDGES',
-    sparkline: [0.50, 0.52, 0.48, 0.51, 0.53, 0.49, 0.52, 0.54],
-  },
-  {
-    id: 'gpt5-release-2026',
-    question: 'Will OpenAI announce GPT-5 before December 2026?',
-    slug: 'openai-gpt5-release',
-    volumeNum: 3800000,
-    volumeFormatted: '$3.8M Vol',
-    clobTokenId: 'gpt5-token',
-    category: 'TECH',
-    currentProb: 0.82,
-    probDelta: +0.22,
-    resolutionDate: 'Dec 01, 2026',
-    difficulty: 'HARD',
-    iconEmoji: '🤖',
-    volatilityLabel: 'LAUNCHPAD JUMPS',
-    sparkline: [0.60, 0.62, 0.58, 0.65, 0.70, 0.75, 0.80, 0.82],
-  },
-  ...LEGENDARY_MARKETS,
-];
-
-// Fetch Real Live Polymarket Gamma Markets with Parallel CLOB History
+// Fetch Real Live Polymarket Gamma Markets with Parallel Fallback
 export async function fetchAllMarkets(): Promise<RideableMarket[]> {
   try {
-    const url = `${GAMMA}/markets?limit=16&active=true&closed=false&order=volume24hr&ascending=false`;
+    const url = `${GAMMA}/markets?limit=18&active=true&closed=false&order=volume24hr&ascending=false`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
     const res = await fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
@@ -218,14 +280,13 @@ export async function fetchAllMarkets(): Promise<RideableMarket[]> {
         const yesIdx = outcomes.findIndex((o) => o.toLowerCase() === 'yes');
         if (yesIdx < 0) continue;
 
-        const vol = typeof row.volumeNum === 'number' ? row.volumeNum : 100000;
+        const vol = typeof row.volumeNum === 'number' ? row.volumeNum : 200000;
         const volFormatted = `$${(vol / 1_000_000).toFixed(1)}M Vol`;
         const cat = categorize(row.question);
         const token = tokens[yesIdx];
 
-        // Generate preliminary initial sparkline
-        const baseProb = Math.min(0.95, Math.max(0.05, 0.3 + (Math.sin(vol) * 0.4)));
-        const delta = (Math.sin(vol * 2) * 0.15);
+        const baseProb = Math.min(0.95, Math.max(0.05, 0.35 + (Math.sin(vol * 0.001) * 0.45)));
+        const delta = (Math.sin(vol * 0.002) * 0.18);
 
         liveMarkets.push({
           id: row.id || row.slug,
@@ -243,7 +304,7 @@ export async function fetchAllMarkets(): Promise<RideableMarket[]> {
           volatilityLabel: Math.abs(delta) > 0.2 ? 'STEEP HILL CLIMBS' : 'ROLLING RIDGES',
           sparkline: [
             baseProb - delta,
-            baseProb - delta * 0.6,
+            baseProb - delta * 0.7,
             baseProb + delta * 0.3,
             baseProb,
           ],
@@ -251,7 +312,7 @@ export async function fetchAllMarkets(): Promise<RideableMarket[]> {
       }
 
       if (liveMarkets.length >= 4) {
-        const full = [...liveMarkets, ...LEGENDARY_MARKETS];
+        const full = [...liveMarkets, ...CURATED_POLYMARKET_FEED.filter(m => m.category === 'LEGENDARY')];
         try {
           localStorage.setItem(CACHE_KEY, JSON.stringify(full));
         } catch {}
@@ -259,13 +320,13 @@ export async function fetchAllMarkets(): Promise<RideableMarket[]> {
       }
     }
   } catch (err) {
-    console.warn('Live Polymarket Gamma fetch fallback:', err);
+    console.warn('Live Polymarket Gamma fetch engaged fallback:', err);
   }
 
-  return FALLBACK_MARKETS;
+  return CURATED_POLYMARKET_FEED;
 }
 
-// Fetch Specific Rideable Series for Selected Market
+// Fetch Price Series for Specific Ride
 export async function fetchRideForMarket(market: RideableMarket, inverted = false): Promise<Ride> {
   let series: PricePoint[] = [];
 
@@ -282,7 +343,7 @@ export async function fetchRideForMarket(market: RideableMarket, inverted = fals
         }
       }
     } catch (e) {
-      console.warn('CLOB price history fetch failed, using smoothed series:', e);
+      console.warn('CLOB price history fetch fallback:', e);
     }
   }
 
@@ -312,6 +373,6 @@ export async function fetchRideForMarket(market: RideableMarket, inverted = fals
 }
 
 export async function fetchRide(): Promise<Ride> {
-  const defaultMarket = FALLBACK_MARKETS[0];
+  const defaultMarket = CURATED_POLYMARKET_FEED[0];
   return fetchRideForMarket(defaultMarket, false);
 }

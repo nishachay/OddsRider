@@ -1,12 +1,12 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 @theme {
   --color-bg: #0a0a0b;
   --color-surface: #101113;
-  --color-line: #1f242d;
+  --color-line: #232529;
   --color-ink: #f0f0f2;
   --color-dim: #7c7f86;
-  --color-toxic: #00df81;
+  --color-toxic: #b6ff00;
   --color-crimson: #ff3355;
   --font-sans: "Space Grotesk", -apple-system, sans-serif;
   --font-display: "Space Grotesk", sans-serif;

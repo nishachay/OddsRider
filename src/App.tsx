@@ -2,8 +2,7 @@
 import PhaserGame from './game/PhaserGame';
 import HudOverlay from './components/HudOverlay';
 import Navbar from './components/Navbar';
-import HeroSection from './components/HeroSection';
-import DailyChallenge from './components/DailyChallenge';
+import HeroSpotlight from './components/HeroSpotlight';
 import MarketGrid from './components/MarketGrid';
 import TrackPreview from './components/TrackPreview';
 import Footer from './components/Footer';
@@ -11,7 +10,7 @@ import { bus, EV } from './game/bus';
 import {
   fetchAllMarkets,
   fetchRideForMarket,
-  FALLBACK_MARKETS,
+  CURATED_POLYMARKET_FEED,
   type RideableMarket,
   type Ride,
 } from './data/polymarket';
@@ -19,17 +18,16 @@ import { recordRun } from './data/playerStorage';
 
 export default function App() {
   const [view, setView] = useState<'home' | 'preview' | 'game'>('home');
-  const [markets, setMarkets] = useState<RideableMarket[]>(FALLBACK_MARKETS);
+  const [markets, setMarkets] = useState<RideableMarket[]>(CURATED_POLYMARKET_FEED);
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedMarket, setSelectedMarket] = useState<RideableMarket>(FALLBACK_MARKETS[0]);
+  const [selectedMarket, setSelectedMarket] = useState<RideableMarket>(CURATED_POLYMARKET_FEED[0]);
 
-  // Load live markets and sync initial URL query state
+  // Load live Polymarket data and sync URL query state
   useEffect(() => {
     fetchAllMarkets().then((data) => {
       if (data && data.length > 0) {
         setMarkets(data);
-        // If current selected market is fallback, sync to first live market
         const params = new URLSearchParams(window.location.search);
         const mId = params.get('market');
         if (mId) {
@@ -82,13 +80,13 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLaunchRide = async (market: RideableMarket) => {
+  const handleLaunchRide = async (market: RideableMarket, inverted = false) => {
     setSelectedMarket(market);
     setView('game');
     syncUrl('game', market.id);
 
     try {
-      const ride: Ride = await fetchRideForMarket(market);
+      const ride: Ride = await fetchRideForMarket(market, inverted);
       bus.emit(EV.LOAD_MARKET, ride);
     } catch (e) {
       console.error('Failed to launch ride:', e);
@@ -100,7 +98,7 @@ export default function App() {
     syncUrl('home');
   };
 
-  const dailyFeatured = markets.find((m) => m.id === 'btc-100k-2026') ?? markets[0];
+  const heroFeaturedMarket = markets[0] ?? CURATED_POLYMARKET_FEED[0];
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-[#f0f0f2] font-sans antialiased">
@@ -111,44 +109,45 @@ export default function App() {
         {view === 'game' && <HudOverlay onOpenLobby={handleGoHome} />}
       </div>
 
-      {/* ── 2. FULL HOME & TRACK INSPECTION WEB VIEWS (NATURAL SCROLL) ── */}
+      {/* ── 2. FULL POLYMARKET WEB EXPERIENCE (NATURAL SCROLL) ── */}
       {view !== 'game' && (
         <div className="w-full flex flex-col min-h-screen">
           <Navbar
             onGoHome={handleGoHome}
-            onSelectTab={handleSelectCategory}
+            activeCategory={activeCategory}
+            onSelectCategory={handleSelectCategory}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
 
           {view === 'preview' ? (
             <main className="flex-1">
               <TrackPreview
                 market={selectedMarket}
-                onLaunchRide={(m) => handleLaunchRide(m)}
+                onLaunchRide={(m, inv) => handleLaunchRide(m, inv)}
                 onBack={handleGoHome}
               />
             </main>
           ) : (
             <main className="flex-1 flex flex-col">
-              <HeroSection
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                activeCategory={activeCategory}
-                onSelectCategory={setActiveCategory}
-                onSearchSubmit={() => {}}
-              />
-
-              {dailyFeatured && (
-                <DailyChallenge
-                  market={dailyFeatured}
-                  onRide={(m) => handleLaunchRide(m)}
+              {/* Top Spotlight: Real Live #1 Trending Polymarket Contract */}
+              {activeCategory === 'ALL' && searchQuery.trim() === '' && (
+                <HeroSpotlight
+                  market={heroFeaturedMarket}
+                  onRideYes={(m) => handleLaunchRide(m, false)}
+                  onRideNo={(m) => handleLaunchRide(m, true)}
+                  onPreview={handlePreviewMarket}
                 />
               )}
 
+              {/* High-Density Polymarket Contract Grid */}
               <MarketGrid
                 markets={markets}
                 activeCategory={activeCategory}
                 searchQuery={searchQuery}
-                onSelectMarket={handlePreviewMarket}
+                onRideYes={(m) => handleLaunchRide(m, false)}
+                onRideNo={(m) => handleLaunchRide(m, true)}
+                onPreview={handlePreviewMarket}
               />
             </main>
           )}

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { getGlobalPlatformStats, getPlayerStats } from '../data/playerStorage';
 
 interface HeroSectionProps {
@@ -47,8 +47,8 @@ export default function HeroSection({
 
       // 1. Subtle terrain gradient fill
       const grad = ctx.createLinearGradient(0, 0, 0, H);
-      grad.addColorStop(0, 'rgba(0, 223, 129, 0.10)');
-      grad.addColorStop(1, 'rgba(0, 223, 129, 0.0)');
+      grad.addColorStop(0, 'rgba(182, 255, 0, 0.12)');
+      grad.addColorStop(1, 'rgba(182, 255, 0, 0.0)');
       ctx.beginPath();
       ctx.moveTo(curvePoints[0][0], H);
       for (const [x, y] of curvePoints) ctx.lineTo(x, y);
@@ -57,24 +57,24 @@ export default function HeroSection({
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // 2. Clean Glowing Probability Line
+      // 2. Clean Glowing Probability Line (Locked #b6ff00 Toxic Green)
       ctx.beginPath();
       for (let i = 0; i < curvePoints.length; i++) {
         const [x, y] = curvePoints[i];
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
-      ctx.strokeStyle = '#00df81';
+      ctx.strokeStyle = '#b6ff00';
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
 
       // 3. Start & Finish Labels
-      ctx.fillStyle = '#6b7280';
+      ctx.fillStyle = '#7c7f86';
       ctx.font = 'bold 10px Geist Mono, monospace';
-      ctx.fillText('0% PROB (START)', curvePoints[10][0], curvePoints[10][1] - 12);
-      ctx.fillText('100% PROB 🏁', curvePoints[curvePoints.length - 20][0] - 20, curvePoints[curvePoints.length - 20][1] - 14);
+      ctx.fillText('0% PROB [START]', curvePoints[10][0], curvePoints[10][1] - 12);
+      ctx.fillText('100% PROB [FINISH]', curvePoints[curvePoints.length - 25][0] - 20, curvePoints[curvePoints.length - 25][1] - 14);
 
       // 4. Motocross Rider on the Probability Curve
       bikeProgress = (bikeProgress + 0.0022) % 0.94;
@@ -89,9 +89,9 @@ export default function HeroSection({
       ctx.rotate(angle);
 
       // Draw rider & bike chassis
-      ctx.fillStyle = '#f3f4f6';
+      ctx.fillStyle = '#f0f0f2';
       ctx.fillRect(-4, -14, 8, 10);
-      ctx.fillStyle = '#00df81';
+      ctx.fillStyle = '#b6ff00';
       ctx.beginPath();
       ctx.arc(-5, -2, 3, 0, Math.PI * 2);
       ctx.arc(5, -2, 3, 0, Math.PI * 2);
@@ -109,17 +109,17 @@ export default function HeroSection({
     <section className="w-full max-w-5xl mx-auto pt-14 pb-8 px-4 flex flex-col items-center text-center select-none font-sans">
       
       {/* ── Subtitle Tagline ── */}
-      <span className="font-mono text-[11px] font-bold tracking-[0.26em] text-[#00df81] uppercase mb-3">
+      <span className="font-mono text-[10.5px] font-extrabold tracking-[0.26em] text-toxic uppercase mb-3">
         PREDICTION MARKETS MEETS MOTOCROSS
       </span>
 
-      {/* ── Main Clean Headline ── */}
-      <h1 className="font-display font-bold text-4xl sm:text-6xl text-white tracking-tight">
+      {/* ── Main Clean Headline (Space Grotesk) ── */}
+      <h1 className="font-display font-bold text-4xl sm:text-6xl text-ink tracking-tight">
         Ride any Polymarket odds.
       </h1>
 
       {/* ── Animated Chart Canvas ── */}
-      <div className="w-full max-w-2xl h-44 sm:h-52 relative mt-8 flex items-center justify-center">
+      <div className="w-full max-w-2xl h-44 sm:h-52 relative mt-8 flex items-center justify-center border border-[#232529] bg-[#101113]">
         <canvas
           ref={canvasRef}
           width={672}
@@ -128,53 +128,53 @@ export default function HeroSection({
         />
       </div>
 
-      {/* ── Global 3 Stats (Polymarket Probability Telemetry) ── */}
-      <div className="w-full max-w-2xl grid grid-cols-3 gap-4 mt-6 pt-4 font-mono">
+      {/* ── Global 3 Stats (Geist Mono Tabular Numerals) ── */}
+      <div className="w-full max-w-2xl grid grid-cols-3 gap-4 mt-6 pt-4 font-mono border-t border-[#232529]">
         <div className="flex flex-col items-center">
-          <span className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+          <span className="text-2xl sm:text-3xl font-bold text-ink tabular-nums">
             {stats.rides}
           </span>
-          <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
+          <span className="text-[10px] text-dim font-sans uppercase font-extrabold tracking-wider mt-1">
             rides completed
           </span>
         </div>
 
-        <div className="flex flex-col items-center">
-          <span className="text-2xl sm:text-3xl font-bold text-[#00df81] tabular-nums">
+        <div className="flex flex-col items-center border-x border-[#232529]">
+          <span className="text-2xl sm:text-3xl font-bold text-toxic tabular-nums">
             {stats.volume}
           </span>
-          <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
+          <span className="text-[10px] text-dim font-sans uppercase font-extrabold tracking-wider mt-1">
             probability volume
           </span>
         </div>
 
         <div className="flex flex-col items-center">
-          <span className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+          <span className="text-2xl sm:text-3xl font-bold text-crimson tabular-nums">
             {stats.crashes}
           </span>
-          <span className="text-[11px] text-[#7c7f86] mt-1 font-sans">
+          <span className="text-[10px] text-dim font-sans uppercase font-extrabold tracking-wider mt-1">
             total wipeouts
           </span>
         </div>
       </div>
 
-      {/* ── Polymarket Category Pill Switcher ── */}
-      <div className="flex flex-wrap items-center justify-center gap-2 mt-8 p-1 bg-[#12151b] border border-[#1f242d] rounded-xl">
+      {/* ── Polymarket Category Pill Switcher (Radius-0) ── */}
+      <div className="flex flex-wrap items-center justify-center gap-1.5 mt-8 p-1.5 bg-[#101113] border border-[#232529]">
         {[
           { id: 'ALL', label: 'ALL MARKETS' },
           { id: 'POLITICS', label: 'POLITICS' },
           { id: 'CRYPTO', label: 'CRYPTO' },
           { id: 'MACRO', label: 'MACRO / FED' },
           { id: 'TECH', label: 'TECH / AI' },
-          { id: 'LEGENDARY', label: '💀 LEGENDARY' },
+          { id: 'LEGENDARY', label: 'LEGENDARY CRASHES' },
         ].map((cat) => (
           <button
             key={cat.id}
             onClick={() => onSelectCategory(cat.id)}
-            className={`px-4 py-1.5 font-mono text-xs font-bold uppercase rounded-lg transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 font-mono text-[11px] font-bold uppercase transition-all cursor-pointer ${
               activeCategory === cat.id
-                ? 'bg-[#00df81]/20 text-[#00df81] border border-[#00df81]/40'
-                : 'text-[#7c7f86] hover:text-white'
+                ? 'bg-toxic/15 text-toxic border border-toxic/40'
+                : 'text-dim hover:text-ink border border-transparent'
             }`}
           >
             {cat.label}
@@ -182,7 +182,7 @@ export default function HeroSection({
         ))}
       </div>
 
-      {/* ── Search Bar ── */}
+      {/* ── Search Bar (Radius-0) ── */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -195,15 +195,15 @@ export default function HeroSection({
           placeholder="Search any Polymarket question... (Bitcoin, Trump, Fed, OpenAI...)"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full bg-[#12151b] border border-[#1f242d] rounded-xl px-4 py-3 text-sm text-white placeholder-[#525866] focus:border-[#00df81] focus:outline-none transition-all pr-24 font-sans"
+          className="w-full bg-[#101113] border border-[#232529] px-4 py-3 text-sm text-ink placeholder-dim/60 focus:border-toxic/60 focus:outline-none transition-all pr-24 font-sans"
         />
         <div className="absolute right-2 flex items-center gap-2">
-          <span className="font-mono text-[10px] text-[#525866] border border-[#232834] rounded px-1.5 py-0.5 select-none hidden sm:inline-block">
+          <span className="font-mono text-[9.5px] text-dim border border-[#232529] px-1.5 py-0.5 select-none hidden sm:inline-block">
             /
           </span>
           <button
             type="submit"
-            className="px-4 py-1.5 bg-[#00df81] text-[#0a0a0b] font-mono text-xs font-bold rounded-lg hover:bg-[#00f58d] transition-colors cursor-pointer"
+            className="px-4 py-1.5 bg-toxic text-bg font-mono text-xs font-bold uppercase hover:bg-toxic/90 transition-colors cursor-pointer"
           >
             Ride
           </button>
