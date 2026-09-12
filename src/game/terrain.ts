@@ -5,6 +5,7 @@ export interface TerrainPoint {
   x: number;
   y: number;
   p: number;
+  raw: number;
 }
 
 export interface TerrainSegment {
@@ -24,26 +25,15 @@ function probToY(p: number): number {
   return TERRAIN.bandBottomY - p * (TERRAIN.bandBottomY - TERRAIN.bandTopY);
 }
 
-function smooth(values: number[], passes: number): number[] {
-  let out = values.slice();
-  for (let pass = 0; pass < passes; pass++) {
-    const next = out.slice();
-    for (let i = 1; i < out.length - 1; i++) {
-      next[i] = out[i - 1] * 0.25 + out[i] * 0.5 + out[i + 1] * 0.25;
-    }
-    out = next;
-  }
-  return out;
-}
-
 export function buildTerrain(series: PricePoint[]): Terrain {
   const pts = series.slice().sort((a, b) => a.t - b.t);
   const n = pts.length;
   if (n < 2) {
     const y = probToY(pts[0]?.p ?? 0.5);
+    const raw = pts[0]?.p ?? 0.5;
     const flat: TerrainPoint[] = [
-      { x: WORLD.spawnX, y, p: pts[0]?.p ?? 0.5 },
-      { x: WORLD.finishX, y, p: pts[0]?.p ?? 0.5 },
+      { x: WORLD.spawnX, y, p: raw, raw },
+      { x: WORLD.finishX, y, p: raw, raw },
     ];
     return { points: flat, segments: [] };
   }
@@ -91,17 +81,17 @@ export function buildTerrain(series: PricePoint[]): Terrain {
   }
 
   const points: TerrainPoint[] = [];
-  const push = (x: number, y: number, p: number) => points.push({ x, y, p });
+  const push = (x: number, y: number, p: number, raw: number) => points.push({ x, y, p, raw });
 
   const firstY = ys[0];
-  push(WORLD.spawnX - TERRAIN.leadIn, firstY, probs[0]);
-  push(graphStartX, firstY, probs[0]);
+  push(WORLD.spawnX - TERRAIN.leadIn, firstY, probs[0], pts[0].p);
+  push(graphStartX, firstY, probs[0], pts[0].p);
   for (let i = 1; i < n; i++) {
     const normT = tSpan > 0 ? (pts[i].t - minT) / tSpan : i / (n - 1);
-    push(graphStartX + span * normT, ys[i], probs[i]);
+    push(graphStartX + span * normT, ys[i], probs[i], pts[i].p);
   }
   const lastY = ys[n - 1];
-  push(WORLD.finishX + TERRAIN.runout, lastY, probs[n - 1]);
+  push(WORLD.finishX + TERRAIN.runout, lastY, probs[n - 1], pts[n - 1].p);
 
   const segments: TerrainSegment[] = [];
   for (let i = 0; i < points.length - 1; i++) {
@@ -115,9 +105,9 @@ export function buildTerrain(series: PricePoint[]): Terrain {
 
 export function probabilityAt(points: TerrainPoint[], x: number): number {
   if (points.length === 0) return 0.5;
-  if (x <= points[0].x) return points[0].p;
+  if (x <= points[0].x) return points[0].raw;
   const last = points[points.length - 1];
-  if (x >= last.x) return last.p;
+  if (x >= last.x) return last.raw;
   let lo = 0;
   let hi = points.length - 1;
   while (hi - lo > 1) {
@@ -128,5 +118,5 @@ export function probabilityAt(points: TerrainPoint[], x: number): number {
   const a = points[lo];
   const b = points[hi];
   const t = (x - a.x) / (b.x - a.x);
-  return a.p + (b.p - a.p) * t;
+  return a.raw + (b.raw - a.raw) * t;
 }

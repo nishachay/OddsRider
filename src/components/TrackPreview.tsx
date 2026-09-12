@@ -3,7 +3,7 @@ import type { RideableMarket } from '../data/polymarket';
 
 interface TrackPreviewProps {
   market: RideableMarket;
-  onLaunchRide: (market: RideableMarket, inverted?: boolean) => void;
+  onLaunchRide: (market: RideableMarket, inverted?: boolean, timeframe?: string) => void;
   onBack: () => void;
 }
 
@@ -14,7 +14,7 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
   const [timeframe, setTimeframe] = useState<string>('LIVE');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const deltaUp = market.probDelta >= 0;
+  const deltaUp = (market.probDelta ?? 0) >= 0;
   const probPct = Math.round(market.currentProb * 100);
 
   useEffect(() => {
@@ -26,6 +26,14 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
     const W = canvas.width;
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
+
+    const basePts = market.sparkline ?? [];
+    if (basePts.length < 2) {
+      ctx.fillStyle = '#7c7f86';
+      ctx.font = 'bold 12px Geist Mono, monospace';
+      ctx.fillText('NO PRICE HISTORY AVAILABLE', 40, H / 2);
+      return;
+    }
 
     // 1. Draw Polymarket Probability Grid Guides
     ctx.strokeStyle = '#232529';
@@ -48,7 +56,6 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
     }
 
     // 2. Generate elevation points
-    const basePts = market.sparkline;
     const plotPts: Array<[number, number]> = [];
     for (let i = 0; i < basePts.length; i++) {
       const x = 40 + (i / (basePts.length - 1)) * (W - 130);
@@ -80,14 +87,14 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
     ctx.fillStyle = TOXIC;
     ctx.fillText('FINISH GATE', fx - 25, fy - 16);
 
-  }, [market, deltaUp, timeframe]);
+  }, [market, market.sparkline, deltaUp, timeframe]);
 
   // Spacebar to start
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' && document.activeElement?.tagName !== 'BUTTON') {
         e.preventDefault();
-        onLaunchRide(market, false);
+        onLaunchRide(market, false, timeframe);
       }
     };
     window.addEventListener('keydown', handleKey);
@@ -132,7 +139,9 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
               </span>
             </div>
             <span className={`text-xs font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
-              {deltaUp ? '↑ +' : '↓ '}{(market.probDelta * 100).toFixed(1)}% 24H
+              {market.probDelta === null
+                ? '— 24H'
+                : `${deltaUp ? '↑ +' : '↓ '}${(market.probDelta * 100).toFixed(1)}% 24H`}
             </span>
           </div>
 
@@ -186,7 +195,9 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
         {/* ── 4. Stats Breakdown Bar ── */}
         <div className="grid grid-cols-4 gap-4 pt-6 border-t border-[#232529] text-center font-mono">
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-ink tabular-nums">120</span>
+            <span className="text-lg font-bold text-ink tabular-nums">
+              {market.sparkline ? market.sparkline.length : '—'}
+            </span>
             <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">PROBABILITY NODES</span>
           </div>
 
@@ -212,14 +223,14 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
       <div className="mt-6 flex flex-col gap-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
-            onClick={() => onLaunchRide(market, false)}
+            onClick={() => onLaunchRide(market, false, timeframe)}
             className="py-4 bg-toxic text-bg font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-toxic/90 transition-all cursor-pointer text-center shadow-[0_0_20px_rgba(182,255,0,0.35)]"
           >
             [ RIDE LIVE ODDS (YES ∧) ]
           </button>
 
           <button
-            onClick={() => onLaunchRide(market, true)}
+            onClick={() => onLaunchRide(market, true, timeframe)}
             className="py-4 border border-crimson/60 bg-crimson/15 text-crimson font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-crimson hover:text-bg transition-all cursor-pointer text-center"
           >
             [ RIDE INVERSE CRASH (NO ∨) ]

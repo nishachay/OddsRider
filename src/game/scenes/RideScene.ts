@@ -49,6 +49,14 @@ export class RideScene extends Phaser.Scene {
   private score = new RideScore();
   private parked = false;
 
+  // Trick detection state (angle in radians, positive = nose down)
+  private trickAirMs = 0;
+  private wheelieMs = 0;
+  private stoppieMs = 0;
+  private rotAcc = 0;
+  private lastTrickAngle = 0;
+  private popupId = 0;
+
   // Camera crash snapshot — lerp to fixed point, not live ragdoll
   private crashCamX = 0;
   private crashCamY = 0;
@@ -277,6 +285,7 @@ export class RideScene extends Phaser.Scene {
     if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
     // Only tick score while alive — stops timer after crash
     if (!this.bike.crashed) this.score.step(steps * STEP_MS, this.bike.x);
+    if (!this.bike.crashed && !this.score.finished) this.detectTricks(steps * STEP_MS);
     if (this.parked) this.bike.park();
 
     this.trackRenderer.update();
@@ -286,6 +295,7 @@ export class RideScene extends Phaser.Scene {
       this.crashHandled = true;
       this.score.applyCrash();
       bus.emit(EV.CRASH);
+      bus.emit(EV.COMBO, 1);
       // Snapshot the camera target at the moment of crash — avoids camera chasing the bouncing ragdoll
       this.crashCamX = this.bike.chassis.position.x;
       this.crashCamY = this.bike.chassis.position.y;
@@ -350,8 +360,74 @@ export class RideScene extends Phaser.Scene {
     }
     if (time > this.nextScoreEmitAt) {
       this.nextScoreEmitAt = time + 150;
-      bus.emit(EV.SCORE, { total: this.score.total, timeMs: this.score.timeMs, finished: this.score.finished });
+      bus.emit(EV.SCORE, { total: this.score.total, timeMs: this.score.timeMs, finished: this.score.finished, combo: this.score.combo });
     }
+  }
+
+  private detectTricks(dtMs: number): void {
+    if (dtMs <= 0) {
+      this.lastTrickAngle = this.bike.angle;
+      return;
+    }
+    const angle = this.bike.angle;
+    let d = angle - this.lastTrickAngle;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    this.lastTrickAngle = angle;
+
+    if (!this.bike.grounded) {
+      this.trickAirMs += dtMs;
+      this.rotAcc += d;
+      while (this.rotAcc >= Math.PI * 2 || this.rotAcc <= -Math.PI * 2) {
+        const backflip = this.rotAcc < 0;
+        this.rotAcc += backflip ? Math.PI * 2 : -Math.PI * 2;
+        this.popup(backflip ? 'BACKFLIP' : 'FRONTFLIP', this.score.awardTrick(500));
+      }
+      return;
+    }
+
+    if (this.trickAirMs >= 1400) {
+      this.popup('BIG AIR', this.score.awardAir());
+    }
+    this.trickAirMs = 0;
+    this.rotAcc = 0;
+
+    // Ground-trick counters freeze across brief hops and reset only
+    // once the bike clearly levels out — porpoising must not eat progress.
+    // Wheelie band sits just outside cruise pitch noise (±0.07).
+    if (angle < -0.08) {
+      if (this.wheelieMs >= 0) {
+        this.wheelieMs += dtMs;
+        if (this.wheelieMs >= 1000) {
+          this.popup('WHEELIE', this.score.awardTrick(300));
+          this.wheelieMs = -2000;
+        }
+      } else {
+        this.wheelieMs += dtMs;
+      }
+    } else if (angle > 0) {
+      this.wheelieMs = 0;
+    }
+
+    if (angle > 0.35) {
+      if (this.stoppieMs >= 0) {
+        this.stoppieMs += dtMs;
+        if (this.stoppieMs >= 1200) {
+          this.popup('STOPPIE', this.score.awardTrick(400));
+          this.stoppieMs = -2000;
+        }
+      } else {
+        this.stoppieMs += dtMs;
+      }
+    } else if (angle < 0.1) {
+      this.stoppieMs = 0;
+    }
+  }
+
+  private popup(text: string, points: number): void {
+    this.popupId += 1;
+    bus.emit(EV.POPUP, { id: this.popupId, text, points });
+    bus.emit(EV.COMBO, this.score.combo);
   }
 
   private doReset(full: boolean): void {
@@ -361,6 +437,10 @@ export class RideScene extends Phaser.Scene {
     }
     this.crashHandled = false;
     this.parked = false;
+    this.trickAirMs = 0;
+    this.wheelieMs = 0;
+    this.stoppieMs = 0;
+    this.rotAcc = 0;
     if (full) this.score.fullReset();
     this.bike.reset();
     this.acc = 0;
@@ -371,7 +451,7 @@ export class RideScene extends Phaser.Scene {
     cam.scrollX = this.bike.x - cam.width / 2;
     cam.scrollY = this.bike.y - 40 - cam.height / 2;
     bus.emit(EV.RESULT, null);
-    bus.emit(EV.SCORE, { total: this.score.total, timeMs: this.score.timeMs, finished: this.score.finished });
+    bus.emit(EV.SCORE, { total: this.score.total, timeMs: this.score.timeMs, finished: this.score.finished, combo: this.score.combo });
     bus.emit(EV.SPEED, 0);
   }
 }

@@ -37,6 +37,8 @@ export const EV = {
   PROB: 'hud:prob',
   MARKET: 'hud:market',
   SCORE: 'hud:score',
+  POPUP: 'hud:popup',
+  COMBO: 'hud:combo',
   RESULT: 'hud:result',
   TRACK: 'hud:track',
   POSITION: 'hud:position',

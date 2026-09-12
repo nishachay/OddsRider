@@ -1,64 +1,41 @@
+import { Link } from 'react-router-dom';
+
 export default function Footer() {
   return (
-    <footer className="w-full bg-[#0a0a0b] border-t border-[#232529] mt-24 py-16 select-none font-sans">
-      <div className="max-w-5xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
-        
-        {/* Brand */}
-        <div className="flex flex-col gap-3 md:col-span-2">
-          <div className="flex items-baseline tracking-[0.24em] uppercase font-display font-black text-xl">
-            <span className="text-ink">ODDS</span>
-            <span className="text-toxic">RIDER</span>
+    <footer className="w-full border-t border-[#232529] bg-[#0a0a0b] select-none">
+      <div className="w-full max-w-6xl mx-auto px-4 py-10 flex flex-col md:flex-row gap-8 justify-between">
+        <div className="flex flex-col gap-2 max-w-sm">
+          <div className="flex items-baseline tracking-[0.24em] uppercase font-display font-black text-sm">
+            <span className="text-ink">Odds</span>
+            <span className="text-toxic">Rider</span>
           </div>
-          <p className="text-xs text-dim max-w-xs leading-relaxed">
-            Real Polymarket prediction odds and orderbook probabilities turned into 2D motocross tracks you can ride.
+          <p className="font-sans text-xs text-dim leading-relaxed">
+            Real Polymarket probability charts turned into rideable motocross tracks.
           </p>
-          <div className="flex items-center gap-3 pt-2">
-            <a
-              href="https://x.com"
-              target="_blank"
-              rel="noreferrer"
-              className="px-2.5 py-1 border border-[#232529] bg-[#101113] font-mono text-[10px] text-dim hover:text-ink transition-colors cursor-pointer"
-            >
-              [ 𝕏 TWITTER ]
-            </a>
-            <a
-              href="https://polymarket.com"
-              target="_blank"
-              rel="noreferrer"
-              className="px-2.5 py-1 border border-[#232529] bg-[#101113] font-mono text-[10px] text-dim hover:text-toxic transition-colors cursor-pointer"
-            >
-              [ POLYMARKET API ]
-            </a>
+          <p className="font-mono text-[10px] text-dim leading-relaxed">
+            Market data by Polymarket (Gamma + CLOB APIs). Not affiliated with Polymarket.
+          </p>
+        </div>
+
+        <div className="flex gap-12 font-mono text-[11px]">
+          <div className="flex flex-col gap-2">
+            <span className="font-bold tracking-widest text-dim uppercase">Play</span>
+            <Link to="/" className="text-ink hover:text-toxic transition-colors">Markets</Link>
+            <Link to="/about" className="text-ink hover:text-toxic transition-colors">About</Link>
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="font-bold tracking-widest text-dim uppercase">Legal</span>
+            <Link to="/about#disclaimer" className="text-ink hover:text-toxic transition-colors">Disclaimer</Link>
+            <Link to="/about#privacy" className="text-ink hover:text-toxic transition-colors">Privacy</Link>
           </div>
         </div>
-
-        {/* Play */}
-        <div className="flex flex-col gap-2.5 text-xs text-dim">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink mb-1">
-            RACE
-          </span>
-          <span className="hover:text-toxic cursor-pointer">Live Prediction Odds</span>
-          <span className="hover:text-toxic cursor-pointer">Daily Challenge Track</span>
-          <span className="hover:text-toxic cursor-pointer">Historic Market Crashes</span>
-          <span className="hover:text-toxic cursor-pointer">Global Leaderboard</span>
-        </div>
-
-        {/* Company */}
-        <div className="flex flex-col gap-2.5 text-xs text-dim">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-ink mb-1">
-            PROJECT
-          </span>
-          <span className="hover:text-toxic cursor-pointer">About OddsRider</span>
-          <span className="hover:text-toxic cursor-pointer">How Odds Become Slopes</span>
-          <span className="hover:text-toxic cursor-pointer">Terms of Use</span>
-          <span className="hover:text-toxic cursor-pointer">Privacy Policy</span>
-        </div>
-
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 mt-12 pt-6 border-t border-[#232529] flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[10.5px] text-dim">
-        <span>Built with real Polymarket prediction data • For entertainment only • Not financial advice</span>
-        <span>ODDSRIDER // PRODUCTION</span>
+      <div className="border-t border-[#1a1c22]">
+        <div className="w-full max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row gap-1 sm:items-center justify-between font-mono text-[10px] text-dim">
+          <span>Not financial advice. No real betting — just a bike and a chart.</span>
+          <span>All stats stay on your device.</span>
+        </div>
       </div>
     </footer>
   );

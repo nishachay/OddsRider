@@ -5,6 +5,7 @@
   marketQuestion?: string;
   finalProb?: number;
   trackPts?: Array<[number, number]> | null;
+  rideUrl?: string;
 }
 
 function fmtTime(ms: number): string {
@@ -95,6 +96,7 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   const words = question.split(' ');
   let line = '';
   let lineY = 178;
+  let lines = 1;
   for (let i = 0; i < words.length; i++) {
     const testLine = line + words[i] + ' ';
     const metrics = ctx.measureText(testLine);
@@ -102,6 +104,14 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
       ctx.fillText(line, 64, lineY);
       line = words[i] + ' ';
       lineY += 26;
+      lines += 1;
+      if (lines >= 3) {
+        line = line.trim() + '… ';
+        while (ctx.measureText(line).width > maxWidth && line.length > 4) {
+          line = line.slice(0, -3) + '… ';
+        }
+        break;
+      }
     } else {
       line = testLine;
     }
@@ -183,13 +193,17 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
     ctx.fillText(`${(payload.finalProb * 100).toFixed(1)}% YES`, 620, statsY + 68);
   }
 
-  // Column 4: Watermark & CTA
+  // Column 4: Watermark & CTA (real host, works on localhost and prod)
+  const host = (payload.rideUrl ?? 'https://oddsrider.com')
+    .replace(/^https?:\/\//, '')
+    .split('/')[0]
+    .toUpperCase();
   ctx.fillStyle = DIM;
   ctx.font = '700 11px "Space Grotesk", sans-serif';
-  ctx.fillText('RIDE REAL POLYMARKET CHARTS AT:', W - 320, statsY + 30);
+  ctx.fillText('RIDE THIS TRACK AT:', W - 320, statsY + 30);
   ctx.fillStyle = TOXIC;
   ctx.font = '900 20px "Space Grotesk", sans-serif';
-  ctx.fillText('ODDSRIDER.COM', W - 320, statsY + 65);
+  ctx.fillText(host, W - 320, statsY + 65);
 
   return canvas;
 }
@@ -209,16 +223,16 @@ export function downloadShareCardImage(payload: SharePayload): void {
 
 export function shareToTwitter(payload: SharePayload): void {
   const timeStr = fmtTime(payload.timeMs);
-  const statusStr = payload.finished ? 'Just conquered the market on @OddsRider 🏍️💨' : 'Crashed trying to ride market volatility on @OddsRider 💥';
+  const statusStr = payload.finished ? 'Just conquered the market on @OddsRider' : 'Crashed trying to ride market volatility on @OddsRider';
   const probStr = payload.finalProb !== undefined ? `${(payload.finalProb * 100).toFixed(1)}% YES` : '';
   const questionStr = payload.marketQuestion ? `"${payload.marketQuestion}"` : 'Polymarket Event';
 
   const tweetText = [
     statusStr,
-    `📈 ${questionStr} (${probStr})`,
-    `⏱️ Time: ${timeStr} | 🏆 Score: ${payload.score.toLocaleString()}`,
+    `${questionStr} (${probStr})`,
+    `Time: ${timeStr} | Score: ${payload.score.toLocaleString()}`,
     ``,
-    `Ride real Polymarket probability charts: https://oddsrider.com`
+    `Ride it: ${payload.rideUrl ?? 'https://oddsrider.com'}`
   ].join('\n');
 
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;

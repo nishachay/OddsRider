@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bus, EV } from "../game/bus";
 import ResultModal from "./ResultModal";
+import TouchControls from "./TouchControls";
 
 const TOXIC = "#b6ff00";
 const CRIMSON = "#ff3355";
 const DIM = "#7c7f86";
 const SUBTLE = "#9ca3af";
 const INK = "#f0f0f2";
-const LINE = "#1f242d";
 
 function fmtTime(ms: number): { main: string; ms: string } {
   const s = ms / 1000;
@@ -106,15 +106,17 @@ function VolumeIcon({ muted }: { muted: boolean }) {
   );
 }
 
-interface ScorePayload { total: number; timeMs: number; finished: boolean; }
+interface ScorePayload { total: number; timeMs: number; finished: boolean; combo: number; }
+interface PopupPayload { id: number; text: string; points: number; }
 interface MarketPayload { question: string; probNow: number; probDelta: number; }
 interface ResultPayload { finished: boolean; score: number; timeMs: number; }
 
 interface HudOverlayProps {
   onOpenLobby?: () => void;
+  rideUrl?: string;
 }
 
-export default function HudOverlay({ onOpenLobby }: HudOverlayProps) {
+export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
   const [speed, setSpeed] = useState(0);
   const [muted, setMuted] = useState(false);
   const [nitro, setNitro] = useState(1);
@@ -123,7 +125,9 @@ export default function HudOverlay({ onOpenLobby }: HudOverlayProps) {
   const [market, setMarket] = useState<MarketPayload | null>(null);
   const [track, setTrack] = useState<TrackPts | null>(null);
   const [progress, setProgress] = useState(0);
-  const [score, setScore] = useState<ScorePayload>({ total: 0, timeMs: 0, finished: false });
+  const [score, setScore] = useState<ScorePayload>({ total: 0, timeMs: 0, finished: false, combo: 1 });
+  const [combo, setCombo] = useState(1);
+  const [popups, setPopups] = useState<PopupPayload[]>([]);
   const [result, setResult] = useState<ResultPayload | null>(null);
   const [airborne, setAirborne] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
@@ -138,9 +142,19 @@ export default function HudOverlay({ onOpenLobby }: HudOverlayProps) {
       bus.on<{ pts: TrackPts }>(EV.TRACK, (t) => { setTrack(t.pts); setProgress(0); }),
       bus.on<number>(EV.POSITION, setProgress),
       bus.on<MarketPayload | null>(EV.MARKET, (m) => { setMarket(m); if (!m) setTrack(null); }),
-      bus.on<ScorePayload>(EV.SCORE, setScore),
+      bus.on<ScorePayload>(EV.SCORE, (s) => {
+        setScore(s);
+        setCombo(s.combo);
+      }),
       bus.on<ResultPayload>(EV.RESULT, setResult),
       bus.on<number>(EV.PROB, setProb),
+      bus.on<number>(EV.COMBO, setCombo),
+      bus.on<PopupPayload>(EV.POPUP, (p) => {
+        setPopups((prev) => [...prev.slice(-3), p]);
+        window.setTimeout(() => {
+          setPopups((prev) => prev.filter((x) => x.id !== p.id));
+        }, 1600);
+      }),
     ];
     let ct = 0;
     const offCrash = bus.on<void>(EV.CRASH, () => {
@@ -276,6 +290,11 @@ export default function HudOverlay({ onOpenLobby }: HudOverlayProps) {
               <span style={{ fontSize: 18, fontWeight: 700, color: INK, lineHeight: 1 }}>
                 {score.total.toLocaleString()}
               </span>
+              {combo > 1 && (
+                <span className="font-mono" style={{ fontSize: 11, fontWeight: 800, color: TOXIC, textShadow: `0 0 10px ${TOXIC}80` }}>
+                  ×{combo}
+                </span>
+              )}
             </div>
           </div>
 
@@ -376,14 +395,29 @@ export default function HudOverlay({ onOpenLobby }: HudOverlayProps) {
 
       </div>
 
-      {/* Crash Vignette Flash */}
-      <div className="absolute inset-0 pointer-events-none transition-all duration-150" style={{
+      {/* Trick popups */}
+      {popups.length > 0 && (
+        <div className="absolute inset-x-0 bottom-32 flex flex-col items-center gap-1">
+          {popups.map((p) => (
+            <span
+              key={p.id}
+              className="font-mono text-sm font-black tracking-widest tabular-nums animate-pulse"
+              style={{ color: TOXIC, textShadow: `0 0 14px ${TOXIC}90` }}
+            >
+              {p.text} +{p.points.toLocaleString()}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Crash Vignette Flash */}      <div className="absolute inset-0 pointer-events-none transition-all duration-150" style={{
         border: crashFlash ? `4px solid ${CRIMSON}` : "0px solid transparent",
         boxShadow: crashFlash ? `inset 0 0 80px ${CRIMSON}` : "none",
         opacity: crashFlash ? 0.8 : 0,
       }} />
 
       {/* Result Modal */}
+      <TouchControls />
       <ResultModal
         isOpen={Boolean(result)}
         result={result ? {
@@ -393,6 +427,7 @@ export default function HudOverlay({ onOpenLobby }: HudOverlayProps) {
         } : null}
         onRetry={rideAgain}
         onOpenLobby={onOpenLobby}
+        rideUrl={rideUrl}
       />
 
     </div>

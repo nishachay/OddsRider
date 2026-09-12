@@ -13,6 +13,7 @@ interface ResultModalProps {
   } | null;
   onRetry: () => void;
   onOpenLobby?: () => void;
+  rideUrl?: string;
 }
 
 function formatTime(ms: number): { main: string; ms: string } {
@@ -110,7 +111,7 @@ function SettlementChartCanvas({ pts, isSuccess }: { pts: Array<[number, number]
   );
 }
 
-export default function ResultModal({ isOpen, result, onRetry }: ResultModalProps) {
+export default function ResultModal({ isOpen, result, onRetry, onOpenLobby, rideUrl }: ResultModalProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -135,7 +136,7 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
       `ODDSRIDER // ${statusStr}`,
       `Market: ${result.marketQuestion ?? 'Polymarket Event'}`,
       `Time: ${timeObj.main}${timeObj.ms} | Score: ${result.score.toLocaleString()} | Odds: ${probStr}`,
-      `https://oddsrider.com`
+      `${rideUrl ?? 'https://oddsrider.com'}`
     ].join('\n');
 
     if (navigator.clipboard) {
@@ -144,17 +145,17 @@ export default function ResultModal({ isOpen, result, onRetry }: ResultModalProp
         setTimeout(() => setCopied(false), 2000);
       });
     }
-  }, [result]);
+  }, [result, rideUrl]);
 
   const handleTwitterShare = useCallback(() => {
     if (!result) return;
-    shareToTwitter(result);
-  }, [result]);
+    shareToTwitter({ ...result, rideUrl });
+  }, [result, rideUrl]);
 
   const handleDownloadImage = useCallback(() => {
     if (!result) return;
-    downloadShareCardImage(result);
-  }, [result]);
+    downloadShareCardImage({ ...result, rideUrl });
+  }, [result, rideUrl]);
 
   if (!isOpen || !result) return null;
 

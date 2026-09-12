@@ -5,9 +5,11 @@ export class RideScore {
   timeMs = 0;
   finished = false;
   started = false;
+  combo = 1;
 
   private bonus = 0;
   private penalty = 0;
+  private trickPoints = 0;
   private maxX: number;
   private spawnX: number;
 
@@ -30,14 +32,35 @@ export class RideScore {
     this.timeMs = 0;
     this.finished = false;
     this.started = false;
+    this.combo = 1;
     this.bonus = 0;
     this.penalty = 0;
+    this.trickPoints = 0;
     this.maxX = this.spawnX;
+  }
+
+  // Combo trick: points scale with current multiplier, then it climbs (max x5).
+  awardTrick(base: number): number {
+    if (this.finished) return 0;
+    const pts = base * this.combo;
+    this.trickPoints += pts;
+    this.combo = Math.min(5, this.combo + 1);
+    this.recompute();
+    return pts;
+  }
+
+  // Big air pays flat, no combo change.
+  awardAir(): number {
+    if (this.finished) return 0;
+    this.trickPoints += 200;
+    this.recompute();
+    return 200;
   }
 
   applyCrash(): void {
     if (this.finished) return;
     this.penalty += 500;
+    this.combo = 1;
     this.recompute();
   }
 
@@ -58,6 +81,6 @@ export class RideScore {
   private recompute(): void {
     const span = WORLD.finishX - this.spawnX;
     const progress = span > 0 ? Math.min(1000, Math.floor(((this.maxX - this.spawnX) / span) * 1000)) : 0;
-    this.total = Math.max(0, progress + this.bonus - this.penalty);
+    this.total = Math.max(0, progress + this.bonus + this.trickPoints - this.penalty);
   }
 }

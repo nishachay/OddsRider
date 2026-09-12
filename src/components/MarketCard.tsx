@@ -55,7 +55,7 @@ function CircularChanceGauge({ prob }: { prob: number }) {
   );
 }
 
-function MiniSparkline({ pts, deltaUp }: { pts: number[]; deltaUp: boolean }) {
+function MiniSparkline({ pts, deltaUp }: { pts: number[] | null; deltaUp: boolean }) {
   if (!pts || pts.length < 2) return null;
   const min = Math.min(...pts);
   const max = Math.max(...pts);
@@ -86,7 +86,11 @@ function MiniSparkline({ pts, deltaUp }: { pts: number[]; deltaUp: boolean }) {
 }
 
 export default function MarketCard({ market, onRideYes, onRideNo, onPreview }: MarketCardProps) {
-  const deltaUp = market.probDelta >= 0;
+  const deltaUp = (market.probDelta ?? 0) >= 0;
+  const deltaLabel =
+    market.probDelta === null
+      ? '—'
+      : `${deltaUp ? '+' : ''}${(market.probDelta * 100).toFixed(1)}%`;
 
   const diffBadge =
     market.difficulty === 'EASY'
@@ -95,6 +99,8 @@ export default function MarketCard({ market, onRideYes, onRideNo, onPreview }: M
       ? 'text-amber-400 bg-amber-400/10 border-amber-400/30'
       : market.difficulty === 'HARD'
       ? 'text-orange-500 bg-orange-500/10 border-orange-500/30'
+      : market.difficulty === 'NEW'
+      ? 'text-dim bg-white/5 border-[#232529]'
       : 'text-crimson bg-crimson/10 border-crimson/30';
 
   return (
@@ -108,10 +114,14 @@ export default function MarketCard({ market, onRideYes, onRideNo, onPreview }: M
       {/* ── Top Row: Category & Difficulty ── */}
       <div className="flex items-center justify-between pb-2 border-b border-[#1a1c22]">
         <div className="flex items-center gap-2">
-          <span className="text-sm">{market.iconEmoji}</span>
           <span className="font-mono text-[9px] font-bold text-dim uppercase border border-[#232529] px-2 py-0.5">
             {market.category}
           </span>
+          {!market.live && (
+            <span className="font-mono text-[9px] font-bold text-amber-400 uppercase border border-amber-400/30 px-2 py-0.5">
+              Cached
+            </span>
+          )}
         </div>
 
         <span className={`font-mono text-[9.5px] font-bold uppercase border px-2 py-0.5 ${diffBadge}`}>
@@ -135,7 +145,7 @@ export default function MarketCard({ market, onRideYes, onRideNo, onPreview }: M
           <div className="flex items-center gap-1.5 font-mono text-xs">
             <span className="text-[8px] font-sans font-extrabold text-dim uppercase">24H:</span>
             <span className={`font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
-              {deltaUp ? '+' : ''}{(market.probDelta * 100).toFixed(1)}%
+              {deltaLabel}
             </span>
           </div>
 
