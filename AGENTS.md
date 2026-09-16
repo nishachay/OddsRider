@@ -1,6 +1,6 @@
 # AGENTS.md
 
-OddsRider: browser motocross game where real Polymarket probability charts become rideable terrain. React shell + Phaser 3 (Matter) game that mounts **only** on `/ride/:marketId`.
+OddsRider: browser motocross game where real Polymarket probability charts become rideable terrain. React shell + Phaser 3 (Matter) game that mounts on `/` (arcade attract backdrop, no HUD) and `/ride/:marketId` (playable, with HUD).
 
 ## Commands
 

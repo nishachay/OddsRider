@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import HeroSpotlight, { SearchStrip } from '../components/HeroSpotlight';
+import ArcadeStage, { SearchStrip } from '../components/HeroSpotlight';
 import DailyChallenge from '../components/DailyChallenge';
 import MarketGrid from '../components/MarketGrid';
 import Footer from '../components/Footer';
@@ -193,8 +193,8 @@ export default function HomePage() {
   const heroFeaturedMarket = markets[0] ?? null;
   const live = !loading && isLiveList(markets);
   const searchingMode = searchQuery.trim() !== '' || searching || searchResults !== null;
-  const trackCount = markets.filter((m) => m.category !== 'LEGENDARY').length;
   const onPreview = useCallback((m: RideableMarket) => navigate(`/preview/${m.id}`), [navigate]);
+  const onRideYes = useCallback((m: RideableMarket) => navigate(ridePath(m, false)), [navigate]);
 
   return (
     <div className="w-full flex flex-col min-h-screen">
@@ -203,12 +203,11 @@ export default function HomePage() {
 
       <main className="flex-1 flex flex-col">
         {heroFeaturedMarket && (
-          <HeroSpotlight
-            market={heroFeaturedMarket}
+          <ArcadeStage
+            markets={markets}
+            featured={heroFeaturedMarket}
             live={live}
-            trackCount={trackCount}
-            onRideYes={(m) => navigate(ridePath(m, false))}
-            onRideNo={(m) => navigate(ridePath(m, true))}
+            onRide={onRideYes}
             onPreview={onPreview}
           />
         )}

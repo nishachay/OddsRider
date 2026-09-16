@@ -85,10 +85,16 @@ export class RideScene extends Phaser.Scene {
     if (this.offRestart) this.offRestart();
     this.offRestart = bus.on(EV.RESTART, () => this.doReset(true));
     const offLoadMarket = bus.on<Ride>(EV.LOAD_MARKET, (ride) => this.applyRide(ride));
-    this.events.once('shutdown', () => {
+    // Detach on shutdown AND destroy: game.destroy() tears down systems
+    // via destroy (not shutdown), so shutdown-only cleanup leaks bus and
+    // input listeners into the next mounted game. Detach is idempotent.
+    const detach = () => {
+      this.inputMgr.destroy();
       if (this.offRestart) { this.offRestart(); this.offRestart = null; }
       offLoadMarket();
-    });
+    };
+    this.events.once('shutdown', detach);
+    this.events.once('destroy', detach);
 
     const cam = this.cameras.main;
     cam.centerOn(this.bike.x, this.bike.y - 40);
@@ -102,6 +108,9 @@ export class RideScene extends Phaser.Scene {
   }
 
   private applyRide(ride: Ride): void {
+    // Attract mode pulls back for a wide showroom shot; the follow lerp
+    // only moves scroll, so zoom persists. Playable rides stay at 1.
+    this.cameras.main.setZoom(ride.attract === true ? 0.62 : 1);
     const terrain = buildTerrain(ride.series);
     this.terrain = terrain;
     this.rideDifficulty = ride.market.difficulty;

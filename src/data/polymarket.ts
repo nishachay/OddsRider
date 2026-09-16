@@ -32,6 +32,9 @@ export interface Ride {
   market: RideableMarket;
   series: PricePoint[];
   inverted?: boolean;
+  // Attract mode (home stage backdrop): scene pulls the camera back for a
+  // wide showroom shot. Never set on the playable ride page.
+  attract?: boolean;
 }
 
 const GAMMA = 'https://gamma-api.polymarket.com';

@@ -1,12 +1,15 @@
-﻿import { useEffect, useRef } from 'react';
+﻿import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import type { RideableMarket } from '../data/polymarket';
+import { bus, EV } from '../game/bus';
+import { fetchRideForMarket } from '../data/polymarket';
 
-interface HeroProps {
-  market: RideableMarket;
+const PhaserGame = lazy(() => import('../game/PhaserGame'));
+
+interface ArcadeProps {
+  markets: RideableMarket[];
+  featured: RideableMarket;
   live: boolean;
-  trackCount: number;
-  onRideYes: (market: RideableMarket) => void;
-  onRideNo: (market: RideableMarket) => void;
+  onRide: (market: RideableMarket) => void;
   onPreview: (market: RideableMarket) => void;
 }
 
@@ -16,211 +19,226 @@ interface SearchStripProps {
   onSearch: (q: string) => void;
 }
 
-const TOXIC = '#b6ff00';
 const QUICK_PICKS = ['BITCOIN', 'TRUMP', 'FED', 'AI'];
 
-const GOING: Record<string, string> = {
-  EASY: 'text-toxic',
-  MEDIUM: 'text-ink',
-  HARD: 'text-orange-500',
-  INSANE: 'text-crimson',
-  NEW: 'text-dim',
-};
-
-function scrollToCard() {
-  document.getElementById('card')?.scrollIntoView({ behavior: 'smooth' });
+function pad(n: number): string {
+  return n.toString().padStart(2, '0');
 }
 
-export default function HeroSpotlight({
-  market,
-  live,
-  trackCount,
-  onRideYes,
-  onRideNo,
-  onPreview,
-}: HeroProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const probPct = Math.round(market.currentProb * 100);
-  const chanceUp = market.currentProb >= 0.5;
+function StagePoster({ market }: { market: RideableMarket }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0b]">
+      <span className="font-mono text-[11px] tracking-[0.3em] text-dim animate-pulse uppercase">
+        Rolling out {market.category} track…
+      </span>
+    </div>
+  );
+}
 
-  // Animated probability curve with a rider marker rolling along it
+// Fullscreen arcade stage: the live game is the backdrop (attract zoom).
+// Browse the rail (the stage re-terrains under you), ENTER rides.
+// Gameplay code untouched — this shell only uses EV.LOAD_MARKET + attract.
+export default function ArcadeStage({ markets, featured, live, onRide, onPreview }: ArcadeProps) {
+  const [selId, setSelId] = useState(featured.id);
+  const [stageOn, setStageOn] = useState(false);
+  const selected = useMemo(
+    () => markets.find((m) => m.id === selId) ?? featured,
+    [markets, selId, featured],
+  );
+  const selRef = useRef(selected);
+  selRef.current = selected;
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const gen = useRef(0);
+  const applied = useRef<string | null>(null);
+  const left = useRef(false);
+
+  const selIndex = Math.max(
+    0,
+    markets.findIndex((m) => m.id === selected.id),
+  );
+  const pct = Math.round(selected.currentProb * 100);
+  const up = selected.currentProb >= 0.5;
+  const delta = selected.probDelta;
+  const deltaLabel =
+    delta === null ? '—' : `${delta >= 0 ? '+' : ''}${(delta * 100).toFixed(1)}%`;
+
+  // Boot: paint the menu first, then roll out the featured terrain.
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const t = window.setTimeout(() => setStageOn(true), 350);
+    return () => window.clearTimeout(t);
+  }, []);
 
-    const basePts = market.sparkline ?? [];
-    const W = canvas.width;
-    const H = canvas.height;
-    if (basePts.length < 2) {
-      ctx.clearRect(0, 0, W, H);
-      ctx.fillStyle = '#7c7f86';
-      ctx.font = 'bold 12px Geist Mono, monospace';
-      ctx.fillText('AWAITING LIVE ODDS', 24, H / 2);
-      return;
-    }
-
-    const curve: Array<[number, number]> = [];
-    for (let x = 0; x <= W; x += 4) {
-      const p = x / W;
-      const f = p * (basePts.length - 1);
-      const i = Math.min(basePts.length - 2, Math.floor(f));
-      const frac = f - i;
-      const v = basePts[i] + (basePts[i + 1] - basePts[i]) * frac;
-      curve.push([x, 26 + (1 - v) * (H - 52)]);
-    }
-
-    let animId = 0;
-    let progress = 0.15;
-    const render = () => {
-      ctx.clearRect(0, 0, W, H);
-
-      ctx.beginPath();
-      ctx.moveTo(curve[0][0], H);
-      for (const [x, y] of curve) ctx.lineTo(x, y);
-      ctx.lineTo(curve[curve.length - 1][0], H);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(182, 255, 0, 0.05)';
-      ctx.fill();
-
-      ctx.beginPath();
-      for (let i = 0; i < curve.length; i++) {
-        const [x, y] = curve[i];
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = TOXIC;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      ctx.fillStyle = '#7c7f86';
-      ctx.font = 'bold 9px Geist Mono, monospace';
-      ctx.fillText('START', curve[4][0], curve[4][1] - 10);
-      ctx.fillStyle = TOXIC;
-      ctx.fillText('FINISH', curve[curve.length - 5][0] - 34, curve[curve.length - 5][1] - 10);
-
-      progress = (progress + 0.002) % 0.95;
-      const ti = Math.floor(progress * (curve.length - 1));
-      const [bx, by] = curve[ti];
-      const [nx, ny] = curve[Math.min(curve.length - 1, ti + 2)];
-      ctx.save();
-      ctx.translate(bx, by);
-      ctx.rotate(Math.atan2(ny - by, nx - bx));
-      ctx.fillStyle = '#f0f0f2';
-      ctx.fillRect(-4, -13, 8, 9);
-      ctx.fillStyle = TOXIC;
-      ctx.beginPath();
-      ctx.arc(-5, -2, 3.5, 0, Math.PI * 2);
-      ctx.arc(5, -2, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      animId = requestAnimationFrame(render);
+  // Load terrain for the selection (debounced for rail browsing).
+  // Emitting with no scene alive is harmless; late scenes read the store.
+  useEffect(() => {
+    if (!stageOn) return;
+    const m = markets.find((x) => x.id === selId) ?? featured;
+    if (applied.current === m.id) return;
+    const isBoot = applied.current === null;
+    const g = ++gen.current;
+    const t = window.setTimeout(
+      () => {
+        fetchRideForMarket(m, false, 'max')
+          .then((ride) => {
+            if (gen.current === g) {
+              applied.current = m.id;
+              bus.emit(EV.LOAD_MARKET, { ...ride, attract: true });
+            }
+          })
+          .catch(() => {});
+      },
+      isBoot ? 0 : 350,
+    );
+    return () => {
+      window.clearTimeout(t);
+      gen.current++;
     };
-    render();
-    return () => cancelAnimationFrame(animId);
-  }, [market]);
+  }, [stageOn, selId, markets, featured]);
+
+  // Keep the selected rail row in view.
+  useEffect(() => {
+    railRef.current
+      ?.querySelector('[data-sel="true"]')
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [selId]);
+
+  // Arcade keys: browse the rail, ENTER rides. Never steal typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName ?? '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const idx = Math.max(
+        0,
+        markets.findIndex((m) => m.id === selRef.current.id),
+      );
+      if (e.code === 'ArrowDown' || e.code === 'KeyJ') {
+        e.preventDefault();
+        setSelId(markets[Math.min(markets.length - 1, idx + 1)].id);
+      } else if (e.code === 'ArrowUp' || e.code === 'KeyK') {
+        e.preventDefault();
+        setSelId(markets[Math.max(0, idx - 1)].id);
+      } else if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyW') {
+        e.preventDefault();
+        if (!left.current) {
+          left.current = true;
+          onRide(selRef.current);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [markets, onRide]);
 
   return (
-    <section className="w-full max-w-6xl mx-auto px-4 pt-10 sm:pt-16 pb-4 select-none">
-      <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-10 items-end">
-        <div className="flex flex-col items-start gap-5">
-          <span className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.3em] uppercase">
-            <span className={`inline-block w-2 h-2 ${live ? 'bg-toxic animate-pulse' : 'bg-amber-400'}`} />
-            <span className={live ? 'text-toxic' : 'text-amber-400'}>
-              {live ? 'Live race card' : 'Offline race card'}
-            </span>
-          </span>
+    <section className="relative w-full h-[calc(100svh-6rem)] min-h-[540px] overflow-hidden select-none">
+      <div className="absolute inset-0 bg-[#0a0a0b]">
+        {stageOn ? (
+          <Suspense fallback={<StagePoster market={selected} />}>
+            <PhaserGame />
+          </Suspense>
+        ) : (
+          <StagePoster market={selected} />
+        )}
+      </div>
 
-          <h1 className="font-poster uppercase leading-[0.88] text-[clamp(3.8rem,10vw,7.5rem)]">
-            <span className="block text-ink">Ride the</span>
-            <span className="block text-outline">odds.</span>
-          </h1>
+      {/* Legibility scrims: content lives top + bottom, world owns the middle */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-[#0a0a0b] via-transparent to-[#0a0a0b]" />
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-[#0a0a0b]/80 via-transparent to-[#0a0a0b]/40" />
 
-          <p className="font-sans text-sm sm:text-base text-dim max-w-md leading-relaxed">
-            Real Polymarket probability charts turned into motocross tracks.
-            Every rally is a climb. Every crash is a cliff.
-          </p>
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="h-full max-w-6xl mx-auto px-4 py-6 sm:py-7 flex gap-6">
+          <div className="flex-1 flex flex-col justify-between min-w-0">
+            <div className="max-w-2xl">
+              <span className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.3em] uppercase">
+                <span
+                  className={`inline-block w-2 h-2 ${live ? 'bg-toxic animate-pulse' : 'bg-amber-400'}`}
+                />
+                <span className={live ? 'text-toxic' : 'text-amber-400'}>
+                  {live ? 'Live' : 'Offline'} · Race {pad(selIndex + 1)} · {selected.category}
+                </span>
+              </span>
 
-          <div className="flex flex-wrap items-center gap-4 pt-1">
-            <button
-              onClick={() => onRideYes(market)}
-              className="px-8 py-4 bg-toxic text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 transition-all cursor-pointer shadow-[0_0_24px_rgba(182,255,0,0.45)]"
-            >
-              Enter race 01
-            </button>
-            <button
-              onClick={scrollToCard}
-              className="font-mono text-[11px] font-bold tracking-[0.2em] text-dim hover:text-toxic transition-colors cursor-pointer uppercase underline underline-offset-8 decoration-[#3b414f] hover:decoration-toxic"
-            >
-              Browse the card
-            </button>
+              <span className="block font-display font-bold text-xl sm:text-2xl text-ink leading-snug pt-3">
+                {selected.question}
+              </span>
+
+              <div className="flex items-end gap-2 pt-1">
+                <span
+                  className={`font-poster leading-none text-6xl sm:text-7xl tabular-nums ${up ? 'text-toxic' : 'text-crimson'}`}
+                  style={{ textShadow: up ? '0 0 32px rgba(182,255,0,0.35)' : '0 0 32px rgba(255,51,85,0.35)' }}
+                >
+                  {pct}
+                  <span className="text-xl text-dim">%</span>
+                </span>
+                <span className="flex flex-col pb-1">
+                  <span className="font-sans text-xs font-extrabold text-ink">YES</span>
+                  <span
+                    className={`font-mono text-[11px] font-bold tabular-nums ${delta !== null && delta < 0 ? 'text-crimson' : 'text-toxic'}`}
+                  >
+                    {deltaLabel} 24H
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex flex-wrap items-center gap-4 pointer-events-auto">
+                <button
+                  onClick={() => onRide(selected)}
+                  className="px-8 py-4 bg-toxic text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 transition-all cursor-pointer shadow-[0_0_24px_rgba(182,255,0,0.45)]"
+                >
+                  Enter race {pad(selIndex + 1)}
+                </button>
+                <button
+                  onClick={() => onPreview(selected)}
+                  className="font-mono text-[11px] font-bold tracking-[0.2em] text-dim hover:text-toxic transition-colors cursor-pointer uppercase underline underline-offset-8 decoration-[#3b414f] hover:decoration-toxic"
+                >
+                  Inspect track
+                </button>
+              </div>
+
+              <span className="hidden sm:block font-mono text-[10px] tracking-[0.2em] text-dim pt-3 uppercase">
+                ↑↓ browse · Enter ride · Free · No account
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] font-bold tracking-[0.18em] uppercase text-dim">
-            <span>
-              <span className="text-ink tabular-nums">{trackCount}</span> runners
-            </span>
-            <span>Free</span>
-            <span>No account</span>
-          </div>
-        </div>
-
-        {/* ── Featured race ── */}
-        <div
-          onClick={() => onPreview(market)}
-          className="border border-[#232529] bg-[#101113] cursor-pointer group hover:border-toxic/50 transition-all"
-        >
-          <div className="flex items-center justify-between px-5 pt-4 font-mono text-[10px] font-bold tracking-[0.22em] uppercase">
-            <span className="text-toxic">Race 01 · {market.category}</span>
-            <span className={GOING[market.difficulty] ?? 'text-dim'}>
-              Going · {market.difficulty}
-              {!market.live && <span className="text-dim"> · Cached</span>}
-            </span>
-          </div>
-
-          <div className="px-5 pt-3 font-display font-bold text-lg leading-snug text-ink group-hover:text-toxic transition-colors">
-            {market.question}
-          </div>
-
-          <div className="flex items-end gap-2 px-5 pt-1">
-            <span
-              className={`font-poster leading-none text-7xl tabular-nums ${chanceUp ? 'text-toxic' : 'text-crimson'}`}
-            >
-              {probPct}
-              <span className="text-2xl text-dim">%</span>
-            </span>
-            <span className="font-sans text-xs font-extrabold text-ink pb-1.5">YES</span>
-            <span className="font-mono text-[11px] text-dim tabular-nums pb-1.5 ml-auto">
-              {market.volumeFormatted}
-            </span>
-          </div>
-
-          <div className="mx-5 mt-3 border border-[#232529] bg-[#0c0e12] overflow-hidden">
-            <canvas ref={canvasRef} width={900} height={220} className="block w-full h-36 sm:h-40" />
-          </div>
-
-          <div className="grid grid-cols-2 mt-4 border-t border-[#232529]">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRideYes(market);
-              }}
-              className="py-4 bg-toxic text-bg font-mono text-xs font-bold tracking-[0.18em] uppercase hover:bg-toxic/90 transition-all cursor-pointer text-center"
-            >
-              Ride yes ∧
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRideNo(market);
-              }}
-              className="py-4 border-l border-[#232529] bg-transparent text-crimson font-mono text-xs font-bold tracking-[0.18em] uppercase hover:bg-crimson hover:text-bg transition-all cursor-pointer text-center"
-            >
-              Ride no ∨
-            </button>
-          </div>
+          <aside className="hidden lg:flex w-80 shrink-0 flex-col justify-center pointer-events-auto">
+            <div className="font-mono text-[10px] font-bold tracking-[0.22em] text-dim uppercase pb-2">
+              On the card · {markets.length}
+            </div>
+            <div ref={railRef} className="overflow-y-auto border-t border-[#232529] max-h-[52vh] bg-[#0a0a0b]/70 backdrop-blur-[2px]">
+              {markets.map((m, i) => {
+                const active = m.id === selected.id;
+                const p = Math.round(m.currentProb * 100);
+                const mUp = m.currentProb >= 0.5;
+                return (
+                  <button
+                    key={m.id}
+                    data-sel={active}
+                    onClick={() => setSelId(m.id)}
+                    onDoubleClick={() => onRide(m)}
+                    className={`w-full flex items-center gap-3 pl-0 pr-3 py-2.5 border-b border-[#1a1c22] text-left transition-colors cursor-pointer ${
+                      active ? 'bg-[#101113]' : 'hover:bg-[#101113]/60'
+                    }`}
+                  >
+                    <span className={`w-[3px] self-stretch shrink-0 ${active ? 'bg-toxic' : 'bg-transparent'}`} />
+                    <span className="font-poster text-lg text-dim w-7 shrink-0 tabular-nums">
+                      {pad(i + 1)}
+                    </span>
+                    <span className="flex-1 min-w-0 truncate font-display text-[13px] font-semibold text-ink">
+                      {m.question}
+                    </span>
+                    <span
+                      className={`font-mono text-xs font-bold tabular-nums shrink-0 ${mUp ? 'text-toxic' : 'text-crimson'}`}
+                    >
+                      {p}%
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
         </div>
       </div>
     </section>
