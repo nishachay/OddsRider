@@ -1,4 +1,24 @@
 import { WORLD } from './constants';
+import type { Difficulty } from '../data/polymarket';
+
+// Star bars per difficulty — harder tracks earn stars cheaper.
+// Same table drives the result modal and share copy.
+const STAR_BARS: Record<Difficulty, number[]> = {
+  EASY: [1000, 2500, 4000, 6000, 8000],
+  MEDIUM: [800, 2000, 3200, 4800, 6500],
+  HARD: [600, 1500, 2500, 3800, 5200],
+  INSANE: [400, 1000, 1800, 2800, 4000],
+  NEW: [800, 2000, 3200, 4800, 6500],
+};
+
+export function starsFor(score: number, difficulty: Difficulty): number {
+  const bars = STAR_BARS[difficulty] ?? STAR_BARS.MEDIUM;
+  let stars = 0;
+  for (const bar of bars) {
+    if (score >= bar) stars += 1;
+  }
+  return stars;
+}
 
 export class RideScore {
   total = 0;
@@ -51,10 +71,15 @@ export class RideScore {
 
   // Big air pays flat, no combo change.
   awardAir(): number {
+    return this.awardFlat(200);
+  }
+
+  // Flat award with no combo change (air, nitro burn).
+  awardFlat(points: number): number {
     if (this.finished) return 0;
-    this.trickPoints += 200;
+    this.trickPoints += points;
     this.recompute();
-    return 200;
+    return points;
   }
 
   applyCrash(): void {

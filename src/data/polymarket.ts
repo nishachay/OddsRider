@@ -21,7 +21,6 @@ export interface RideableMarket {
   probDelta: number | null;
   resolutionDate: string;
   difficulty: Difficulty;
-  iconEmoji: string;
   volatilityLabel: string;
   // Real downsampled CLOB history, or null when unavailable.
   sparkline: number[] | null;
@@ -332,26 +331,40 @@ async function enrichRow(row: GammaRow): Promise<RideableMarket | null> {
     probDelta: delta,
     resolutionDate: formatDate(row.endDate),
     difficulty,
-    iconEmoji: '',
     volatilityLabel: DIFFICULTY_LABEL[difficulty],
     sparkline,
     live: true,
   };
 }
 
-export async function fetchAllMarkets(): Promise<RideableMarket[]> {
-  const staleFallback = readCache()?.markets ?? null;
+export type FeedError = 'OK' | 'GAMMA_UNREACHABLE' | 'INSUFFICIENT_LIVE';
 
+export interface FeedResult {
+  markets: RideableMarket[];
+  error: FeedError;
+}
+
+export async function fetchAllMarkets(): Promise<FeedResult> {
+  const staleFallback = readCache()?.markets ?? null;
+  const fallback = (error: FeedError): FeedResult => ({
+    markets: staleFallback && staleFallback.length > 0 ? staleFallback : CURATED_POLYMARKET_FEED,
+    error,
+  });
+
+  let gammaOk = false;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    const timeout = setTimeout(() => controller.abort(), 8000);
     let rows: GammaRow[] = [];
     try {
       const res = await fetch(
         `${GAMMA}/markets?limit=24&active=true&closed=false&order=volume24hr&ascending=false`,
         { signal: controller.signal },
       );
-      if (res.ok) rows = (await res.json()) as GammaRow[];
+      if (res.ok) {
+        rows = (await res.json()) as GammaRow[];
+        gammaOk = true;
+      }
     } finally {
       clearTimeout(timeout);
     }
@@ -366,17 +379,60 @@ export async function fetchAllMarkets(): Promise<RideableMarket[]> {
       liveMarkets.sort((a, b) => b.volumeNum - a.volumeNum);
       const full = [...liveMarkets, ...CURATED_POLYMARKET_FEED.filter((m) => m.category === 'LEGENDARY')];
       writeCache(full);
-      return full;
+      return { markets: full, error: 'OK' };
     }
+    return fallback(gammaOk ? 'INSUFFICIENT_LIVE' : 'GAMMA_UNREACHABLE');
   } catch (err) {
     console.warn('Live Polymarket Gamma fetch fallback:', err);
+    return fallback('GAMMA_UNREACHABLE');
   }
-
-  return staleFallback && staleFallback.length > 0 ? staleFallback : CURATED_POLYMARKET_FEED;
 }
 
-// Resolve any market by text: instant local filter first, live Gamma
-// search upgrades the results when the network answers.
+// Paste-any-Polymarket-URL: extract the slug and resolve it to a
+// rideable market through Gamma. Returns null when unresolvable.
+export function extractPolymarketSlug(input: string): string | null {
+  const m = input.match(/polymarket\.com\/(?:event|market)\/([^/?#]+)/i);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+async function fetchGammaRows(url: string): Promise<GammaRow[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return [];
+    const data = (await res.json()) as unknown;
+    if (Array.isArray(data)) return data as GammaRow[];
+    const obj = data as { markets?: GammaRow[]; events?: Array<{ markets?: GammaRow[] }> };
+    if (Array.isArray(obj.markets)) return obj.markets;
+    if (Array.isArray(obj.events)) {
+      const rows: GammaRow[] = [];
+      for (const ev of obj.events) {
+        if (Array.isArray(ev.markets)) rows.push(...ev.markets);
+      }
+      return rows;
+    }
+    return [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function resolvePolymarketUrl(input: string): Promise<RideableMarket | null> {
+  const slug = extractPolymarketSlug(input);
+  if (!slug) return null;
+  const [a, b] = await Promise.all([
+    fetchGammaRows(`${GAMMA}/events?slug=${encodeURIComponent(slug)}`),
+    fetchGammaRows(`${GAMMA}/markets?slug=${encodeURIComponent(slug)}`),
+  ]);
+  for (const row of [...a, ...b]) {
+    const market = await enrichRow(row);
+    if (market) return market;
+  }
+  return null;
+}
 export function filterMarketsLocal(query: string, local: RideableMarket[]): RideableMarket[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [];
@@ -449,7 +505,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: +0.072,
     resolutionDate: 'Dec 31, 2026',
     difficulty: 'HARD',
-    iconEmoji: '',
     volatilityLabel: 'EXTREME UPHILL CLIMBS',
     sparkline: [0.22, 0.28, 0.35, 0.42, 0.38, 0.52, 0.65, 0.78, 0.72, 0.80, 0.85, 0.86],
     live: false,
@@ -466,7 +521,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: -0.13,
     resolutionDate: 'Open',
     difficulty: 'MEDIUM',
-    iconEmoji: '',
     volatilityLabel: 'ROLLERCOASTER DOWNHILL',
     sparkline: [0.32, 0.45, 0.65, 0.72, 0.68, 0.55, 0.42, 0.35, 0.22, 0.18, 0.15, 0.19],
     live: false,
@@ -483,7 +537,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: +0.36,
     resolutionDate: 'Sep 18, 2026',
     difficulty: 'EASY',
-    iconEmoji: '',
     volatilityLabel: 'HIGH-SPEED STRAIGHTAWAYS',
     sparkline: [0.31, 0.35, 0.40, 0.42, 0.48, 0.55, 0.62, 0.65, 0.67],
     live: false,
@@ -500,7 +553,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: +0.04,
     resolutionDate: 'Nov 07, 2028',
     difficulty: 'MEDIUM',
-    iconEmoji: '',
     volatilityLabel: 'ROLLING RIDGES',
     sparkline: [0.50, 0.52, 0.48, 0.51, 0.53, 0.49, 0.52, 0.54],
     live: false,
@@ -517,7 +569,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: -0.05,
     resolutionDate: 'Dec 31, 2026',
     difficulty: 'EASY',
-    iconEmoji: '',
     volatilityLabel: 'LOW-ALTITUDE HIGHWAY',
     sparkline: [0.19, 0.18, 0.16, 0.15, 0.17, 0.14, 0.14],
     live: false,
@@ -534,7 +585,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: +0.22,
     resolutionDate: 'Dec 01, 2026',
     difficulty: 'HARD',
-    iconEmoji: '',
     volatilityLabel: 'LAUNCHPAD JUMPS',
     sparkline: [0.60, 0.62, 0.58, 0.65, 0.70, 0.75, 0.80, 0.82],
     live: false,
@@ -551,7 +601,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: +0.18,
     resolutionDate: 'Open',
     difficulty: 'HARD',
-    iconEmoji: '',
     volatilityLabel: 'ASCENDING PEAKS',
     sparkline: [0.45, 0.55, 0.60, 0.72, 0.75, 0.78, 0.80],
     live: false,
@@ -568,7 +617,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: +0.12,
     resolutionDate: 'Dec 31, 2026',
     difficulty: 'HARD',
-    iconEmoji: '',
     volatilityLabel: 'AGGRESSIVE CLIFFS',
     sparkline: [0.30, 0.35, 0.28, 0.32, 0.38, 0.44, 0.40, 0.42],
     live: false,
@@ -586,7 +634,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: -0.96,
     resolutionDate: 'Nov 11, 2022',
     difficulty: 'INSANE',
-    iconEmoji: '',
     volatilityLabel: 'VERTICAL DEATH SPIRAL',
     sparkline: [0.98, 0.96, 0.92, 0.88, 0.75, 0.45, 0.18, 0.05, 0.01],
     live: false,
@@ -603,7 +650,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: -0.99,
     resolutionDate: 'May 13, 2022',
     difficulty: 'INSANE',
-    iconEmoji: '',
     volatilityLabel: 'SHEER CLIFF DROP-OFF',
     sparkline: [1.00, 0.98, 0.92, 0.80, 0.60, 0.30, 0.10, 0.02, 0.00],
     live: false,
@@ -620,7 +666,6 @@ export const CURATED_POLYMARKET_FEED: RideableMarket[] = [
     probDelta: +0.78,
     resolutionDate: 'Mar 13, 2023',
     difficulty: 'INSANE',
-    iconEmoji: '',
     volatilityLabel: 'MEGA V-SHAPE RECOVERY',
     sparkline: [0.90, 0.70, 0.35, 0.20, 0.18, 0.45, 0.75, 0.95, 0.99],
     live: false,

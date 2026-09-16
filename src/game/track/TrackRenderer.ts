@@ -9,6 +9,7 @@ export class TrackRenderer {
   private gfx: Phaser.GameObjects.Graphics;
   private terrain: Terrain | null = null;
   private labels: Phaser.GameObjects.Text[] = [];
+  private moveLabels: Phaser.GameObjects.Text[] = [];
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -19,6 +20,8 @@ export class TrackRenderer {
     this.terrain = terrain;
     for (const label of this.labels) label.destroy();
     this.labels = [];
+    for (const label of this.moveLabels) label.destroy();
+    this.moveLabels = [];
     for (let x = WORLD.markerSpacing; x <= WORLD.markerMaxX; x += WORLD.markerSpacing) {
       this.labels.push(
         this.scene.add
@@ -29,6 +32,40 @@ export class TrackRenderer {
           })
           .setOrigin(0.5, 0)
           .setDepth(1),
+      );
+    }
+    this.placeMoveLabels(terrain.points);
+  }
+
+  // Floating probability labels at the biggest belief moves (max 5,
+  // spaced apart so they never clutter the hero visual).
+  private placeMoveLabels(points: TerrainPoint[]): void {
+    const moves: Array<{ x: number; y: number; delta: number }> = [];
+    for (let i = 1; i < points.length; i++) {
+      const delta = points[i].raw - points[i - 1].raw;
+      if (Math.abs(delta) >= 0.05) {
+        moves.push({ x: points[i].x, y: points[i].y, delta });
+      }
+    }
+    moves.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+    const placed: typeof moves = [];
+    for (const m of moves) {
+      if (placed.length >= 5) break;
+      if (placed.some((p) => Math.abs(p.x - m.x) < 1500)) continue;
+      placed.push(m);
+    }
+    for (const m of placed) {
+      const up = m.delta >= 0;
+      const pct = `${up ? '+' : ''}${Math.round(m.delta * 100)}%`;
+      this.moveLabels.push(
+        this.scene.add
+          .text(m.x, m.y - 44, pct, {
+            fontFamily: MONO,
+            fontSize: '12px',
+            color: up ? '#b6ff00' : '#ff3355',
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(3),
       );
     }
   }

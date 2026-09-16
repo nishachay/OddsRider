@@ -12,6 +12,8 @@ export class CyberEffects {
   private scene: Phaser.Scene;
   private gfx: Phaser.GameObjects.Graphics;
   private sparkEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private dustEmitter!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private prevGrounded = true;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -19,6 +21,7 @@ export class CyberEffects {
 
     this.makeSparkTexture();
     this.makeSparkEmitter();
+    this.makeDustEmitter();
   }
 
   private makeSparkTexture(): void {
@@ -45,9 +48,36 @@ export class CyberEffects {
       .setDepth(8);
   }
 
+  private makeDustEmitter(): void {
+    this.dustEmitter = this.scene.add
+      .particles(0, 0, "cyber_spark", {
+        lifespan: 420,
+        speed: { min: 30, max: 160 },
+        angle: { min: 200, max: 340 },
+        scale: { start: 1.5, end: 0.2 },
+        alpha: { start: 0.7, end: 0 },
+        gravityY: 160,
+        tint: [0x7c7f86, 0x3b414f],
+        emitting: false,
+      })
+      .setDepth(8);
+  }
+
   render(bike: Bike): void {
     this.gfx.clear();
-    if (bike.crashed) return;
+    if (bike.crashed) {
+      this.prevGrounded = false;
+      return;
+    }
+
+    // Landing dust burst on air-to-ground transitions, scaled by impact
+    if (!this.prevGrounded && bike.grounded) {
+      const impact = Math.max(0, bike.chassis.velocity.y);
+      const count = Math.min(24, Math.max(4, Math.round(4 + impact * 1.5)));
+      this.dustEmitter.setPosition(bike.rearWheel.position.x, bike.rearWheel.position.y + 10);
+      this.dustEmitter.explode(count);
+    }
+    this.prevGrounded = bike.grounded;
 
     const chassis = bike.chassis;
     const rearWheel = bike.rearWheel;

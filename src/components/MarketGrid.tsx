@@ -1,4 +1,5 @@
 ﻿import type { RideableMarket } from '../data/polymarket';
+import { useMarkets } from '../data/marketsContext';
 import MarketCard from './MarketCard';
 
 interface MarketGridProps {
@@ -15,9 +16,14 @@ interface MarketGridProps {
   onPreview: (market: RideableMarket) => void;
 }
 
-const CATEGORIES = ['ALL', 'POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY'];
+const DIVISIONS = ['ALL', 'POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY'];
 
-function CardRow({
+const FEED_REASON: Record<string, string> = {
+  GAMMA_UNREACHABLE: 'GAMMA API UNREACHABLE — CHECK VPN, AD-BLOCK, OR REGIONAL BLOCK.',
+  INSUFFICIENT_LIVE: 'NOT ENOUGH LIVE CONTRACTS ANSWERED — TRY AGAIN SHORTLY.',
+};
+
+function RaceList({
   items,
   onRideYes,
   onRideNo,
@@ -29,11 +35,12 @@ function CardRow({
   onPreview: (m: RideableMarket) => void;
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-      {items.map((m) => (
+    <div className="border-b border-[#232529]">
+      {items.map((m, i) => (
         <MarketCard
           key={m.id}
           market={m}
+          index={i + 1}
           onRideYes={onRideYes}
           onRideNo={onRideNo}
           onPreview={onPreview}
@@ -56,8 +63,12 @@ export default function MarketGrid({
   onRideNo,
   onPreview,
 }: MarketGridProps) {
+  const { reload, feedError } = useMarkets();
+  // Legendary tracks run in their own race — never duplicate them
+  // inside the main card.
   const filtered = markets.filter((m) => {
-    if (activeCategory !== 'ALL' && m.category !== activeCategory) return false;
+    if (activeCategory === 'ALL') return m.category !== 'LEGENDARY';
+    if (m.category !== activeCategory) return false;
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
       return (
@@ -74,91 +85,95 @@ export default function MarketGrid({
   const results = searchResults ?? filtered;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 py-8 select-none font-sans flex flex-col gap-12">
+    <div className="w-full max-w-6xl mx-auto px-4 pt-12 pb-16 select-none flex flex-col gap-10">
 
-      {/* ── Category pills ── */}
-      <div className="flex flex-wrap items-center gap-2">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => onSelectCategory(cat)}
-            className={`px-3.5 py-1.5 font-mono text-[10px] font-bold tracking-[0.14em] uppercase border transition-colors cursor-pointer ${
-              activeCategory === cat
-                ? 'border-toxic bg-toxic/15 text-toxic'
-                : 'border-[#232529] text-dim hover:text-ink'
-            }`}
-          >
-            {cat === 'ALL' ? 'All markets' : cat}
-          </button>
-        ))}
+      <div className="flex flex-col gap-5">
+        <div className="flex items-end justify-between gap-4">
+          <h2 className="font-poster uppercase leading-none text-4xl sm:text-5xl text-ink">
+            {activeCategory === 'LEGENDARY' ? 'Legendary crashes' : "Today's card"}
+          </h2>
+          <span className="font-mono text-[10px] text-dim tracking-[0.18em] pb-1 whitespace-nowrap">
+            SORTED BY 24H VOLUME
+          </span>
+        </div>
+
+        {/* ── Divisions ── */}
+        <div className="flex flex-wrap gap-x-6 gap-y-2 font-mono text-[11px] font-bold tracking-[0.18em] uppercase">
+          {DIVISIONS.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => onSelectCategory(cat)}
+              className={`pb-1 border-b-2 transition-colors cursor-pointer ${
+                activeCategory === cat
+                  ? 'text-toxic border-toxic'
+                  : 'text-dim border-transparent hover:text-ink'
+              }`}
+            >
+              {cat === 'ALL' ? 'All races' : cat}
+            </button>
+          ))}
+        </div>
       </div>
 
       {!live && (
-        <div className="border border-amber-400/40 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-400">
-          LIVE FEED UNAVAILABLE — SHOWING CACHED MARKETS. CONNECT TO RIDE REAL ODDS.
+        <div className="border border-amber-400/40 border-l-4 border-l-amber-400 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-400 flex flex-wrap items-center justify-between gap-2">
+          <span>
+            LIVE FEED UNAVAILABLE — SHOWING CACHED MARKETS.{' '}
+            {FEED_REASON[feedError ?? 'GAMMA_UNREACHABLE']}
+          </span>
+          <button
+            onClick={reload}
+            className="shrink-0 font-bold tracking-widest hover:bg-amber-400 hover:text-bg px-2 py-1 transition-colors cursor-pointer uppercase"
+          >
+            Retry →
+          </button>
         </div>
       )}
 
       {/* ── Search results mode ── */}
       {showSearch ? (
-        <section className="flex flex-col gap-5">
-          <div className="flex items-center justify-between border-b border-[#232529] pb-3">
-            <h2 className="font-mono text-xs font-bold tracking-[0.2em] text-ink uppercase">
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-mono text-xs font-bold tracking-[0.2em] text-ink uppercase">
               {searching ? 'Searching Polymarket…' : `Results for "${searchQuery}" (${results.length})`}
-            </h2>
+            </h3>
             <button
               onClick={onClearSearch}
               className="font-mono text-[10px] font-bold tracking-widest text-dim hover:text-toxic transition-colors cursor-pointer uppercase"
             >
-              [ Clear ]
+              Clear ×
             </button>
           </div>
 
           {results.length === 0 && searching ? (
-            <div className="border border-[#232529] bg-[#101113] p-12 text-center font-mono text-xs text-dim animate-pulse">
+            <div className="border-y border-[#232529] p-12 text-center font-mono text-xs text-dim animate-pulse">
               QUERYING LIVE MARKETS…
             </div>
           ) : results.length === 0 ? (
-            <div className="border border-[#232529] bg-[#101113] p-12 text-center font-mono text-xs text-dim">
-              NO CONTRACTS FOUND. TRY "BITCOIN", "TRUMP", OR "FED".
+            <div className="border-y border-[#232529] p-12 text-center font-mono text-xs text-dim">
+              NO RUNNERS FOUND. TRY "BITCOIN", "TRUMP", OR "FED".
             </div>
           ) : (
-            <CardRow items={results} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
+            <RaceList items={results} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
           )}
         </section>
       ) : (
         <>
-          {/* ── Trending ── */}
-          <section className="flex flex-col gap-5">
-            <div className="flex items-center justify-between border-b border-[#232529] pb-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-toxic animate-pulse" />
-                <h2 className="font-mono text-xs font-bold tracking-[0.2em] text-ink uppercase">
-                  Trending now ({filtered.length})
-                </h2>
-              </div>
-              <span className="font-mono text-[10px] text-dim">SORTED BY 24H VOLUME</span>
+          {filtered.length === 0 ? (
+            <div className="border-y border-[#232529] p-12 text-center font-mono text-xs text-dim">
+              NOTHING IN THIS DIVISION YET.
             </div>
-
-            {filtered.length === 0 ? (
-              <div className="border border-[#232529] bg-[#101113] p-12 text-center font-mono text-xs text-dim">
-                NOTHING IN THIS CATEGORY YET.
-              </div>
-            ) : (
-              <CardRow items={filtered} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
-            )}
-          </section>
+          ) : (
+            <RaceList items={filtered} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
+          )}
 
           {/* ── Legendary crashes ── */}
           {activeCategory !== 'LEGENDARY' && legendary.length > 0 && (
-            <section className="flex flex-col gap-5 pt-4 border-t border-[#232529]">
-              <div className="flex items-center justify-between border-b border-[#232529] pb-3">
-                <h2 className="font-mono text-xs font-bold tracking-[0.2em] text-crimson uppercase">
-                  Legendary crashes
-                </h2>
-                <span className="font-mono text-[10px] text-dim">INSANE DIFFICULTY</span>
-              </div>
-              <CardRow items={legendary} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
+            <section className="flex flex-col gap-4 pt-2">
+              <h3 className="font-poster uppercase leading-none text-3xl sm:text-4xl text-crimson">
+                Legendary crashes
+              </h3>
+              <RaceList items={legendary} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
             </section>
           )}
         </>

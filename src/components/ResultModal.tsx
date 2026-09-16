@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadShareCardImage, shareToTwitter } from '../utils/shareCard';
+import { starsFor } from '../game/score';
+import type { Difficulty } from '../data/polymarket';
 
 interface ResultModalProps {
   isOpen: boolean;
@@ -7,6 +9,7 @@ interface ResultModalProps {
     finished: boolean;
     score: number;
     timeMs: number;
+    difficulty: Difficulty;
     marketQuestion?: string;
     finalProb?: number;
     trackPts?: Array<[number, number]> | null;
@@ -160,6 +163,7 @@ export default function ResultModal({ isOpen, result, onRetry, onOpenLobby, ride
   if (!isOpen || !result) return null;
 
   const isSuccess = result.finished;
+  const stars = starsFor(result.score, result.difficulty);
   const probPercent = result.finalProb !== undefined ? (result.finalProb * 100).toFixed(1) : null;
   const timeObj = formatTime(result.timeMs);
 
@@ -242,7 +246,7 @@ export default function ResultModal({ isOpen, result, onRetry, onOpenLobby, ride
           {/* Time Elapsed */}
           <div className="flex flex-col gap-0.5 pl-4 border-l border-[#1f242d]">
             <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
-              SESSION TIME
+              Ride time
             </span>
             <div className="flex items-baseline font-mono tabular-nums">
               <span className="text-2xl font-bold text-ink tracking-tight">
@@ -255,7 +259,21 @@ export default function ResultModal({ isOpen, result, onRetry, onOpenLobby, ride
           </div>
         </div>
 
-        {/* ── 4. SOCIAL SHARE ACTIONS ROW ── */}
+        {/* ── 4. STAR RATING ── */}
+        <div className="py-3 border-b border-[#1f242d] flex items-center justify-between">
+          <span className="text-[8px] font-extrabold tracking-[0.22em] text-dim uppercase">
+            Rating · {result.difficulty} track
+          </span>
+          <span className="font-mono text-lg font-black tracking-[0.2em]" aria-label={`${stars} out of 5 stars`}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span key={i} className={i < stars ? 'text-toxic' : 'text-[#2a2e38]'}>
+                ★
+              </span>
+            ))}
+          </span>
+        </div>
+
+        {/* ── 5. SOCIAL SHARE ACTIONS ROW ── */}
         <div className="pt-4 flex items-center gap-2">
           {/* Share on X */}
           <button

@@ -1,86 +1,78 @@
 # AGENTS.md
 
-Spec-driven game project. The master spec (V2) is the single source of truth for product decisions: phased build order, locked creative choices (Dark Cyber Dirt Bike only, near-black bg, glowing probability track is the visual hero). Do not redesign these.
+OddsRider: browser motocross game where real Polymarket probability charts become rideable terrain. React shell + Phaser 3 (Matter) game that mounts **only** on `/ride/:marketId`.
 
 ## Commands
 
-- Package manager is **pnpm** (spec-mandated), never npm/yarn.
-- `pnpm dev` — dev server (slow first start on /mnt/e; ~10s+).
-- `pnpm build` — typecheck (`tsc --noEmit`, strict) + Vite build. This is the only verification gate; there are no tests or lint yet.
-- `pnpm preview` — serve `dist/`. Bind `--host 127.0.0.1` in WSL: plain `localhost` can resolve to IPv6 and fail.
+- Package manager is **pnpm** (`pnpm-lock.yaml` exists; there is no `package-lock.json`). Never npm/yarn.
+- `pnpm dev` — Vite dev server (`:5173`).
+- `pnpm build` — `tsc --noEmit` (strict) + Vite build. **The only verification gate: no tests, lint, or CI exist** (no test/lint scripts in `package.json`, no `.github/`).
+- `pnpm preview` — serves `dist/` on `:4173`; root `*.cjs` helpers expect that port.
+
+## Routes & data (see README for the full contract)
+
+- `/` home (hero, daily challenge, trending, legendary crashes) · `/preview/:marketId` (track preview, timeframe select, your runs) · `/ride/:marketId` (game) · `/about`. Unknown paths redirect to `/`.
+- Ride params: `?side=no` rides the inverted NO track, `?tf=24H|7D|ALL` picks the price-history window (`RidePage.tsx`).
+- `src/data/polymarket.ts` fetches Gamma (odds/metadata) + CLOB (price history); `marketsContext.tsx` owns feed/cache state; `playerStorage.ts` keeps stats in localStorage (no accounts).
+- Data honesty (README, binding): odds are last-trade Gamma prices; tracks map CLOB history 1:1 with no smoothing; uncomputable 24h change shows "—"; untrackable markets say so; unreachable feed shows a cached-markets notice. Never invent stats.
+- Odds flow (do not re-derive): `EV.MARKET` carries the market's official `currentProb`/`probDelta` (cards = preview = HUD); `EV.PROB` is the live under-wheels interpolation for the minimap dot + result screen only. Feed state lives in `marketsContext` (`feedError`, `reload()`, silent 60s poll, same-feed dedupe).
+- Deploys as static site (`vercel.json` SPA rewrites).
 
 ## Stack pins (do not upgrade casually)
 
-- **Phaser 3.90.x** — spec locks Phaser 3; Phaser 4 exists but its Matter API surface differs.
-- React 19 + Tailwind CSS v4 (CSS-first: theme tokens live in `@theme` in `src/index.css`, no tailwind.config).
-- Matter physics comes bundled inside Phaser; do NOT add the separate `matter-js` package.
+- **Phaser 3.90.0** pinned; Matter physics comes bundled inside Phaser — do NOT add `matter-js`.
+- React 19 + Tailwind CSS v4, CSS-first: tokens in `src/index.css` `@theme`, no `tailwind.config`.
+- Fonts load via Google Fonts `<link>` in `index.html` (Space Grotesk + Geist Mono). Canvas code in `TrackRenderer.ts` / `RideScene.ts` / `finish.ts` references `'JetBrains Mono'`, which is **not** loaded — it silently falls back to monospace. Don't add font families without loading them.
 
 ## Architecture
 
 ```
-src/App.tsx + game/PhaserGame.tsx   React mounts one Phaser.Game into a fixed div
+src/App.tsx                      BrowserRouter + MarketsProvider + ScrollToTop, 4 routes
+src/pages/                       HomePage / PreviewPage / RidePage / AboutPage
+src/components/                  Navbar, Footer, MarketCard/Grid, HeroSpotlight, DailyChallenge,
+                                 TrackPreview, HudOverlay, CountdownGate, ResultModal, TouchControls
 src/game/
-  config.ts        Phaser config: gravity y:1.1, matter autoUpdate:false, input.keyboard:false
-  constants.ts     ALL tuning numbers (BIKE geometry, TUNING per-step values, WORLD, PALETTE, SPRITE)
-  perfect_assets.ts  LOCKED sprite-alignment spec v0.1 — SPRITE in constants.ts must match it
-  bus.ts           tiny emitter bridging Phaser scene → React HUD (EV.SPEED/MUTE/NITRO/CRASH/…)
+  config.ts        gravity y:1.1, matter autoUpdate:false, input.keyboard:false, scenes [Boot, Ride]
+  constants.ts     ALL tuning: PALETTE, STEP_MS=1000/60, MAX_STEPS_PER_FRAME=4, BIKE, TUNING, WORLD, SPRITE
+  bus.ts           emitter bridging Phaser scene → React HUD
+  terrain.ts + track/TrackRenderer.ts   CLOB history → physics bodies + glow rendering
   scenes/BootScene.ts   loads public/assets/game/{bike,wheel,rider,ragdoll,flag}.png
-  scenes/RideScene.ts   fixed-step accumulator loop, camera lerp follow, ground/ticks/gates,
-                   auto-respawn; exposes window.__oddsrider debug handle
-  bike/Bike.ts     bodies + suspension constraints + drive/lean/nitro/jump +
-                   integrity enforcement + crash detection + ejectRider() ragdoll (one class)
-  bike/BikeRenderer.ts  sprite rendering anchored to rear-wheel hub ("Wheel-First")
-  bike/CyberEffects.ts  particles/camera-shake juice engine (terminal aesthetic, no slop)
-  input/InputManager.ts window-level keydown/keyup Set<code> (NOT Phaser keyboard),
-                   edge-triggered R reset / M mute / Space jump
-src/components/HudOverlay.tsx  React HUD, subscribes to bus events
-public/assets/game/   processed game-ready PNGs   public/assets2/  original AI sources (never delete)
+  scenes/RideScene.ts   fixed-step accumulator, camera follow, score/tricks, auto-respawn,
+                        exposes window.__oddsrider debug handle
+  bike/Bike.ts     bodies + suspension constraints + drive/lean/nitro/jump + enforceIntegrity +
+                   crash detection + ejectRider() ragdoll (one class)
+  bike/BikeRenderer.ts  rear-wheel-hub-anchored ("Wheel-First") sprite rendering
+  bike/CyberEffects.ts  particles/camera-shake juice
+  input/InputManager.ts window-level keydown/keyup Set<code>, NOT Phaser keyboard (R/M/Space are edge-triggered)
+  score.ts / finish.ts / audio.ts
+public/assets/game/  processed PNGs   public/assets2/  original AI sources (never delete)
 ```
-
-## Sprite alignment (locked — do not eyeball-tune)
-
-Bike/rider/ragdoll placement went through many alignment commits and ended in a locked spec:
-`SPRITE` (constants.ts) mirrors `src/game/perfect_assets.ts` v0.1. Rendering is **anchored on the
-rear wheel hub** (wheel sprites are the base; chassis/rider are offsets from it); `BIKE.wheelR = 25`
-was deliberately matched to the visual tire so tires sit flush on the ground line. If art looks
-misaligned, re-measure headlessly (see root `dump_*.cjs` / `measure_*.cjs`) — don't nudge numbers.
 
 ## Physics rules (hard-won — do not regress)
 
-- Matter world steps **manually**: fixed accumulator in RideScene, `STEP_MS = 1000/60`, max 4 steps/frame. `autoUpdate: false` in config. Never let Phaser auto-step.
-- Gravity is **1.1**, not Phaser's default 1 and not "feels right" guesses. All tuning lives in `constants.ts` as **per-step** units (matter velocities are px/step; multiply by 60 for px/s display).
-- Bike = chassis + 2 wheels + head body, joined by 2 suspension constraints per wheel (stiffness 0.62 / damping 0.2) + 2 head pins. Derived from the proven ornn-rider reference implementation.
-- `Bike.enforceIntegrity()` must run every step after `world.step`: terminal velocity caps + wheel-socket clamping. Removing it makes soft-constraint wheels blow out on hard landings ("works then collapses").
-- Drive/lean mutate angular velocity directly (reference pattern); nitro uses force along chassis angle. Jump is a one-shot velocity set gated by grounded/coyote.
-- Debug handle: `window.__oddsrider` exposes x/y/angle/speed/grounded/crashed/nitro/reset — used by headless smoke tests.
+- Matter steps **manually**: accumulator in `RideScene` (`STEP_MS`, max 4 steps/frame), `autoUpdate: false`. Never let Phaser auto-step.
+- Gravity is **1.1**. Tuning in `constants.ts` is **per-step** (Matter velocities are px/step; ×60 for px/s display).
+- `Bike.enforceIntegrity()` runs every step after `world.step` (terminal-velocity caps + wheel-socket clamping). Removing it lets soft-constraint wheels blow out on hard landings.
+- Drive/lean mutate angular velocity directly; nitro applies force along chassis angle; jump is a one-shot velocity set gated by grounded/coyote.
 
-## Verification without a display (WSL)
+## Sprite alignment (locked — do not eyeball-tune)
 
-Headless chromium smoke tests are the substitute for playtesting:
-- `playwright` is a devDependency, but chromium-headless-shell + system libs live under
-  `/tmp/opencode` (libs extracted to `/tmp/opencode/libs/root/usr/lib/x86_64-linux-gnu`, no sudo on
-  this box) — run node with `LD_LIBRARY_PATH` pointing there.
-- `/tmp` is wiped between sessions; reinstall pattern: `npm i playwright` + `apt-get download <libs>` + `dpkg -x`.
-- Root helpers (`smoke_test.cjs`, `measure_*.cjs`, `dump_*.cjs`) expect the preview server on
-  `http://localhost:4173` and drive `window.__oddsrider`.
-- Check telemetry assertions (speed ramps, |angle| small, x progresses, zero console errors) +
-  screenshots, not just "it boots". `browser.close()` often hangs past timeout — output already
-  printed means success.
+`SPRITE` (`constants.ts:120`) mirrors `perfect_assets.ts` (`wheelR: 25` in both, matched to the visual tire). Rendering anchors on the **rear wheel hub**. If art looks off, re-measure headlessly (`dump_*.cjs` / `measure_*.cjs`) — don't nudge numbers.
 
-## Design language (locked)
+## Design language (race-day program — the old terminal spec is retired)
 
-Betting-terminal aesthetic, explicitly anti-AI-slop: radius-0 corners, 1px `#232529` borders, 2-Font System (`Space Grotesk` interface + `Geist Mono` tabular telemetry), toxic `#b6ff00` / crimson `#ff3355` accents used sparingly. Banned: gradients on UI, glassmorphism, rounded cards, emoji, purple/blue palettes. Full specification documented in `docs/DESIGN_SYSTEM.md`. Tokens live in `index.css @theme` + `PALETTE` in `constants.ts` — change them there, not inline.
+Site chrome is a **race-meet program**, not the old boxed terminal: Anton poster headlines/odds (`font-poster`, loaded via Google Fonts in `index.html`), Space Grotesk questions, Geist Mono data; toxic `#b6ff00` / crimson `#ff3355` on near-black; scrolling odds ticker + live UTC clock for aliveness; numbered racecard rows (not grids); full-bleed YES/NO actions; no corner reticles, no `[ bracket ]` buttons. `docs/DESIGN_SYSTEM.md` is **superseded** for site chrome — its honesty/palette core still applies to the in-game HUD, which is untouched and must stay that way.
 
-## Code traps (learned the hard way)
+## Headless verification (no display on this box)
 
-- TS strict + `noUnusedLocals/noUnusedParameters` — unused imports fail the build.
-- Don't name a class field `renderer` inside Scene subclasses (`Phaser.Scene` already has one).
-- Matter body `label` isn't typed by Phaser: cast `(pair.bodyA as unknown as { label: string }).label`.
-- No code comments unless asked; no emojis in code or UI.
+- `playwright` is a devDependency; drive `window.__oddsrider` (x/y/angle/speed/grounded/crashed/nitro/reset) against the preview server on `:4173` and assert telemetry (speed ramps, |angle| small, x progresses, zero console errors) + screenshots.
+- `smoke_test.cjs` still hardcodes a stale Windows screenshot path (`E:/OddsRider/screenshot.png`) — override the path when reusing it.
+
+## Code traps
+
+- TS `noUnusedLocals` + `noUnusedParameters` — unused imports fail the build.
 
 ## Repo conventions
 
-- Remote: `github.com/nishachay/OddsRider`, branch `main`, git identity configured locally (nishachay noreply email). Pushes need a user-supplied PAT (fine-grained, Contents: Read+Write); never persist tokens to `.git/config`.
-- Commits: concise imperative, e.g. `Phase 1: core ride loop foundation`.
-- `HANDOFF.md` has deep context (physics derivation numbers, asset pipeline, WSL setup detail) but its point-in-time status sections go stale — trust `git log`, not its TODO list.
-- Roadmap order per spec: Phase 2 = Polymarket Gamma/CLOB data → probability terrain generation (green/red segments), crash/finish scoring; Phase 3 = home page/markets/share card; Phase 4 = mobile/juice/caching. Don't jump ahead of the current phase.
+- Remote `github.com/nishachay/OddsRider`, branch `main`, local git identity configured. Concise imperative commits (e.g. `Phase 1: core ride loop foundation`).
+- `HANDOFF.md` has deep background, but its status/plan sections lag the code (e.g. it claims `pixelArt:true`, which `config.ts` doesn't set) — trust code + `git log` over it.

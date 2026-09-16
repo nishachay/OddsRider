@@ -170,7 +170,7 @@ export function generateShareCard(payload: SharePayload): HTMLCanvasElement {
   // Column 1: Time Elapsed
   ctx.fillStyle = DIM;
   ctx.font = '800 11px "Space Grotesk", sans-serif';
-  ctx.fillText('SESSION TIME', 64, statsY + 30);
+  ctx.fillText('RIDE TIME', 64, statsY + 30);
   ctx.fillStyle = INK;
   ctx.font = '800 34px "Geist Mono", monospace';
   ctx.fillText(fmtTime(payload.timeMs), 64, statsY + 68);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bus, EV } from "../game/bus";
 import ResultModal from "./ResultModal";
 import TouchControls from "./TouchControls";
+import type { Difficulty } from "../data/polymarket";
 
 const TOXIC = "#b6ff00";
 const CRIMSON = "#ff3355";
@@ -108,8 +109,10 @@ function VolumeIcon({ muted }: { muted: boolean }) {
 
 interface ScorePayload { total: number; timeMs: number; finished: boolean; combo: number; }
 interface PopupPayload { id: number; text: string; points: number; }
-interface MarketPayload { question: string; probNow: number; probDelta: number; }
-interface ResultPayload { finished: boolean; score: number; timeMs: number; }
+// Official contract odds from the scene: same last-trade numbers as the
+// market card and preview. probDelta is null when uncomputable ("—").
+interface MarketPayload { question: string; currentProb: number; probDelta: number | null; }
+interface ResultPayload { finished: boolean; score: number; timeMs: number; difficulty: Difficulty; }
 
 interface HudOverlayProps {
   onOpenLobby?: () => void;
@@ -182,9 +185,14 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
   }, []);
 
   const deltaUp = (market?.probDelta ?? 0) >= 0;
-  const deltaSign = deltaUp ? "+" : "";
-  const deltaAbs = ((market?.probDelta ?? 0) * 100).toFixed(1);
-  const probPct = prob === null ? null : prob * 100;
+  const deltaKnown = market?.probDelta != null;
+  const deltaColor = !deltaKnown ? DIM : deltaUp ? TOXIC : CRIMSON;
+  const deltaLabel = !deltaKnown ? "—" : `${deltaUp ? "+" : ""}${((market?.probDelta ?? 0) * 100).toFixed(1)}%`;
+  // Official contract odds. The live under-wheels value (EV.PROB) feeds the
+  // minimap dot and the result screen — never the hero number.
+  const chanceUp = market ? market.currentProb >= 0.5 : deltaUp;
+  const probPct = market ? market.currentProb * 100 : prob === null ? null : prob * 100;
+  const heroColor = probPct === null ? DIM : chanceUp ? TOXIC : CRIMSON;
   const fullQuestion = market?.question ?? "LOADING LIVE POLYMARKET DATA...";
 
   const toggleMute = useCallback(() => {
@@ -206,7 +214,7 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
 
       {/* ── TOP DECK: FOCUS & TACTICAL SPARKLINE ── */}
       <div className="flex items-start justify-between w-full">
-        
+
         {/* Top-Left: Brand Identity & Lobby Switcher */}
         <div className="flex items-center gap-4">
           <div className="flex items-baseline tracking-[0.24em] uppercase font-display font-black text-sm sm:text-base">
@@ -267,7 +275,7 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
 
         {/* Bottom-Left: Pure Cockpit Telemetry (Speed + Score + Nitro) */}
         <div className="flex flex-col gap-2">
-          
+
           {/* Speed & Score Baseline Duo */}
           <div className="flex items-baseline gap-6 font-mono tabular-nums">
             <div className="flex items-baseline gap-1">
@@ -330,7 +338,7 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
 
 
         {/* Bottom-Center: Start-Gate Keycaps Helper (Gracefully Fades Out On Drive) */}
-        <div 
+        <div
           className="flex items-center gap-2 pb-1 font-sans transition-opacity duration-500 ease-out"
           style={{ opacity: hasStarted ? 0 : 0.75 }}
         >
@@ -343,7 +351,7 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
             { key: "R", label: "RESET" },
           ].map(({ key, label }) => (
             <span key={label} className="flex items-center gap-1">
-              <span className="font-mono px-1 py-0.5 text-[7.5px] font-bold text-subtle leading-none" 
+              <span className="font-mono px-1 py-0.5 text-[7.5px] font-bold text-subtle leading-none"
                     style={{ background: "rgba(255,255,255,0.04)", border: "1px solid #232529" }}>
                 {key}
               </span>
@@ -356,9 +364,9 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
 
 
         {/* Bottom-Right: Polymarket Prediction Outcome Column */}
-        <div className="flex flex-col items-end gap-1.5 max-w-[460px] text-right pl-6" 
-             style={{ borderRight: `2px solid ${deltaUp ? TOXIC : CRIMSON}`, paddingRight: 12 }}>
-          
+        <div className="flex flex-col items-end gap-1.5 max-w-[460px] text-right pl-6"
+              style={{ borderRight: `2px solid ${heroColor}`, paddingRight: 12 }}>
+
           {/* Full Question Text */}
           <span className="font-sans font-medium text-[12.5px] leading-[1.38] text-ink/90 tracking-[-0.01em]">
             {fullQuestion}
@@ -369,12 +377,12 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
             <div className="flex items-baseline gap-1 font-mono tabular-nums">
               <span style={{
                 fontSize: 36, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.04em",
-                color: probPct === null ? DIM : deltaUp ? TOXIC : CRIMSON,
-                textShadow: probPct === null ? "none" : deltaUp ? `0 0 16px ${TOXIC}60` : `0 0 16px ${CRIMSON}60`,
+                color: heroColor,
+                textShadow: probPct === null ? "none" : `0 0 16px ${heroColor}60`,
               }}>
                 {probPct === null ? "—" : `${probPct.toFixed(1)}%`}
               </span>
-              
+
               <span className="font-sans font-extrabold text-[10px] tracking-[0.18em] text-ink ml-0.5">
                 YES
               </span>
@@ -382,11 +390,11 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
 
             {market && (
               <span className="font-mono text-[9.5px] font-bold px-1.5 py-0.5" style={{
-                color: deltaUp ? TOXIC : CRIMSON,
-                background: deltaUp ? "rgba(182,255,0,0.08)" : "rgba(255,51,85,0.08)",
-                border: `1px solid ${deltaUp ? TOXIC : CRIMSON}30`,
+                color: deltaColor,
+                background: `${deltaColor}14`,
+                border: `1px solid ${deltaColor}30`,
               }}>
-                {deltaSign}{deltaAbs}%
+                {deltaLabel}
               </span>
             )}
           </div>
@@ -422,6 +430,7 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
         isOpen={Boolean(result)}
         result={result ? {
           finished: result.finished, score: result.score, timeMs: result.timeMs,
+          difficulty: result.difficulty,
           marketQuestion: market?.question, finalProb: prob ?? undefined,
           trackPts: track,
         } : null}

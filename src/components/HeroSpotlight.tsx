@@ -1,46 +1,47 @@
 ﻿import { useEffect, useRef } from 'react';
 import type { RideableMarket } from '../data/polymarket';
-import type { PlayerStats } from '../data/playerStorage';
 
 interface HeroProps {
   market: RideableMarket;
   live: boolean;
-  stats: PlayerStats;
-  query: string;
-  onQueryChange: (q: string) => void;
+  trackCount: number;
   onRideYes: (market: RideableMarket) => void;
   onRideNo: (market: RideableMarket) => void;
   onPreview: (market: RideableMarket) => void;
+}
+
+interface SearchStripProps {
+  query: string;
+  onQueryChange: (q: string) => void;
   onSearch: (q: string) => void;
 }
 
 const TOXIC = '#b6ff00';
+const QUICK_PICKS = ['BITCOIN', 'TRUMP', 'FED', 'AI'];
+
+const GOING: Record<string, string> = {
+  EASY: 'text-toxic',
+  MEDIUM: 'text-ink',
+  HARD: 'text-orange-500',
+  INSANE: 'text-crimson',
+  NEW: 'text-dim',
+};
+
+function scrollToCard() {
+  document.getElementById('card')?.scrollIntoView({ behavior: 'smooth' });
+}
 
 export default function HeroSpotlight({
   market,
   live,
-  stats,
-  query,
-  onQueryChange,
+  trackCount,
   onRideYes,
   onRideNo,
   onPreview,
-  onSearch,
 }: HeroProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const probPct = Math.round(market.currentProb * 100);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, []);
+  const chanceUp = market.currentProb >= 0.5;
 
   // Animated probability curve with a rider marker rolling along it
   useEffect(() => {
@@ -121,132 +122,171 @@ export default function HeroSpotlight({
     return () => cancelAnimationFrame(animId);
   }, [market]);
 
-  const submit = () => {
-    if (query.trim()) onSearch(query.trim());
-  };
+  return (
+    <section className="w-full max-w-6xl mx-auto px-4 pt-10 sm:pt-16 pb-4 select-none">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-10 items-end">
+        <div className="flex flex-col items-start gap-5">
+          <span className="flex items-center gap-2 font-mono text-[10px] font-bold tracking-[0.3em] uppercase">
+            <span className={`inline-block w-2 h-2 ${live ? 'bg-toxic animate-pulse' : 'bg-amber-400'}`} />
+            <span className={live ? 'text-toxic' : 'text-amber-400'}>
+              {live ? 'Live race card' : 'Offline race card'}
+            </span>
+          </span>
+
+          <h1 className="font-poster uppercase leading-[0.88] text-[clamp(3.8rem,10vw,7.5rem)]">
+            <span className="block text-ink">Ride the</span>
+            <span className="block text-outline">odds.</span>
+          </h1>
+
+          <p className="font-sans text-sm sm:text-base text-dim max-w-md leading-relaxed">
+            Real Polymarket probability charts turned into motocross tracks.
+            Every rally is a climb. Every crash is a cliff.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-4 pt-1">
+            <button
+              onClick={() => onRideYes(market)}
+              className="px-8 py-4 bg-toxic text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 transition-all cursor-pointer shadow-[0_0_24px_rgba(182,255,0,0.45)]"
+            >
+              Enter race 01
+            </button>
+            <button
+              onClick={scrollToCard}
+              className="font-mono text-[11px] font-bold tracking-[0.2em] text-dim hover:text-toxic transition-colors cursor-pointer uppercase underline underline-offset-8 decoration-[#3b414f] hover:decoration-toxic"
+            >
+              Browse the card
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] font-bold tracking-[0.18em] uppercase text-dim">
+            <span>
+              <span className="text-ink tabular-nums">{trackCount}</span> runners
+            </span>
+            <span>Free</span>
+            <span>No account</span>
+          </div>
+        </div>
+
+        {/* ── Featured race ── */}
+        <div
+          onClick={() => onPreview(market)}
+          className="border border-[#232529] bg-[#101113] cursor-pointer group hover:border-toxic/50 transition-all"
+        >
+          <div className="flex items-center justify-between px-5 pt-4 font-mono text-[10px] font-bold tracking-[0.22em] uppercase">
+            <span className="text-toxic">Race 01 · {market.category}</span>
+            <span className={GOING[market.difficulty] ?? 'text-dim'}>
+              Going · {market.difficulty}
+              {!market.live && <span className="text-dim"> · Cached</span>}
+            </span>
+          </div>
+
+          <div className="px-5 pt-3 font-display font-bold text-lg leading-snug text-ink group-hover:text-toxic transition-colors">
+            {market.question}
+          </div>
+
+          <div className="flex items-end gap-2 px-5 pt-1">
+            <span
+              className={`font-poster leading-none text-7xl tabular-nums ${chanceUp ? 'text-toxic' : 'text-crimson'}`}
+            >
+              {probPct}
+              <span className="text-2xl text-dim">%</span>
+            </span>
+            <span className="font-sans text-xs font-extrabold text-ink pb-1.5">YES</span>
+            <span className="font-mono text-[11px] text-dim tabular-nums pb-1.5 ml-auto">
+              {market.volumeFormatted}
+            </span>
+          </div>
+
+          <div className="mx-5 mt-3 border border-[#232529] bg-[#0c0e12] overflow-hidden">
+            <canvas ref={canvasRef} width={900} height={220} className="block w-full h-36 sm:h-40" />
+          </div>
+
+          <div className="grid grid-cols-2 mt-4 border-t border-[#232529]">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRideYes(market);
+              }}
+              className="py-4 bg-toxic text-bg font-mono text-xs font-bold tracking-[0.18em] uppercase hover:bg-toxic/90 transition-all cursor-pointer text-center"
+            >
+              Ride yes ∧
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRideNo(market);
+              }}
+              className="py-4 border-l border-[#232529] bg-transparent text-crimson font-mono text-xs font-bold tracking-[0.18em] uppercase hover:bg-crimson hover:text-bg transition-all cursor-pointer text-center"
+            >
+              Ride no ∨
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function SearchStrip({ query, onQueryChange, onSearch }: SearchStripProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   return (
-    <section className="w-full max-w-6xl mx-auto px-4 pt-10 pb-2 select-none">
-      <div className="flex flex-col items-center text-center gap-3">
-        <span className="font-mono text-[10px] font-bold tracking-[0.3em] text-toxic uppercase">
-          Motocross meets prediction markets
-        </span>
-        <h1 className="font-display font-black text-4xl sm:text-6xl text-ink tracking-tight">
-          Ride the odds.
-        </h1>
-        <p className="font-sans text-sm sm:text-base text-dim max-w-xl leading-relaxed">
-          Real Polymarket probability charts turned into motocross tracks.
-          Every rally is a climb. Every crash is a cliff.
-        </p>
+    <section id="find" className="w-full max-w-6xl mx-auto px-4 pt-12 scroll-mt-16 select-none">
+      <h2 className="font-poster uppercase text-3xl sm:text-4xl text-ink leading-none">
+        Find your race
+      </h2>
+      <p className="font-mono text-[10px] font-bold tracking-[0.22em] text-dim pt-2 uppercase">
+        Search the card — or paste any Polymarket link
+      </p>
 
-        <div className="flex items-center gap-2 pt-1 font-mono text-[10px] font-bold tracking-widest uppercase">
-          <span className={`inline-block w-2 h-2 ${live ? 'bg-toxic animate-pulse' : 'bg-amber-400'}`} />
-          <span className={live ? 'text-toxic' : 'text-amber-400'}>
-            {live ? 'Live feed' : 'Offline cache'}
-          </span>
-        </div>
-
-        <form
-          className="w-full max-w-xl flex gap-2 pt-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            submit();
-          }}
+      <form
+        className="flex items-end gap-3 pt-4 max-w-2xl"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (query.trim()) onSearch(query.trim());
+        }}
+      >
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Bitcoin, Trump, Fed…  ( / )"
+          className="flex-1 bg-transparent border-b-2 border-[#3b414f] focus:border-toxic focus:outline-none font-display font-bold text-xl py-2 text-ink placeholder:text-dim/40 transition-colors"
+        />
+        <button
+          type="submit"
+          className="font-mono text-xs font-bold tracking-[0.2em] uppercase text-toxic border-b-2 border-toxic px-1 py-2 hover:bg-toxic hover:text-bg transition-all cursor-pointer"
         >
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => {
-              onQueryChange(e.target.value);
-            }}
-            placeholder="Search any market… ( / )"
-            className="flex-1 bg-[#101113] border border-[#232529] px-4 py-3 font-mono text-sm text-ink placeholder-dim/60 focus:border-toxic/60 focus:outline-none transition-all"
-          />
+          Find →
+        </button>
+      </form>
+
+      <div className="flex items-center gap-5 pt-3 font-mono text-[11px] font-bold tracking-[0.18em] uppercase">
+        {QUICK_PICKS.map((chip, i) => (
           <button
-            type="submit"
-            className="px-6 py-3 bg-toxic text-bg font-mono text-xs font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 transition-all cursor-pointer"
+            key={chip}
+            type="button"
+            onClick={() => {
+              onQueryChange(chip);
+              onSearch(chip);
+            }}
+            className="text-dim hover:text-toxic transition-colors cursor-pointer"
           >
-            Find
+            <span className="text-[#3b414f] mr-1">0{i + 1}</span>
+            {chip}
           </button>
-        </form>
-      </div>
-
-      <div className="relative border border-[#232529] bg-[#101113] p-6 sm:p-8 mt-8">
-        <span className="absolute -top-1 -left-1 text-[10px] text-[#3b414f] font-mono leading-none">+</span>
-        <span className="absolute -top-1 -right-1 text-[10px] text-[#3b414f] font-mono leading-none">+</span>
-        <span className="absolute -bottom-1 -left-1 text-[10px] text-[#3b414f] font-mono leading-none">+</span>
-        <span className="absolute -bottom-1 -right-1 text-[10px] text-[#3b414f] font-mono leading-none">+</span>
-
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-          <div className="flex-1 flex flex-col gap-3">
-            <div className="flex items-center gap-2 font-mono text-[9px] font-bold uppercase">
-              <span className="tracking-[0.24em] text-toxic border border-toxic/30 bg-toxic/10 px-2.5 py-1">
-                #1 Trending
-              </span>
-              <span className="text-dim border border-[#232529] px-2 py-1">{market.category}</span>
-              <span className="text-toxic">• {market.difficulty}</span>
-              {!market.live && <span className="text-amber-400">• Cached</span>}
-            </div>
-
-            <h2
-              onClick={() => onPreview(market)}
-              className="font-display font-bold text-2xl sm:text-3xl text-ink leading-snug hover:text-toxic transition-colors cursor-pointer"
-            >
-              {market.question}
-            </h2>
-
-            <div className="flex flex-wrap items-baseline gap-6 pt-1 font-mono">
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-sans text-[8.5px] font-extrabold tracking-[0.2em] text-dim uppercase">
-                  Chance:
-                </span>
-                <span className="text-3xl sm:text-4xl font-black tabular-nums text-toxic tracking-tight">
-                  {probPct}%
-                </span>
-                <span className="font-sans text-xs font-extrabold text-ink">YES</span>
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-sans text-[8.5px] font-extrabold tracking-[0.2em] text-dim uppercase">
-                  24H Volume:
-                </span>
-                <span className="text-base font-bold text-ink tabular-nums">{market.volumeFormatted}</span>
-              </div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-sans text-[8.5px] font-extrabold tracking-[0.2em] text-dim uppercase">
-                  Your rides:
-                </span>
-                <span className="text-base font-bold text-ink tabular-nums">
-                  {stats.ridesCompleted} · Best {stats.highScore.toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 pt-3">
-              <button
-                onClick={() => onRideYes(market)}
-                className="px-6 py-3.5 bg-toxic text-bg font-mono text-xs font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 transition-all cursor-pointer shadow-[0_0_20px_rgba(182,255,0,0.4)]"
-              >
-                [ Ride Yes ]
-              </button>
-              <button
-                onClick={() => onRideNo(market)}
-                className="px-6 py-3.5 border border-crimson/60 bg-crimson/15 text-crimson font-mono text-xs font-bold tracking-[0.16em] uppercase hover:bg-crimson hover:text-bg transition-all cursor-pointer"
-              >
-                [ Ride No ]
-              </button>
-              <button
-                onClick={() => onPreview(market)}
-                className="px-4 py-3.5 border border-[#232529] bg-[#101113] font-mono text-xs font-bold text-dim hover:text-ink transition-colors cursor-pointer"
-              >
-                [ Inspect track ]
-              </button>
-            </div>
-          </div>
-
-          <div className="w-full lg:w-[420px] h-48 sm:h-52 relative border border-[#232529] bg-[#0c0e12]">
-            <canvas ref={canvasRef} width={420} height={208} className="w-full h-full" />
-          </div>
-        </div>
+        ))}
       </div>
     </section>
   );

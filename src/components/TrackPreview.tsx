@@ -16,6 +16,11 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
 
   const deltaUp = (market.probDelta ?? 0) >= 0;
   const probPct = Math.round(market.currentProb * 100);
+  const chanceUp = market.currentProb >= 0.5;
+  const deltaLabel =
+    market.probDelta === null
+      ? '—'
+      : `${deltaUp ? '+' : ''}${(market.probDelta * 100).toFixed(1)}%`;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -99,91 +104,71 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [market, onLaunchRide]);
+  }, [market, onLaunchRide, timeframe]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 py-8 select-none font-sans text-ink">
-      
+    <div className="w-full max-w-4xl mx-auto px-4 py-8 select-none text-ink">
+
       {/* ── 1. Breadcrumb ── */}
-      <nav className="flex items-center gap-2 font-mono text-xs text-dim mb-6">
+      <nav className="flex items-center gap-2 font-mono text-[11px] tracking-[0.16em] text-dim mb-6 uppercase">
         <button onClick={onBack} className="hover:text-toxic cursor-pointer">
-          Markets
+          ← All races
         </button>
-        <span>/</span>
-        <span className="uppercase">{market.category}</span>
-        <span>/</span>
-        <span className="text-ink truncate max-w-md">{market.question}</span>
+        <span className="text-[#3b414f]">/</span>
+        <span>{market.category}</span>
       </nav>
 
-      {/* ── 2. Header: Polymarket Question + Live Chance + Delta ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-[#232529]">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-display font-bold text-2xl text-ink leading-snug">
+      {/* ── 2. Header: question + poster odds ── */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b-2 border-[#f0f0f2]">
+        <div className="flex flex-col gap-2">
+          <span className="font-mono text-[10px] font-bold tracking-[0.24em] text-toxic uppercase">
+            Race card · {market.difficulty}
+          </span>
+          <h1 className="font-display font-bold text-2xl sm:text-3xl text-ink leading-snug">
             {market.question}
           </h1>
-          <div className="flex items-center gap-3 text-xs font-mono text-dim">
-            <span>RESOLVES: {market.resolutionDate}</span>
-            <span>•</span>
-            <span>VOLUME: {market.volumeFormatted}</span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-dim uppercase tracking-[0.14em]">
+            <span>Resolves {market.resolutionDate}</span>
+            <span>·</span>
+            <span>{market.volumeFormatted}</span>
+            <span>·</span>
+            <span>{market.volatilityLabel}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4 font-mono">
-          <div className="flex flex-col items-end">
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-black text-ink tabular-nums">
-                {probPct}%
-              </span>
-              <span className="font-sans text-xs font-bold text-toxic">
-                YES
-              </span>
-            </div>
-            <span className={`text-xs font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
-              {market.probDelta === null
-                ? '— 24H'
-                : `${deltaUp ? '↑ +' : '↓ '}${(market.probDelta * 100).toFixed(1)}% 24H`}
+        <div className="flex items-end gap-2 shrink-0">
+          <span className={`font-poster leading-none text-7xl tabular-nums ${chanceUp ? 'text-toxic' : 'text-crimson'}`}>
+            {probPct}
+            <span className="text-2xl text-dim">%</span>
+          </span>
+          <span className="flex flex-col pb-1">
+            <span className="font-sans text-xs font-extrabold text-ink">YES</span>
+            <span className={`font-mono text-[11px] font-bold tabular-nums ${deltaUp ? 'text-toxic' : 'text-crimson'}`}>
+              {deltaLabel} 24H
             </span>
-          </div>
-
-          <span className="text-xs text-dim border border-[#232529] px-2.5 py-1 uppercase">
-            {market.difficulty}
           </span>
         </div>
       </div>
 
-      {/* ── 3. High-Res Track Card (Radius-0) ── */}
-      <div className="relative border border-[#232529] bg-[#101113] p-6 shadow-2xl mt-6">
-        {/* Tactical Corner Reticles */}
-        <span className="absolute -top-1 -left-1 text-[9px] text-[#3b414f] font-mono leading-none">+</span>
-        <span className="absolute -top-1 -right-1 text-[9px] text-[#3b414f] font-mono leading-none">+</span>
-        <span className="absolute -bottom-1 -left-1 text-[9px] text-[#3b414f] font-mono leading-none">+</span>
-        <span className="absolute -bottom-1 -right-1 text-[9px] text-[#3b414f] font-mono leading-none">+</span>
-
-        {/* Timeframe Selectors */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#232529]">
-          <div className="flex items-center gap-1.5 font-mono text-xs">
-            {['LIVE', '24H', '7D', 'ALL'].map((tf) => (
-              <button
-                key={tf}
-                onClick={() => setTimeframe(tf)}
-                className={`px-3 py-1 transition-colors cursor-pointer border ${
-                  timeframe === tf
-                    ? 'border-toxic bg-toxic/15 text-toxic font-bold'
-                    : 'border-[#232529] text-dim hover:text-ink'
-                }`}
-              >
-                {tf}
-              </button>
-            ))}
-          </div>
-
-          <span className="text-xs text-dim border border-[#232529] px-3 py-1 font-mono">
-            {market.volatilityLabel}
-          </span>
+      {/* ── 3. Track chart ── */}
+      <div className="border border-[#232529] bg-[#101113] mt-6">
+        <div className="flex items-center gap-5 px-6 pt-4 font-mono text-xs">
+          {['LIVE', '24H', '7D', 'ALL'].map((tf) => (
+            <button
+              key={tf}
+              onClick={() => setTimeframe(tf)}
+              className={`pb-1 border-b-2 transition-colors cursor-pointer ${
+                timeframe === tf
+                  ? 'border-toxic text-toxic font-bold'
+                  : 'border-transparent text-dim hover:text-ink'
+              }`}
+            >
+              {tf}
+            </button>
+          ))}
         </div>
 
-        {/* Canvas Area */}
-        <div className="w-full h-64 my-4 flex items-center justify-center">
+        <div className="w-full h-64 px-2 py-4 flex items-center justify-center">
           <canvas
             ref={canvasRef}
             width={768}
@@ -192,56 +177,46 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
           />
         </div>
 
-        {/* ── 4. Stats Breakdown Bar ── */}
-        <div className="grid grid-cols-4 gap-4 pt-6 border-t border-[#232529] text-center font-mono">
+        {/* ── 4. Stats strip ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 px-6 py-5 border-t border-[#232529] text-center font-mono">
           <div className="flex flex-col">
             <span className="text-lg font-bold text-ink tabular-nums">
               {market.sparkline ? market.sparkline.length : '—'}
             </span>
-            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">PROBABILITY NODES</span>
+            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Probability nodes</span>
           </div>
 
-          <div className="flex flex-col border-l border-[#232529]">
+          <div className="flex flex-col sm:border-l sm:border-[#232529]">
             <span className="text-lg font-bold text-toxic uppercase">{market.difficulty}</span>
-            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">TRACK VOLATILITY</span>
+            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Track volatility</span>
           </div>
 
-          <div className="flex flex-col border-l border-[#232529]">
+          <div className="flex flex-col border-t sm:border-t-0 border-[#232529] pt-4 sm:pt-0 sm:border-l">
             <span className="text-lg font-bold text-ink tabular-nums">32°</span>
-            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">MAX SLOPE ANGLE</span>
+            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Max slope angle</span>
           </div>
 
-          <div className="flex flex-col border-l border-[#232529]">
+          <div className="flex flex-col border-t sm:border-t-0 border-[#232529] pt-4 sm:pt-0 sm:border-l">
             <span className="text-lg font-bold text-ink tabular-nums">24,000 PX</span>
-            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">RACE DISTANCE</span>
+            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Race distance</span>
           </div>
         </div>
-
       </div>
 
-      {/* ── 5. Dual Action Buttons: RIDE YES vs RIDE NO ── */}
-      <div className="mt-6 flex flex-col gap-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            onClick={() => onLaunchRide(market, false, timeframe)}
-            className="py-4 bg-toxic text-bg font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-toxic/90 transition-all cursor-pointer text-center shadow-[0_0_20px_rgba(182,255,0,0.35)]"
-          >
-            [ RIDE LIVE ODDS (YES ∧) ]
-          </button>
-
-          <button
-            onClick={() => onLaunchRide(market, true, timeframe)}
-            className="py-4 border border-crimson/60 bg-crimson/15 text-crimson font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-crimson hover:text-bg transition-all cursor-pointer text-center"
-          >
-            [ RIDE INVERSE CRASH (NO ∨) ]
-          </button>
-        </div>
+      {/* ── 5. Dual ride actions, full-bleed ── */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 border border-[#232529] divide-y sm:divide-y-0 sm:divide-x divide-[#232529]">
+        <button
+          onClick={() => onLaunchRide(market, false, timeframe)}
+          className="py-4 bg-toxic text-bg font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-toxic/90 transition-all cursor-pointer text-center shadow-[0_0_20px_rgba(182,255,0,0.35)]"
+        >
+          Ride yes ∧
+        </button>
 
         <button
-          onClick={onBack}
-          className="w-full py-2 font-mono text-xs text-dim hover:text-ink transition-colors cursor-pointer text-center"
+          onClick={() => onLaunchRide(market, true, timeframe)}
+          className="py-4 bg-transparent text-crimson font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-crimson hover:text-bg transition-all cursor-pointer text-center"
         >
-          [ ← RETURN TO PREDICTION FEED ]
+          Ride no ∨
         </button>
       </div>
 

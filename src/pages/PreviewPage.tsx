@@ -33,9 +33,18 @@ export default function PreviewPage() {
             {best && best.runs.length > 0 && (
               <section className="w-full max-w-4xl mx-auto px-4 pb-10 select-none">
                 <div className="border border-[#232529] bg-[#101113] p-5">
-                  <h2 className="font-mono text-[10px] font-bold tracking-[0.24em] text-dim uppercase pb-3 border-b border-[#232529]">
-                    Your runs on this track
-                  </h2>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#232529]">
+                    <h2 className="font-mono text-[10px] font-bold tracking-[0.24em] text-dim uppercase">
+                      Your runs on this track
+                    </h2>
+                    <span className="font-mono text-[10px] font-bold tracking-widest text-dim uppercase">
+                      Best <span className="text-toxic tabular-nums">{best.best.toLocaleString()}</span>
+                      {' · '}
+                      {best.plays} play{best.plays === 1 ? '' : 's'}
+                      {' · '}
+                      {best.wins} win{best.wins === 1 ? '' : 's'}
+                    </span>
+                  </div>
                   <div className="flex flex-col">
                     {best.runs.map((r, i) => (
                       <div

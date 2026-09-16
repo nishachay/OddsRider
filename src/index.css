@@ -11,6 +11,7 @@
   --font-sans: "Space Grotesk", -apple-system, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, monospace;
+  --font-poster: "Anton", "Arial Narrow", sans-serif;
 }
 
 html,
@@ -26,4 +27,33 @@ body {
   font-family: var(--font-sans);
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+::selection {
+  background: #b6ff00;
+  color: #0a0a0b;
+}
+
+/* Poster outline type */
+.text-outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px #f0f0f2;
+}
+
+/* Odds ticker tape */
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ticker-track {
+  animation: ticker-scroll 45s linear infinite;
+}
+
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
 }

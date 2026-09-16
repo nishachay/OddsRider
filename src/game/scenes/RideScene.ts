@@ -6,7 +6,7 @@ import type { DriveInput } from '../bike/Bike';
 import { BikeRenderer } from '../bike/BikeRenderer';
 import { InputManager } from '../input/InputManager';
 import { fetchRide } from '../../data/polymarket';
-import type { Ride } from '../../data/polymarket';
+import type { Ride, Difficulty } from '../../data/polymarket';
 import { buildTerrain, probabilityAt } from '../terrain';
 import type { Terrain } from '../terrain';
 import { TrackRenderer } from '../track/TrackRenderer';
@@ -53,9 +53,12 @@ export class RideScene extends Phaser.Scene {
   private trickAirMs = 0;
   private wheelieMs = 0;
   private stoppieMs = 0;
+  private speedDemonMs = 0;
+  private nitroMs = 0;
   private rotAcc = 0;
   private lastTrickAngle = 0;
   private popupId = 0;
+  private rideDifficulty: Difficulty = 'MEDIUM';
 
   // Camera crash snapshot — lerp to fixed point, not live ragdoll
   private crashCamX = 0;
@@ -101,6 +104,7 @@ export class RideScene extends Phaser.Scene {
   private applyRide(ride: Ride): void {
     const terrain = buildTerrain(ride.series);
     this.terrain = terrain;
+    this.rideDifficulty = ride.market.difficulty;
     this.trackRenderer.setTerrain(terrain);
     this.swapToTerrain(terrain);
 
@@ -114,10 +118,13 @@ export class RideScene extends Phaser.Scene {
     }
     bus.emit(EV.TRACK, { pts });
 
-    const series = ride.series;
-    const probNow = series[series.length - 1]?.p ?? 0.5;
-    const probDelta = probNow - (series[0]?.p ?? probNow);
-    bus.emit(EV.MARKET, { question: ride.market.question, probNow, probDelta });
+    // Official contract numbers travel with the ride. The HUD shows these —
+    // never range-derived values — so cards, preview, and game always agree.
+    bus.emit(EV.MARKET, {
+      question: ride.market.question,
+      currentProb: ride.market.currentProb,
+      probDelta: ride.market.probDelta,
+    });
     this.doReset(true);
     this.matter.world.resume();
   }
@@ -285,7 +292,9 @@ export class RideScene extends Phaser.Scene {
     if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
     // Only tick score while alive — stops timer after crash
     if (!this.bike.crashed) this.score.step(steps * STEP_MS, this.bike.x);
-    if (!this.bike.crashed && !this.score.finished) this.detectTricks(steps * STEP_MS);
+    if (!this.bike.crashed && !this.score.finished) {
+      this.detectTricks(steps * STEP_MS, firstRead.nitro && this.bike.nitro > 0);
+    }
     if (this.parked) this.bike.park();
 
     this.trackRenderer.update();
@@ -304,6 +313,7 @@ export class RideScene extends Phaser.Scene {
           finished: false,
           score: this.score.total,
           timeMs: this.score.timeMs,
+          difficulty: this.rideDifficulty,
         });
       });
     }
@@ -317,6 +327,7 @@ export class RideScene extends Phaser.Scene {
           finished: true,
           score: this.score.total,
           timeMs: this.score.timeMs,
+          difficulty: this.rideDifficulty,
         });
       });
     }
@@ -364,7 +375,7 @@ export class RideScene extends Phaser.Scene {
     }
   }
 
-  private detectTricks(dtMs: number): void {
+  private detectTricks(dtMs: number, nitroBurning: boolean): void {
     if (dtMs <= 0) {
       this.lastTrickAngle = this.bike.angle;
       return;
@@ -422,6 +433,27 @@ export class RideScene extends Phaser.Scene {
     } else if (angle < 0.1) {
       this.stoppieMs = 0;
     }
+
+    // Speed demon: hold near top speed. Nitro burn: small trickle bonus.
+    if (Math.abs(this.bike.speed) >= 1200) {
+      this.speedDemonMs += dtMs;
+      if (this.speedDemonMs >= 5000) {
+        this.popup('SPEED DEMON', this.score.awardTrick(200));
+        this.speedDemonMs = 0;
+      }
+    } else {
+      this.speedDemonMs = 0;
+    }
+
+    if (nitroBurning) {
+      this.nitroMs += dtMs;
+      if (this.nitroMs >= 3000) {
+        this.popup('NITRO BURN', this.score.awardFlat(30));
+        this.nitroMs = 0;
+      }
+    } else {
+      this.nitroMs = 0;
+    }
   }
 
   private popup(text: string, points: number): void {
@@ -440,6 +472,8 @@ export class RideScene extends Phaser.Scene {
     this.trickAirMs = 0;
     this.wheelieMs = 0;
     this.stoppieMs = 0;
+    this.speedDemonMs = 0;
+    this.nitroMs = 0;
     this.rotAcc = 0;
     if (full) this.score.fullReset();
     this.bike.reset();
