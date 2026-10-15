@@ -3,8 +3,10 @@ import gammaFixtures from '../fixtures/gamma-markets.json';
 import clobFixtures from '../fixtures/clob-history.json';
 import {
   categoryFromTags,
+  chunkRange,
   createPolymarketSource,
   extractMarketRows,
+  HISTORY_CHUNK_SECONDS,
   isRideableMarket,
   DEFAULT_RIDEABLE_FILTERS,
   parseListish,
@@ -233,6 +235,22 @@ describe('createPolymarketSource (recorded fixtures, no live calls)', () => {
     expect(await weird.getHistory(market(0))).toEqual([]);
   });
 
+  it('requests an explicit window for ranged history', async () => {
+    const history = await source.getHistoryRange(market(0), 1_700_000_000, 1_700_086_400);
+    expect(history).toHaveLength(48);
+    const last = calls[calls.length - 1];
+    expect(last).toContain('startTs=1700000000');
+    expect(last).toContain('endTs=1700086400');
+    expect(last).not.toContain('interval=');
+  });
+
+  it('refuses an inverted or unusable range instead of guessing', async () => {
+    const before = calls.length;
+    expect(await source.getHistoryRange(market(0), 200, 100)).toEqual([]);
+    expect(await source.getHistoryRange(market(0), Number.NaN, 100)).toEqual([]);
+    expect(calls.length).toBe(before);
+  });
+
   it('resolves a slug through both the events and markets endpoints', async () => {
     const markets = await source.listBySlug('a-market');
     expect(markets.length).toBeGreaterThan(0);
@@ -246,6 +264,23 @@ describe('createPolymarketSource (recorded fixtures, no live calls)', () => {
       attempts: 1,
     });
     expect(await empty.listBySlug('no-such-market')).toEqual([]);
+  });
+});
+
+describe('chunkRange', () => {
+  it('covers the whole span in capped chunks', () => {
+    const chunks = chunkRange(0, HISTORY_CHUNK_SECONDS * 2 + 100);
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0][0]).toBe(0);
+    expect(chunks[chunks.length - 1][1]).toBe(HISTORY_CHUNK_SECONDS * 2 + 100);
+    for (const [from, to] of chunks) {
+      expect(to - from).toBeLessThanOrEqual(HISTORY_CHUNK_SECONDS);
+    }
+  });
+
+  it('returns nothing for an empty span', () => {
+    expect(chunkRange(100, 100)).toEqual([]);
+    expect(chunkRange(200, 100)).toEqual([]);
   });
 });
 

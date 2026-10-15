@@ -30,6 +30,7 @@ export const gammaMarketRowSchema = z.object({
   outcomes: listish.optional(),
   outcomePrices: listish.optional(),
   clobTokenIds: listish.optional(),
+  startDate: z.string().optional(),
   endDate: z.string().optional(),
   oneDayPriceChange: numericish.optional(),
   priceChange24h: numericish.optional(),
@@ -45,6 +46,28 @@ export const clobHistorySchema = z.object({
   history: z.array(z.object({ t: z.number(), p: z.number() })).optional(),
 });
 
+export function parseHistory(payload: unknown): PricePoint[] {
+  const parsed = clobHistorySchema.safeParse(payload);
+  if (!parsed.success) return [];
+  return (parsed.data.history ?? []).filter(
+    (point) => Number.isFinite(point.t) && Number.isFinite(point.p),
+  );
+}
+
+/** Explicit CLOB windows cap at 15 days; split longer spans into chunks. */
+export const HISTORY_CHUNK_SECONDS = 14 * 86400;
+
+export function chunkRange(startTs: number, endTs: number): Array<[number, number]> {
+  const chunks: Array<[number, number]> = [];
+  let cursor = Math.floor(startTs);
+  const end = Math.floor(endTs);
+  while (cursor < end) {
+    chunks.push([cursor, Math.min(cursor + HISTORY_CHUNK_SECONDS, end)]);
+    cursor += HISTORY_CHUNK_SECONDS;
+  }
+  return chunks;
+}
+
 export interface SourceMarket {
   source: 'polymarket';
   sourceId: string;
@@ -57,6 +80,7 @@ export interface SourceMarket {
   change24h: number | null;
   volume24h: number | null;
   liquidity: number | null;
+  startDate: string | null;
   endDate: string | null;
   tags: string[];
   /** Kept for future features (plan §8). Raw source ids, never displayed. */
@@ -161,6 +185,7 @@ export function toSourceMarket(row: unknown): SourceMarket | null {
     change24h,
     volume24h: parseNumberish(raw.volume24hr) ?? parseNumberish(raw.volumeNum) ?? parseNumberish(raw.volume),
     liquidity: parseNumberish(raw.liquidityNum) ?? parseNumberish(raw.liquidity),
+    startDate: raw.startDate ?? null,
     endDate: raw.endDate ?? null,
     tags,
     externalIds: {
@@ -188,6 +213,13 @@ export interface SourceAdapter {
   listBySlug(slug: string): Promise<SourceMarket[]>;
   /** Full price history for a market's YES token. */
   getHistory(market: SourceMarket, interval?: string): Promise<PricePoint[]>;
+  /**
+   * History for an explicit window (unix seconds, inclusive). The documented
+   * path for settled markets: `interval=max` with a fine fidelity serves an
+   * empty page for old tokens instead of their history.
+   */
+  getHistoryRange(market: SourceMarket, startTs: number, endTs: number): Promise<PricePoint[]>;
+}
 }
 
 export function extractMarketRows(payload: unknown): unknown[] {
@@ -297,11 +329,16 @@ export function createPolymarketSource(options: PolymarketSourceOptions): Source
       const payload = await request(
         `${clobBase}/prices-history?market=${encodeURIComponent(market.yesTokenId)}&interval=${interval}&fidelity=60`,
       );
-      const parsed = clobHistorySchema.safeParse(payload);
-      if (!parsed.success) return [];
-      return (parsed.data.history ?? []).filter(
-        (point) => Number.isFinite(point.t) && Number.isFinite(point.p),
+      return parseHistory(payload);
+    },
+
+    async getHistoryRange(market, startTs, endTs) {
+      if (!market.yesTokenId) return [];
+      if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) return [];
+      const payload = await request(
+        `${clobBase}/prices-history?market=${encodeURIComponent(market.yesTokenId)}&startTs=${Math.floor(startTs)}&endTs=${Math.floor(endTs)}&fidelity=60`,
       );
+      return parseHistory(payload);
     },
   };
 }

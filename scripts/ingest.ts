@@ -28,6 +28,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildTrack,
+  chunkRange,
   createPolymarketSource,
   filterBlocked,
   isRideableMarket,
@@ -205,14 +206,20 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
       warn(`skipping "${market.slug}": no price token`);
       continue;
     }
-    // CLOB serves recent history at `max`; archived legs may only answer
-    // `all`. First non-empty window wins; both are real responses.
-    let history: Array<{ t: number; p: number }> = [];
-    for (const window of ['all', 'max']) {
-      history = await upstream.source.getHistory(market, window);
-      if (history.length > 0) break;
+    // Settled legs predate CLOB's servable `max` window: fetch their exact
+    // lifespan in capped chunks (the documented path for old tokens).
+    const startTs = market.startDate ? Date.parse(market.startDate) / 1000 : Number.NaN;
+    const endTs = market.endDate ? Date.parse(market.endDate) / 1000 : Number.NaN;
+    if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) {
+      warn(`skipping "${market.slug}": no usable lifespan dates`);
+      continue;
     }
-    const series = normalizeSeries(history);
+    const ranged: Array<{ t: number; p: number }> = [];
+    for (const [from, to] of chunkRange(startTs, endTs)) {
+      ranged.push(...(await upstream.source.getHistoryRange(market, from, to)));
+    }
+    ranged.sort((a, b) => a.t - b.t);
+    const series = normalizeSeries(ranged);
     if (series.length < MIN_HISTORY_POINTS) {
       warn(`skipping "${market.slug}": only ${series.length} history points`);
       continue;
