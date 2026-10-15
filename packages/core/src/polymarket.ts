@@ -191,18 +191,27 @@ export interface SourceAdapter {
 }
 
 export function extractMarketRows(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) return payload;
+  // An event carries its binary markets in a nested `markets` array — both
+  // at the top level (`{ events: [...] }`) and inside array responses
+  // (`/events?slug=` returns `[event]`).
+  const flatten = (items: unknown[]): unknown[] => {
+    const rows: unknown[] = [];
+    for (const item of items) {
+      const nested =
+        item !== null && typeof item === 'object'
+          ? (item as { markets?: unknown }).markets
+          : undefined;
+      if (Array.isArray(nested)) rows.push(...nested);
+      else rows.push(item);
+    }
+    return rows;
+  };
+
+  if (Array.isArray(payload)) return flatten(payload);
   if (payload && typeof payload === 'object') {
     const obj = payload as { markets?: unknown; events?: unknown };
-    if (Array.isArray(obj.markets)) return obj.markets;
-    if (Array.isArray(obj.events)) {
-      const rows: unknown[] = [];
-      for (const event of obj.events) {
-        const markets = (event as { markets?: unknown }).markets;
-        if (Array.isArray(markets)) rows.push(...markets);
-      }
-      return rows;
-    }
+    if (Array.isArray(obj.markets)) return flatten(obj.markets);
+    if (Array.isArray(obj.events)) return flatten(obj.events);
   }
   return [];
 }

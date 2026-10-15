@@ -189,7 +189,10 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
       warn(`skipping "${spec.slug}": lookup failed (${error instanceof Error ? error.message : String(error)})`);
       continue;
     }
-    const market = candidates.find((row) => row.status === 'closed') ?? candidates[0];
+    const market =
+      candidates
+        .filter((row) => row.status === 'closed')
+        .sort((a, b) => (b.volume24h ?? 0) - (a.volume24h ?? 0))[0] ?? candidates[0];
     if (!market) {
       warn(`skipping "${spec.slug}": slug resolved nowhere`);
       continue;
@@ -247,7 +250,11 @@ async function main(): Promise<void> {
     const urlObject = new URL(url);
     const slug = urlObject.searchParams.get('slug') ?? urlObject.searchParams.get('market') ?? 'trending';
     const safe = slug.replace(/[^a-z0-9-]+/gi, '-').slice(0, 80);
-    const what = url.includes('/prices-history') ? 'clob' : 'gamma';
+    const what = url.includes('/prices-history')
+      ? 'clob'
+      : url.includes('/events?')
+        ? 'gamma-events'
+        : 'gamma-markets';
     await mkdir(options.dump, { recursive: true });
     await writeFile(join(options.dump, `${what}-${safe}.json`), `${JSON.stringify(payload, null, 2)}\n`);
   };

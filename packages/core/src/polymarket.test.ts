@@ -76,6 +76,13 @@ describe('extractMarketRows', () => {
     ]);
   });
 
+  it('flattens events nested inside an array response', () => {
+    // `/events?slug=` returns `[event]` — the event itself is not a market.
+    expect(
+      extractMarketRows([{ id: 9, title: 'An event', markets: [{ id: 1 }, { id: 2 }] }]),
+    ).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
   it('returns nothing for an unusable payload', () => {
     expect(extractMarketRows({ nope: true })).toEqual([]);
     expect(extractMarketRows('nope')).toEqual([]);
