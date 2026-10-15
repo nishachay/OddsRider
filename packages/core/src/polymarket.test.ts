@@ -93,12 +93,12 @@ describe('extractMarketRows', () => {
 });
 
 describe('toSourceMarket', () => {
-  it('maps a fixture row', () => {
+  it('maps a recorded row', () => {
     const parsed = market(0);
-    expect(parsed.sourceId).toBe('100001');
-    expect(parsed.probability).toBeCloseTo(0.62, 6);
-    expect(parsed.volume24h).toBe(4_200_000);
-    expect(parsed.change24h).toBeCloseTo(0.04, 6);
+    expect(parsed.sourceId).toBe('5126779');
+    expect(parsed.probability).toBeCloseTo(0.125, 6);
+    expect(parsed.volume24h).toBeCloseTo(2_108_416.46, 2);
+    expect(parsed.change24h).toBeCloseTo(-0.05, 6);
     expect(parsed.yesTokenId).toBe(yesToken(0));
     expect(parsed.status).toBe('open');
   });
@@ -206,13 +206,13 @@ describe('createPolymarketSource (recorded fixtures, no live calls)', () => {
   it('lists trending markets from the recorded payload', async () => {
     const markets = await source.listTrending(24);
     expect(markets).toHaveLength(2);
-    expect(markets[0].sourceId).toBe('100001');
+    expect(markets[0].sourceId).toBe('5126779');
     expect(calls[0]).toContain('/markets?active=true&closed=false&order=volume24hr');
   });
 
   it('reads price history for a market token', async () => {
     const history = await source.getHistory(market(0));
-    expect(history).toHaveLength(48);
+    expect(history).toHaveLength(385);
     expect(calls[calls.length - 1]).toContain('/prices-history');
   });
 
@@ -238,7 +238,7 @@ describe('createPolymarketSource (recorded fixtures, no live calls)', () => {
 
   it('requests an explicit window for ranged history', async () => {
     const history = await source.getHistoryRange(market(0), 1_700_000_000, 1_700_086_400);
-    expect(history).toHaveLength(48);
+    expect(history).toHaveLength(385);
     const last = calls[calls.length - 1];
     expect(last).toContain('startTs=1700000000');
     expect(last).toContain('endTs=1700086400');
