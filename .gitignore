@@ -7,3 +7,8 @@ dist-ssr
 .vite
 test-results
 playwright-report
+
+# Local agent tooling and session transcripts — never repo content
+.agents/
+skills-lock.json
+session-*.md
