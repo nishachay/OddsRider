@@ -55,6 +55,24 @@ describe('track schemas', () => {
     expect(() => parseTrack({ ...track, kind: 'invented' })).toThrow();
   });
 
+  it('requires a final YES or NO on settled tracks', async () => {
+    const settled = await buildTrack(
+      input({ kind: 'closed', status: 'closed', resolution: 'YES' }),
+    );
+    expect(parseTrack(settled).resolution).toBe('YES');
+
+    const unknown = await buildTrack(input({ kind: 'closed', status: 'closed' }));
+    expect(() => parseTrack({ ...unknown, resolution: null })).toThrow(/resolution/);
+    expect(() => parseTrack({ ...unknown })).toThrow(/resolution/);
+    const { series: _dropped, ...summary } = unknown;
+    expect(safeParseTrack(summary)).toBeNull();
+  });
+
+  it('still allows live tracks without a resolution', async () => {
+    const track = await buildTrack(input());
+    expect(parseTrack(track).resolution).toBeNull();
+  });
+
   it('reports failure instead of silently dropping a bad summary', async () => {
     const track = await buildTrack(input());
     expect(safeParseTrack(track)).not.toBeNull();

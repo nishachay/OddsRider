@@ -37,7 +37,12 @@ export const CLOSED_MARKETS: ClosedMarketSpec[] = [
   {
     slug: 'fed-interest-rates-december-2024',
     note: 'Fed December 2024 decision brackets ($58.8M event volume) — the 25bps-cut leg resolved YES. Event slug: sub-market slugs do not resolve on Gamma.',
-    pick: '25 bps',
+    pick: 'decreases interest rates by 25 bps',
+  },
+  {
+    slug: 'fed-interest-rates-december-2024',
+    note: 'Same Fed decision, the 75bps+ bracket — resolved NO. Kept deliberately: both famous legs of the decision.',
+    pick: 'decreases interest rates by 75',
   },
   {
     slug: 'bitcoin-new-all-time-high-in-2024',

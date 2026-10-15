@@ -138,4 +138,23 @@ describe('planIngest', () => {
     expect(plan.tracks).toHaveLength(1);
     expect(plan.prune).toHaveLength(1);
   });
+
+  it('lists each market once in the index: the newest snapshot', async () => {
+    const snapshots = [
+      await track('1', { offset: 0, createdAt: '2026-09-01T00:00:00.000Z' }),
+      await track('1', { offset: 0.05, createdAt: '2026-09-15T00:00:00.000Z' }),
+      await track('1', { offset: 0.1, createdAt: '2026-10-01T00:00:00.000Z' }),
+      await track('2', { createdAt: '2026-09-20T00:00:00.000Z' }),
+    ];
+    const plan = planIngest([], snapshots);
+
+    // Files keep both retained snapshots; the index (what Home renders)
+    // lists market 1 once, at its newest snapshot.
+    expect(plan.tracks).toHaveLength(KEEP_PER_SOURCE + 1);
+    expect(plan.index.tracks).toHaveLength(2);
+    const keys = plan.index.tracks.map((t) => `${t.kind}:${t.sourceId}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(plan.index.tracks.find((t) => t.sourceId === '1')?.id).toBe(snapshots[2].id);
+    expect(plan.index.generatedAt).toBe('2026-10-01T00:00:00.000Z');
+  });
 });

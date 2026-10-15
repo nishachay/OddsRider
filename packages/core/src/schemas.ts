@@ -47,6 +47,12 @@ export const trackSummarySchema = z.object({
   difficulty: difficultySchema,
   hash: z.string().regex(/^[0-9a-f]{64}$/, 'hash must be a sha256 hex digest'),
   createdAt: z.string().min(1),
+}).superRefine((summary, ctx) => {
+  // A settled track without a final YES/NO is corrupt data: the ingest must
+  // fail loudly instead of publishing it, so the schema rejects it here.
+  if (summary.kind === 'closed' && summary.resolution !== 'YES' && summary.resolution !== 'NO') {
+    ctx.addIssue({ code: 'custom', message: 'closed tracks require resolution YES or NO' });
+  }
 });
 
 export const trackV1Schema = trackSummarySchema.extend({

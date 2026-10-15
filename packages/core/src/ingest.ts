@@ -9,7 +9,8 @@
  *   - a track id is content-addressed, so an existing file is never rewritten;
  *   - only the newest `keepPerSource` snapshots per market are kept, which
  *     bounds repo growth while keeping shared links alive for a while;
- *   - the index is derived, deterministic, and only changes when the set does.
+ *   - the index lists each market once (newest snapshot) and only changes
+ *     when the set does — it is what Home renders.
  */
 import type { TrackIndex, TrackSummary, TrackV1 } from './types.ts';
 
@@ -100,5 +101,10 @@ export function planIngest(
     .filter((track) => kept.has(track.id))
     .sort((a, b) => byNewest(summarize(a), summarize(b)));
 
-  return { write, prune, tracks, index: buildIndex(tracks) };
+  // Files keep every retained snapshot; the index lists each market once
+  // (newest snapshot), because the index is what Home renders.
+  const listed = dedupeNewest(tracks.map(summarize));
+  const listedIds = new Set(listed.map((summary) => summary.id));
+  const listedTracks = tracks.filter((track) => listedIds.has(track.id));
+  return { write, prune, tracks, index: buildIndex(listedTracks) };
 }

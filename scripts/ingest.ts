@@ -32,6 +32,7 @@ import {
   clampProbability,
   createPolymarketSource,
   filterBlocked,
+  filterSportsMarkets,
   isRideableMarket,
   MIN_HISTORY_POINTS,
   MIN_TRACK_RANGE,
@@ -140,9 +141,11 @@ async function buildLiveTracks(
   options: Options,
   now: string,
 ): Promise<TrackV1[]> {
-  const candidates = filterBlocked(
-    markets.filter((market) => isRideableMarket(market)),
-    (market) => market.tags,
+  const candidates = filterSportsMarkets(
+    filterBlocked(
+      markets.filter((market) => isRideableMarket(market)),
+      (market) => market.tags,
+    ),
   ).slice(0, options.limit);
 
   const tracks: TrackV1[] = [];
@@ -223,6 +226,14 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
       warn(`skipping "${market.slug}": range too flat to ride`);
       continue;
     }
+    // A settled track without a final YES/NO is corrupt data: fail the run
+    // loudly instead of publishing a null resolution.
+    const resolution = resolutionFromClose(clampProbability(market.probability));
+    if (resolution === null) {
+      throw new Error(
+        `cannot determine resolution for closed market "${market.slug}" (final price ${market.probability}): refusing to write a null resolution`,
+      );
+    }
     tracks.push(
       await buildTrack(
         {
@@ -233,7 +244,7 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
           question: market.question,
           category: market.category,
           status: 'closed',
-          resolution: resolutionFromClose(clampProbability(market.probability)),
+          resolution,
           probability: market.probability,
           change24h: market.change24h,
           volume24h: market.volume24h,

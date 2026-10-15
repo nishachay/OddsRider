@@ -32,6 +32,7 @@ export const gammaMarketRowSchema = z.object({
   clobTokenIds: listish.optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
+  sportsMarketType: z.string().optional(),
   oneDayPriceChange: numericish.optional(),
   priceChange24h: numericish.optional(),
   dayPriceChange: numericish.optional(),
@@ -82,6 +83,8 @@ export interface SourceMarket {
   liquidity: number | null;
   startDate: string | null;
   endDate: string | null;
+  /** e.g. "moneyline" — set only on sports markets. Absent otherwise. */
+  sportsMarketType: string | null;
   tags: string[];
   /** Kept for future features (plan §8). Raw source ids, never displayed. */
   externalIds: Record<string, string>;
@@ -187,6 +190,7 @@ export function toSourceMarket(row: unknown): SourceMarket | null {
     liquidity: parseNumberish(raw.liquidityNum) ?? parseNumberish(raw.liquidity),
     startDate: raw.startDate ?? null,
     endDate: raw.endDate ?? null,
+    sportsMarketType: raw.sportsMarketType ?? null,
     tags,
     externalIds: {
       yesTokenId: tokens[yesIndex],
@@ -401,4 +405,18 @@ export function selectRideableMarkets(
   filters?: { minProbability: number; maxProbability: number; minVolume24h: number },
 ): SourceMarket[] {
   return markets.filter((market) => isRideableMarket(market, filters));
+}
+
+/**
+ * Single-game sports markets expire the same day and have no business on the
+ * card (they also miscategorise as TECH). Gamma marks them with
+ * `sportsMarketType` ("moneyline", "totals", …); anything carrying the field
+ * is out, everything else stays.
+ */
+export function isSportsMarket(market: SourceMarket): boolean {
+  return market.sportsMarketType !== null && market.sportsMarketType !== '';
+}
+
+export function filterSportsMarkets(markets: SourceMarket[]): SourceMarket[] {
+  return markets.filter((market) => !isSportsMarket(market));
 }

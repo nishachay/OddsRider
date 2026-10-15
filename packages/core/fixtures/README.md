@@ -9,6 +9,7 @@ or invented. If a value looks odd, the API really said that.
 |---|---|
 | `gamma-markets.json` | 2 rows of a Gamma `/markets` response (array of market rows) |
 | `clob-history.json` | CLOB `/prices-history` responses, keyed by YES token id |
+| `gamma-sports-row.json` | 1 complete recorded Gamma row: a single-game moneyline market, for the sports filter test |
 
 - `outcomes`, `outcomePrices` and `clobTokenIds` are JSON-encoded **strings**,
   exactly as Gamma sends them.

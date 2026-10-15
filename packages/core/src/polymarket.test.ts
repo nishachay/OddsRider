@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import gammaFixtures from '../fixtures/gamma-markets.json';
 import clobFixtures from '../fixtures/clob-history.json';
+// Complete recorded Gamma row (Leverkusen moneyline, 2026-10-15): real data.
+import sportsRow from '../fixtures/gamma-sports-row.json';
 import {
   categoryFromTags,
   chunkRange,
   createPolymarketSource,
   extractMarketRows,
+  filterSportsMarkets,
   HISTORY_CHUNK_SECONDS,
   isRideableMarket,
+  isSportsMarket,
   DEFAULT_RIDEABLE_FILTERS,
   parseListish,
   parseNumberish,
@@ -304,6 +308,29 @@ describe('selectClosedTarget', () => {
 
   it('returns null when nothing settled', () => {
     expect(selectClosedTarget([])).toBeNull();
+  });
+});
+
+describe('sports filter (recorded moneyline response)', () => {
+  it('parses the recorded sports row', () => {
+    const parsed = toSourceMarket(sportsRow);
+    if (!parsed) throw new Error('recorded sports row did not parse');
+    expect(parsed.question).toBe('Will Bayer 04 Leverkusen win on 2026-10-15?');
+    expect(parsed.sportsMarketType).toBe('moneyline');
+  });
+
+  it('excludes the sports row but keeps real non-sports markets', () => {
+    const sports = toSourceMarket(sportsRow);
+    if (!sports) throw new Error('recorded sports row did not parse');
+    expect(isSportsMarket(sports)).toBe(true);
+    expect(isSportsMarket(market(0))).toBe(false);
+    expect(isSportsMarket(market(1))).toBe(false);
+    expect(filterSportsMarkets([market(0), sports, market(1)])).toHaveLength(2);
+  });
+
+  it('treats a missing field as non-sports, never as sports', () => {
+    expect(isSportsMarket({ ...market(0), sportsMarketType: null })).toBe(false);
+    expect(isSportsMarket({ ...market(0), sportsMarketType: '' })).toBe(false);
   });
 });
 
