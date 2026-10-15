@@ -220,7 +220,6 @@ export interface SourceAdapter {
    */
   getHistoryRange(market: SourceMarket, startTs: number, endTs: number): Promise<PricePoint[]>;
 }
-}
 
 export function extractMarketRows(payload: unknown): unknown[] {
   // An event carries its binary markets in a nested `markets` array — both
