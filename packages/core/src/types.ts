@@ -6,13 +6,13 @@
  * describes the same terrain. Nothing in here may invent a number.
  */
 
-export type TrackKind = 'live' | 'legendary' | 'remix';
+export type TrackKind = 'live' | 'closed';
 
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD' | 'INSANE' | 'NEW';
 
-export type Category = 'POLITICS' | 'CRYPTO' | 'MACRO' | 'TECH' | 'LEGENDARY' | 'REMIX';
+export type Category = 'POLITICS' | 'CRYPTO' | 'MACRO' | 'TECH' | 'LEGENDARY';
 
-export type TrackSource = 'polymarket' | 'remix';
+export type TrackSource = 'polymarket';
 
 /** `t` is unix SECONDS, `p` is a probability in 0..1. */
 export interface PricePoint {
@@ -40,7 +40,7 @@ export interface TrackV1 {
   version: 1;
   kind: TrackKind;
   source: TrackSource;
-  /** Market id at the source, or the remix slug. Stable per market. */
+  /** Market id at the source. Stable per market. */
   sourceId: string;
   slug: string;
   question: string;

@@ -122,7 +122,11 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b-2 border-[#f0f0f2]">
         <div className="flex flex-col gap-2">
           <span className="font-mono text-[10px] font-bold tracking-[0.24em] text-toxic uppercase">
-            Race card · {market.difficulty}
+            {market.kind === 'closed'
+              ? market.resolution
+                ? `Settled · resolved ${market.resolution}`
+                : 'Settled track'
+              : `Race card · ${market.difficulty}`}
           </span>
           <h1 className="font-display font-bold text-2xl sm:text-3xl text-ink leading-snug">
             {market.question}

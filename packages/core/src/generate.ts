@@ -80,10 +80,9 @@ export function slugifyKey(value: string): string {
  * Content-addressed id: the same series for the same market always produces the
  * same id, so `/ride/<id>` is forever the same terrain.
  */
-export function trackIdFor(kind: TrackKind, sourceId: string, hash: string): string {
+export function trackIdFor(sourceId: string, hash: string): string {
   const key = slugifyKey(sourceId) || 'market';
-  const prefix = kind === 'remix' && !key.startsWith('remix-') ? 'remix-' : '';
-  return `${prefix}${key}-${hash.slice(0, 12)}`;
+  return `${key}-${hash.slice(0, 12)}`;
 }
 
 export interface BuildTrackResult {
@@ -103,7 +102,7 @@ export async function buildTrack(input: TrackInput, createdAt?: string): Promise
   const sparkline = lttb(series, PREVIEW_POINTS).map((point) => point.p);
 
   return {
-    id: trackIdFor(input.kind, input.sourceId, hash),
+    id: trackIdFor(input.sourceId, hash),
     version: 1,
     kind: input.kind,
     source: input.source,

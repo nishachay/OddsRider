@@ -65,13 +65,12 @@ describe('toRideableMarket', () => {
     expect(market.sparkline).toEqual([0.4, 0.5, 0.62]);
   });
 
-  it('marks remix tracks as remix, never live, with no invented volume', () => {
-    const market = view({ kind: 'remix', category: 'REMIX', volume24h: null, change24h: null });
+  it('marks settled tracks as settled, never live', () => {
+    const market = view({ kind: 'closed', resolution: 'YES', volume24h: 28_600_000, change24h: -0.99 });
     expect(market.live).toBe(false);
-    expect(market.kind).toBe('remix');
-    expect(market.volumeNum).toBe(0);
-    expect(market.volumeFormatted).toBe('—');
-    expect(market.probDelta).toBeNull();
+    expect(market.kind).toBe('closed');
+    expect(market.resolution).toBe('YES');
+    expect(market.volumeFormatted).toBe('$28.6M 24H');
   });
 
   it('formats volume and dates for display', () => {
@@ -104,8 +103,8 @@ describe('simpleHash', () => {
 
 describe('isLiveList', () => {
   it('is true only when a live track is listed', () => {
-    expect(isLiveList([view(), view({ kind: 'remix', category: 'REMIX' })])).toBe(true);
-    expect(isLiveList([view({ kind: 'remix', category: 'REMIX' })])).toBe(false);
+    expect(isLiveList([view(), view({ kind: 'closed', resolution: 'NO' })])).toBe(true);
+    expect(isLiveList([view({ kind: 'closed', resolution: 'NO' })])).toBe(false);
     expect(isLiveList([])).toBe(false);
   });
 });
@@ -116,7 +115,7 @@ describe('getBiggestMovers', () => {
       view({ id: 'flat', change24h: 0.02 }),
       view({ id: 'skull', change24h: -0.3 }),
       view({ id: 'unknown', change24h: null }),
-      view({ id: 'remix', kind: 'remix', category: 'REMIX', change24h: null }),
+      view({ id: 'settled', kind: 'closed', resolution: 'YES', change24h: -0.99 }),
     ];
     expect(getBiggestMovers(markets, 4).map((m) => m.id)).toEqual(['skull', 'flat']);
     expect(getBiggestMovers(markets, 1).map((m) => m.id)).toEqual(['skull']);
@@ -129,17 +128,17 @@ describe('getDailyChallenge', () => {
     expect(getDailyChallenge(pool, '2026-10-15')?.id).toBe(getDailyChallenge(pool, '2026-10-15')?.id);
   });
 
-  it('never headlines a remix while live tracks exist', () => {
-    const pool = [view({ id: 'a' }), view({ id: 'r', kind: 'remix', category: 'REMIX' })];
+  it('never headlines a settled track while live tracks exist', () => {
+    const pool = [view({ id: 'a' }), view({ id: 's', kind: 'closed', resolution: 'YES' })];
     for (let day = 1; day <= 28; day++) {
       const date = `2026-10-${String(day).padStart(2, '0')}`;
       expect(getDailyChallenge(pool, date)?.kind).toBe('live');
     }
   });
 
-  it('falls back to remix only when nothing real is published', () => {
-    const pool = [view({ id: 'r', kind: 'remix', category: 'REMIX' })];
-    expect(getDailyChallenge(pool, '2026-10-15')?.id).toBe('r');
+  it('falls back to settled tracks when nothing live is published', () => {
+    const pool = [view({ id: 's', kind: 'closed', resolution: 'YES' })];
+    expect(getDailyChallenge(pool, '2026-10-15')?.id).toBe('s');
   });
 
   it('returns null when there is nothing to ride', () => {
@@ -148,13 +147,13 @@ describe('getDailyChallenge', () => {
 });
 
 describe('getHomePageData', () => {
-  it('keeps remix out of the trending card', () => {
+  it('keeps settled tracks out of the trending card', () => {
     const data = getHomePageData([
       view({ id: 'live', volume24h: 100 }),
-      view({ id: 'r', kind: 'remix', category: 'REMIX', volume24h: null }),
+      view({ id: 's', kind: 'closed', resolution: 'NO', volume24h: 50 }),
     ]);
     expect(data.trending.map((m) => m.id)).toEqual(['live']);
-    expect(data.remix.map((m) => m.id)).toEqual(['r']);
+    expect(data.closed.map((m) => m.id)).toEqual(['s']);
     expect(data.live).toBe(true);
   });
 });

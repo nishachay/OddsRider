@@ -8,7 +8,7 @@
  */
 import type { Category } from './types.ts';
 
-type KeywordCategory = Exclude<Category, 'LEGENDARY' | 'REMIX'>;
+type KeywordCategory = Exclude<Category, 'LEGENDARY'>;
 
 /** Default bucket when nothing matches. Deliberately boring, never a guess. */
 export const DEFAULT_CATEGORY: Category = 'TECH';

@@ -27,7 +27,7 @@ async function track(
 ): Promise<TrackV1> {
   const input: TrackInput = {
     kind,
-    source: kind === 'remix' ? 'remix' : 'polymarket',
+    source: 'polymarket',
     sourceId,
     slug: `slug-${sourceId}`,
     question: `Will market ${sourceId} do the thing?`,
@@ -78,15 +78,15 @@ describe('dedupeNewest', () => {
     expect(list.map((t) => t.sourceId)).toEqual(['1', '2']);
   });
 
-  it('treats a remix and a live track with the same source id as different', async () => {
+  it('treats a closed and a live track with the same source id as different', async () => {
     const live = await track('shared', { kind: 'live' });
-    const remix = await track('shared', { kind: 'remix', offset: 0.2 });
-    expect(dedupeNewest([summarize(live), summarize(remix)])).toHaveLength(2);
+    const closed = await track('shared', { kind: 'closed', offset: 0.2 });
+    expect(dedupeNewest([summarize(live), summarize(closed)])).toHaveLength(2);
   });
 
   it('never drops a kind when only one exists', async () => {
-    const remix = await track('only-remix', { kind: 'remix' });
-    expect(dedupeNewest([summarize(remix)])).toHaveLength(1);
+    const closed = await track('only-closed', { kind: 'closed' });
+    expect(dedupeNewest([summarize(closed)])).toHaveLength(1);
   });
 });
 

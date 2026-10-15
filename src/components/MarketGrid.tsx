@@ -16,7 +16,7 @@ interface MarketGridProps {
   onPreview: (market: RideableMarket) => void;
 }
 
-const DIVISIONS = ['ALL', 'POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY', 'REMIX'];
+const DIVISIONS = ['ALL', 'POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY', 'CLOSED'];
 
 const FEED_REASON: Record<string, string> = {
   TRACKS_UNREACHABLE: 'TRACK INDEX UNREACHABLE — CHECK YOUR CONNECTION AND RETRY.',
@@ -65,10 +65,11 @@ export default function MarketGrid({
   onPreview,
 }: MarketGridProps) {
   const { reload, feedError } = useMarkets();
-  // Legendary and remix tracks run in their own races — never duplicate them
-  // inside the main card.
+  // Legendary and settled tracks run in their own races — never duplicate
+  // them inside the main card.
   const filtered = markets.filter((m) => {
-    if (activeCategory === 'ALL') return m.category !== 'LEGENDARY' && m.kind !== 'remix';
+    if (activeCategory === 'ALL') return m.category !== 'LEGENDARY' && m.kind !== 'closed';
+    if (activeCategory === 'CLOSED') return m.kind === 'closed';
     if (m.category !== activeCategory) return false;
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
@@ -82,7 +83,7 @@ export default function MarketGrid({
   });
 
   const legendary = markets.filter((m) => m.category === 'LEGENDARY');
-  const remix = markets.filter((m) => m.kind === 'remix');
+  const closed = markets.filter((m) => m.kind === 'closed');
   const showSearch = searchQuery.trim() !== '' || searching || searchResults !== null;
   const results = searchResults ?? filtered;
 
@@ -94,8 +95,8 @@ export default function MarketGrid({
           <h2 className="font-poster uppercase leading-none text-4xl sm:text-5xl text-ink">
             {activeCategory === 'LEGENDARY'
               ? 'Legendary crashes'
-              : activeCategory === 'REMIX'
-                ? 'Remix tracks'
+              : activeCategory === 'CLOSED'
+                ? 'Settled tracks'
                 : "Today's card"}
           </h2>
           <span className="font-mono text-[10px] text-dim tracking-[0.18em] pb-1 whitespace-nowrap">
@@ -183,16 +184,16 @@ export default function MarketGrid({
             </section>
           )}
 
-          {/* ── Remix: hand-drawn fiction, never market data ── */}
-          {activeCategory !== 'REMIX' && remix.length > 0 && (
+          {/* ── Settled: real resolved markets, final outcome on the card ── */}
+          {activeCategory !== 'CLOSED' && closed.length > 0 && (
             <section className="flex flex-col gap-4 pt-2">
               <h3 className="font-poster uppercase leading-none text-3xl sm:text-4xl text-dim">
-                Remix tracks
+                Settled tracks
               </h3>
               <p className="font-mono text-[10px] tracking-[0.18em] text-dim uppercase">
-                Hand-drawn shapes for practice — not market data, never on the live card.
+                Real resolved markets — the final result rides with you.
               </p>
-              <RaceList items={remix} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
+              <RaceList items={closed} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
             </section>
           )}
         </>

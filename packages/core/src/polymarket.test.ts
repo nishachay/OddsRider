@@ -10,6 +10,7 @@ import {
   parseListish,
   parseNumberish,
   parseProbability,
+  resolutionFromClose,
   selectRideableMarkets,
   toSourceMarket,
   type FetchImpl,
@@ -223,5 +224,33 @@ describe('createPolymarketSource (recorded fixtures, no live calls)', () => {
       attempts: 1,
     });
     expect(await weird.getHistory(market(0))).toEqual([]);
+  });
+
+  it('resolves a slug through both the events and markets endpoints', async () => {
+    const markets = await source.listBySlug('a-market');
+    expect(markets.length).toBeGreaterThan(0);
+    expect(calls.some((url) => url.includes('/events?slug=a-market'))).toBe(true);
+    expect(calls.some((url) => url.includes('/markets?slug=a-market'))).toBe(true);
+  });
+
+  it('returns nothing when a slug resolves nowhere', async () => {
+    const empty = createPolymarketSource({
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => [] }),
+      attempts: 1,
+    });
+    expect(await empty.listBySlug('no-such-market')).toEqual([]);
+  });
+});
+
+describe('resolutionFromClose', () => {
+  it('calls the rails, never the middle', () => {
+    expect(resolutionFromClose(1)).toBe('YES');
+    expect(resolutionFromClose(0.995)).toBe('YES');
+    expect(resolutionFromClose(0)).toBe('NO');
+    expect(resolutionFromClose(0.005)).toBe('NO');
+    expect(resolutionFromClose(0.62)).toBeNull();
+    expect(resolutionFromClose(0.5)).toBeNull();
+    expect(resolutionFromClose(null)).toBeNull();
+    expect(resolutionFromClose(Number.NaN)).toBeNull();
   });
 });

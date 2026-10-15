@@ -94,7 +94,7 @@ export default function MarketCard({ market, index, onRideYes, onRideNo, onPrevi
           {market.category} · <span className={GOING[market.difficulty] ?? 'text-dim'}>{market.difficulty}</span>
           {' · '}
           {market.volumeFormatted}
-          {market.kind === 'remix' ? ' · REMIX' : market.kind === 'legendary' ? ' · CLOSED' : ''}
+          {market.kind === 'closed' ? (market.resolution ? ` · RESOLVED ${market.resolution}` : ' · CLOSED') : ''}
         </span>
       </div>
 

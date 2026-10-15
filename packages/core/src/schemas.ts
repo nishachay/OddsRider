@@ -22,15 +22,15 @@ export const trackStatsSchema = z.object({
   spanDays: z.number().finite().nonnegative(),
 });
 
-export const trackKindSchema = z.enum(['live', 'legendary', 'remix']);
+export const trackKindSchema = z.enum(['live', 'closed']);
 export const difficultySchema = z.enum(['EASY', 'MEDIUM', 'HARD', 'INSANE', 'NEW']);
-export const categorySchema = z.enum(['POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY', 'REMIX']);
+export const categorySchema = z.enum(['POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY']);
 
 export const trackSummarySchema = z.object({
   id: z.string().min(3),
   version: z.literal(1),
   kind: trackKindSchema,
-  source: z.enum(['polymarket', 'remix']),
+  source: z.enum(['polymarket']),
   sourceId: z.string().min(1),
   slug: z.string().min(1),
   question: z.string().min(1),

@@ -184,6 +184,8 @@ export interface SourceAdapter {
   listTrending(limit: number): Promise<SourceMarket[]>;
   /** Recently closed markets, highest total volume first. */
   listClosedByVolume(limit: number): Promise<SourceMarket[]>;
+  /** Markets matching a slug, from the events and markets endpoints. */
+  listBySlug(slug: string): Promise<SourceMarket[]>;
   /** Full price history for a market's YES token. */
   getHistory(market: SourceMarket, interval?: string): Promise<PricePoint[]>;
 }
@@ -262,6 +264,25 @@ export function createPolymarketSource(options: PolymarketSourceOptions): Source
     listClosedByVolume: (limit) =>
       listMarkets('closed=true&order=volumeNum&ascending=false', limit),
 
+    async listBySlug(slug: string) {
+      const [fromEvents, fromMarkets] = await Promise.all([
+        request(`${gammaBase}/events?slug=${encodeURIComponent(slug)}`).then(extractMarketRows),
+        request(`${gammaBase}/markets?slug=${encodeURIComponent(slug)}`).then(extractMarketRows),
+      ]);
+      const markets: SourceMarket[] = [];
+      const seen = new Set<string>();
+      for (const row of [...fromEvents, ...fromMarkets]) {
+        const market = toSourceMarket(row);
+        // Both endpoints can return the same market; freeze it once.
+        const key = `${market?.sourceId}::${market?.yesTokenId}`;
+        if (market && !seen.has(key)) {
+          seen.add(key);
+          markets.push(market);
+        }
+      }
+      return markets;
+    },
+
     async getHistory(market, interval = 'max') {
       if (!market.yesTokenId) return [];
       const payload = await request(
@@ -283,6 +304,21 @@ export const DEFAULT_RIDEABLE_FILTERS = {
   maxProbability: 0.97,
   minVolume24h: 50_000,
 } as const;
+
+/**
+ * Final outcome of a settled market from its last frozen price. The band is
+ * deliberately strict: anything that did not settle at the rails reports
+ * null (ambiguous) instead of a guessed resolution.
+ */
+export const RESOLUTION_YES_AT_OR_ABOVE = 0.99;
+export const RESOLUTION_NO_AT_OR_BELOW = 0.01;
+
+export function resolutionFromClose(finalProbability: number | null): 'YES' | 'NO' | null {
+  if (finalProbability === null || !Number.isFinite(finalProbability)) return null;
+  if (finalProbability >= RESOLUTION_YES_AT_OR_ABOVE) return 'YES';
+  if (finalProbability <= RESOLUTION_NO_AT_OR_BELOW) return 'NO';
+  return null;
+}
 
 export function isRideableMarket(
   market: SourceMarket,
