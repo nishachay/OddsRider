@@ -1,6 +1,24 @@
 ﻿# ODDSRIDER MASTER DESIGN SYSTEM
 
-*Status: Locked & Authoritative*
+> **RETIRED FOR SITE CHROME — see `AGENTS.md` → "Design language".**
+>
+> Site chrome is now a **race-meet program**, not a boxed betting terminal: Anton
+> poster headlines and odds, numbered racecard rows instead of grids, a scrolling
+> odds ticker and live UTC clock, full-bleed YES/NO actions, and a CSS-only motion
+> system (expo easing, `.rise` stagger reveals, `active:scale` press states).
+> The type sizes, keycap labels, card/bracket patterns and "Cyberpunk
+> Betting-Terminal" framing described below no longer apply to the website.
+>
+> What still binds from this document:
+>
+> - the **honesty core** (no invented numbers, `—` over guesses, probabilities
+>   always rendered as the source's last-trade values),
+> - the **palette** (near-black surfaces, toxic `#b6ff00`, crimson `#ff3355`),
+> - the in-game HUD, which is deliberately untouched and still follows this spec.
+>
+> Where this document and `AGENTS.md` disagree, `AGENTS.md` wins.
+
+*Status: Superseded for site chrome; authoritative for the in-game HUD*
 
 OddsRider uses a **Cyberpunk Betting-Terminal** aesthetic. It is explicitly anti-AI-slop: zero emojis, zero glassmorphism, zero rounded cards, and zero gratuitous gradients. Every pixel serves either telemetry or financial prediction context.
 

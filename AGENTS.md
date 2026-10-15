@@ -22,7 +22,7 @@ OddsRider: browser motocross game where real Polymarket probability charts becom
 
 - **Phaser 3.90.0** pinned; Matter physics comes bundled inside Phaser — do NOT add `matter-js`.
 - React 19 + Tailwind CSS v4, CSS-first: tokens in `src/index.css` `@theme`, no `tailwind.config`.
-- Fonts load via Google Fonts `<link>` in `index.html` (Space Grotesk + Geist Mono). Canvas code in `TrackRenderer.ts` / `RideScene.ts` / `finish.ts` references `'JetBrains Mono'`, which is **not** loaded — it silently falls back to monospace. Don't add font families without loading them.
+- Fonts load via Google Fonts `<link>` in `index.html` (Anton, Space Grotesk, Geist Mono) — nothing is bundled via `@fontsource`. Canvas code in `TrackRenderer.ts` / `RideScene.ts` / `finish.ts` uses `'Geist Mono'` (a real loaded family); every other canvas consumer must do the same. Don't add font families without loading them — an unloaded family silently falls back to monospace.
 
 ## Architecture
 

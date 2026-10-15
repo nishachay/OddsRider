@@ -22,7 +22,7 @@ export class FinishCelebration {
 
     this.label = scene.add
       .text(x + 6, groundY - 80, 'FINISH', {
-        fontFamily: "'JetBrains Mono', monospace",
+        fontFamily: "'Geist Mono', monospace",
         fontSize: '10px',
         color: '#ffffff',
       })
