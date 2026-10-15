@@ -29,12 +29,8 @@ export const CLOSED_MARKETS: ClosedMarketSpec[] = [
     note: 'US presidential election winner 2024 ($3.7B volume) — Trump. Multi-outcome event; binary legs are picked up individually.',
   },
   {
-    slug: 'fed-decreases-interest-rates-by-25-bps-after-december-2024-meeting',
-    note: 'Fed December 2024 decision, 25bps bracket ($58.8M event volume) — resolved YES.',
-  },
-  {
-    slug: 'fed-decreases-interest-rates-by-50-bps-after-december-2024-meeting',
-    note: 'Fed December 2024 decision, 50bps bracket — resolved NO.',
+    slug: 'fed-interest-rates-december-2024',
+    note: 'Fed December 2024 decision brackets ($58.8M event volume) — the 25bps-cut leg resolved YES. Event slug: sub-market slugs do not resolve on Gamma.',
   },
   {
     slug: 'bitcoin-new-all-time-high-in-2024',

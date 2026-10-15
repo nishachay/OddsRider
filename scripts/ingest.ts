@@ -205,7 +205,14 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
       warn(`skipping "${market.slug}": no price token`);
       continue;
     }
-    const series = normalizeSeries(await upstream.source.getHistory(market));
+    // CLOB serves recent history at `max`; archived legs may only answer
+    // `all`. First non-empty window wins; both are real responses.
+    let history: Array<{ t: number; p: number }> = [];
+    for (const window of ['all', 'max']) {
+      history = await upstream.source.getHistory(market, window);
+      if (history.length > 0) break;
+    }
+    const series = normalizeSeries(history);
     if (series.length < MIN_HISTORY_POINTS) {
       warn(`skipping "${market.slug}": only ${series.length} history points`);
       continue;
