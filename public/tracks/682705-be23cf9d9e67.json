@@ -1,5 +1,5 @@
 {
-  "id": "682705-81f8795bc70b",
+  "id": "682705-be23cf9d9e67",
   "version": 1,
   "kind": "live",
   "source": "polymarket",
@@ -11,8 +11,8 @@
   "resolution": null,
   "probability": 0.275,
   "change24h": -0.03,
-  "volume24h": 400667.90408900025,
-  "liquidity": 492566.4841,
+  "volume24h": 401566.4755210003,
+  "liquidity": 467912.9831,
   "endDate": "2026-10-28T03:59:00Z",
   "series": [
     {
@@ -2412,7 +2412,7 @@
       "p": 0.275
     },
     {
-      "t": 1792085839,
+      "t": 1792086756,
       "p": 0.275
     }
   ],
@@ -2472,9 +2472,9 @@
     "maxDrop": 0.03999999999999998,
     "maxRise": 0.040000000000000036,
     "range": 0.10999999999999999,
-    "spanDays": 29.98402777777778
+    "spanDays": 29.994641203703704
   },
   "difficulty": "EASY",
-  "hash": "81f8795bc70b7cc312a1b2a84a80d69e6d45ab24ba9502ae98beb690f9293e19",
-  "createdAt": "2026-10-15T17:39:53.274Z"
+  "hash": "be23cf9d9e67025a05971d2ed3368f7ec303b8e96a78cd59541bdb382c0ca1af",
+  "createdAt": "2026-10-15T17:57:42.592Z"
 }

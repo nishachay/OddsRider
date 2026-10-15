@@ -1,5 +1,5 @@
 {
-  "id": "601826-769040b016d4",
+  "id": "601826-06defe2af1cc",
   "version": 1,
   "kind": "live",
   "source": "polymarket",
@@ -9,10 +9,10 @@
   "category": "POLITICS",
   "status": "open",
   "resolution": null,
-  "probability": 0.7705,
-  "change24h": -0.08,
-  "volume24h": 576475.030051,
-  "liquidity": 560493.90579,
+  "probability": 0.768,
+  "change24h": -0.0825,
+  "volume24h": 584354.3367459999,
+  "liquidity": 549080.28626,
   "endDate": "2026-10-05T03:59:00Z",
   "series": [
     {
@@ -2412,8 +2412,8 @@
       "p": 0.769
     },
     {
-      "t": 1792085722,
-      "p": 0.7705
+      "t": 1792086982,
+      "p": 0.768
     }
   ],
   "sparkline": [
@@ -2464,17 +2464,17 @@
     0.861,
     0.861,
     0.8275,
-    0.7705
+    0.768
   ],
   "stats": {
     "points": 600,
-    "volatility": 0.010356685018835082,
+    "volatility": 0.010356754313750287,
     "maxDrop": 0.061999999999999944,
     "maxRise": 0.21500000000000008,
     "range": 0.37450000000000006,
-    "spanDays": 29.98273148148148
+    "spanDays": 29.997314814814814
   },
   "difficulty": "HARD",
-  "hash": "769040b016d4b8e3d5c7b3dc7d44dfee8357efed1a947b0f8ee883147cf23650",
-  "createdAt": "2026-10-15T17:39:53.274Z"
+  "hash": "06defe2af1cc26b52ff1f9f1252bc7bb7439193ed268358509eb159a216bbafe",
+  "createdAt": "2026-10-15T17:57:42.592Z"
 }
