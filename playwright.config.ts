@@ -1,8 +1,10 @@
 import { defineConfig } from 'playwright/test';
 
-// Smoke test: boots the built app, rides for a few seconds, asserts zero console
-// errors. It runs fully offline — Polymarket calls are mocked from
-// tests/fixtures, and any other external request fails the test.
+// Smoke test: boots the built app, rides a frozen track for a few seconds,
+// asserts zero console errors, and checks the missing-index error state. It
+// runs fully offline — the browser reads only our own committed
+// `public/tracks/*.json`, Google Fonts is stubbed, and any other external
+// request (including any Polymarket call) fails the test.
 //
 // `pnpm preview` serves the existing `dist/`, so run `pnpm build` first.
 export default defineConfig({

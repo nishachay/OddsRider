@@ -1,0 +1,54 @@
+name: Ingest tracks
+
+# Frozen-track ingest: fetches Polymarket, validates with zod, writes frozen
+# TrackV1 JSON to public/tracks/ and commits only when the set changed.
+#
+# The schedule runs on the default branch only (GitHub Actions cron does not
+# run on other branches). Use "Run workflow" to ingest onto any branch
+# manually — e.g. to publish the first live tracks onto a release branch.
+on:
+  schedule:
+    # Every 6 hours, offset from the hour to spread load.
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ingest-tracks
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.10.1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Ingest frozen tracks
+        run: pnpm ingest
+
+      - name: Commit only when the set changed
+        run: |
+          git config user.name "oddsrider-ingest"
+          git config user.email "oddsrider-ingest@users.noreply.github.com"
+          git add public/tracks
+          if git diff --cached --quiet; then
+            echo "ingest: no changes, nothing to commit"
+          else
+            git commit -m "ingest: refresh frozen tracks"
+            git push
+          fi

@@ -4,3 +4,6 @@ supportedArchitectures:
     - linux
   cpu:
     - x64
+
+packages:
+  - packages/*

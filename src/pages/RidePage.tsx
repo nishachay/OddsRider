@@ -4,7 +4,7 @@ import HudOverlay from '../components/HudOverlay';
 import CountdownGate from '../components/CountdownGate';
 import { audio } from '../game/audio';
 import { bus, EV } from '../game/bus';
-import { fetchRideForMarket, type RideInterval } from '../data/polymarket';
+import { fetchRideForTrack, rideIntervalFromParam, type RideInterval } from '../data/tracks';
 import { recordRun } from '../data/playerStorage';
 import { useMarket } from '../data/marketsContext';
 
@@ -22,8 +22,7 @@ export default function RidePage() {
   const [gateOpen, setGateOpen] = useState(false);
 
   const inverted = searchParams.get('side') === 'no';
-  const tf = searchParams.get('tf');
-  const interval: RideInterval = tf === '24H' ? 'day' : tf === '7D' ? 'week' : tf === 'ALL' ? 'all' : 'max';
+  const interval: RideInterval = rideIntervalFromParam(searchParams.get('tf'));
   const rideUrl = market
     ? `${window.location.origin}/ride/${market.id}${inverted ? '?side=no' : ''}`
     : window.location.href;
@@ -35,7 +34,7 @@ export default function RidePage() {
     setLoadError(false);
     setNoHistory(false);
     let cancelled = false;
-    fetchRideForMarket(market, inverted, interval)
+    fetchRideForTrack(market, inverted, interval)
       .then((ride) => {
         if (!cancelled) bus.emit(EV.LOAD_MARKET, ride);
       })
@@ -74,10 +73,10 @@ export default function RidePage() {
     return (
       <div className="min-h-screen bg-[#0a0a0b] text-[#f0f0f2] flex flex-col items-center justify-center gap-4">
         {loading ? (
-          <p className="font-mono text-xs text-dim animate-pulse">LOADING POLYMARKET CONTRACT...</p>
+          <p className="font-mono text-xs text-dim animate-pulse">LOADING FROZEN TRACK...</p>
         ) : (
           <>
-            <p className="font-mono text-xs text-dim">CONTRACT NOT FOUND: {marketId}</p>
+            <p className="font-mono text-xs text-dim">TRACK NOT FOUND: {marketId}</p>
             <Link
               to="/"
               className="font-mono text-xs font-bold tracking-widest text-toxic border border-toxic/40 px-4 py-2 hover:bg-toxic hover:text-bg transition-colors"
@@ -134,7 +133,7 @@ export default function RidePage() {
       {!gateOpen && <CountdownGate onDone={openGate} />}
       {loadError && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 font-mono text-[11px] text-crimson border border-crimson/50 bg-[#0a0a0b]/90 px-4 py-2">
-          FAILED TO LOAD LIVE ODDS — RIDING CACHED TRACK
+          FAILED TO LOAD TRACK DATA
         </div>
       )}
     </div>

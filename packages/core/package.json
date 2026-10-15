@@ -1,0 +1,16 @@
+{
+  "name": "@oddsrider/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OddsRider track domain: frozen TrackV1 generation, validation and slicing. No framework, no network.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  }
+}

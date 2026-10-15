@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { RideableMarket } from '../data/polymarket';
+import type { RideableMarket } from '../data/tracks';
 import { getMarketBest } from '../data/playerStorage';
 
 interface DailyChallengeProps {

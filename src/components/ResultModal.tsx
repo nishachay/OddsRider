@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadShareCardImage, shareToTwitter } from '../utils/shareCard';
 import { starsFor } from '../game/score';
-import type { Difficulty } from '../data/polymarket';
+import type { Difficulty } from '../data/tracks';
 
 interface ResultModalProps {
   isOpen: boolean;

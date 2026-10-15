@@ -5,32 +5,33 @@ import { expect, test, type Page } from 'playwright/test';
 // ---------------------------------------------------------------------------
 // Offline smoke test.
 //
-// This test never touches the network. Polymarket (Gamma + CLOB) responses come
-// from tests/fixtures, Google Fonts is stubbed, and any other external request
-// is aborted and reported as a failure. Everything it rides is local and
-// deterministic.
+// This test never touches the network. The browser reads only our own frozen
+// `/tracks/*.json` (committed to the repo), Google Fonts is stubbed, and any
+// other external request — including any call to a Polymarket domain — is
+// aborted and reported as a failure.
 //
-// Scope: the app shell boots, a ride starts, the bike moves under its own
-// power, and the console stays clean. Gameplay physics are not asserted here.
+// Scope: the app shell boots from the frozen index, a ride starts on a real
+// frozen track, the bike moves under its own power, the console stays clean,
+// and a missing index shows a clear error state instead of fake data.
+// Gameplay physics are not asserted here.
 // ---------------------------------------------------------------------------
 
-interface HistoryPoint {
-  t: number;
-  p: number;
+interface TrackSummary {
+  id: string;
+  kind: string;
+  question: string;
 }
 
-function fixture<T>(name: string): T {
-  const path = fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
-  return JSON.parse(readFileSync(path, 'utf8')) as T;
+function trackIndex(): TrackSummary[] {
+  const path = fileURLToPath(new URL('../public/tracks/index.json', import.meta.url));
+  const index = JSON.parse(readFileSync(path, 'utf8')) as { tracks: TrackSummary[] };
+  if (index.tracks.length === 0) throw new Error('public/tracks/index.json has no tracks');
+  return index.tracks;
 }
 
-const GAMMA_MARKETS = fixture<unknown[]>('gamma-markets.json');
-const CLOB_HISTORY = fixture<Record<string, HistoryPoint[]>>('clob-history.json');
-
-// The tracked fixture the test expects to ride: the highest-volume market, which
-// is what the arcade stage selects on load.
-const FIXTURE_TRACK_ID = '100001';
-const FIXTURE_QUESTION = 'Will the fixture rate cut land in Q3?';
+const TRACKS = trackIndex();
+// Whatever the ingest published first is what the home stage features.
+const FEATURED = TRACKS[0];
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 
@@ -64,19 +65,13 @@ async function telemetry(page: Page): Promise<Telemetry> {
   });
 }
 
-// Serve every third-party call from disk. `external` collects anything that is
-// neither local nor mocked, so a new outbound call fails the test loudly.
+// Everything third-party is stubbed or forbidden. `external` collects anything
+// that is neither local nor stubbed, so a new outbound call — a Polymarket
+// request, an analytics pixel, anything — fails the test loudly.
 async function mockThirdParties(page: Page, external: string[]): Promise<void> {
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
 
-    if (url.hostname === 'gamma-api.polymarket.com') {
-      return route.fulfill({ json: GAMMA_MARKETS });
-    }
-    if (url.hostname === 'clob.polymarket.com') {
-      const token = url.searchParams.get('market') ?? '';
-      return route.fulfill({ json: { history: CLOB_HISTORY[token] ?? [] } });
-    }
     if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
       return route.fulfill({
         status: 200,
@@ -93,30 +88,47 @@ async function mockThirdParties(page: Page, external: string[]): Promise<void> {
   });
 }
 
-test('starts a ride from fixture data with no console errors and no network', async ({ page }) => {
+function listen(page: Page): { consoleErrors: string[]; pageErrors: string[]; external: string[] } {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const external: string[] = [];
-
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  return { consoleErrors, pageErrors, external };
+}
 
+function assertClean(
+  consoleErrors: string[],
+  pageErrors: string[],
+  external: string[],
+  ignoredConsole: RegExp[] = [],
+): void {
+  const relevant = consoleErrors.filter((message) => !ignoredConsole.some((re) => re.test(message)));
+  expect(pageErrors, `uncaught page errors:\n${pageErrors.join('\n')}`).toEqual([]);
+  expect(relevant, `console errors:\n${relevant.join('\n')}`).toEqual([]);
+  expect(external, `the smoke test must not reach the network, but saw:\n${external.join('\n')}`).toEqual([]);
+}
+
+test('starts a ride from a frozen track with no console errors and no network', async ({ page }) => {
+  const { consoleErrors, pageErrors, external } = listen(page);
   await mockThirdParties(page, external);
 
-  // --- Home: the fixture feed must be accepted, not the bundled fallback ----
+  // --- Home: the frozen index must render, not a bundled fallback ------------
   await page.goto('/');
-  await expect(page.getByText(FIXTURE_QUESTION).first()).toBeVisible();
+  await expect(page.getByText(FEATURED.question).first()).toBeVisible();
   await page.screenshot({ path: 'test-results/smoke-home.png' });
 
-  // --- Start the ride --------------------------------------------------------
-  // The stage CTA drops straight into the game for the selected fixture track.
+  // --- Start the ride ---------------------------------------------------------
+  // The stage CTA drops straight into the game for the featured frozen track.
   await page.getByRole('button', { name: /enter race/i }).click();
-  await expect(page).toHaveURL(new RegExp(`/ride/${FIXTURE_TRACK_ID}$`));
+  await expect(page).toHaveURL(new RegExp(`/ride/${FEATURED.id}$`));
 
-  // --- The game boots and installs its debug handle --------------------------
-  await expect(page.locator('canvas')).toBeVisible();
+  // --- The game boots and installs its debug handle ---------------------------
+  // (the game canvas is first in the DOM: Phaser mounts before the HUD, whose
+  // progress bar renders its own small canvas)
+  await expect(page.locator('canvas').first()).toBeVisible();
   await page.waitForFunction(
     () => Boolean((window as unknown as { __oddsrider?: DebugHandle }).__oddsrider),
   );
@@ -130,7 +142,7 @@ test('starts a ride from fixture data with no console errors and no network', as
   expect(Number.isFinite(before.x)).toBe(true);
   expect(before.simMs).toBeGreaterThanOrEqual(0);
 
-  // --- Ride: hold throttle and watch the bike make progress ------------------
+  // --- Ride: hold throttle and watch the bike make progress -------------------
   await page.keyboard.down('w');
   let furthest = before.x;
   let fastest = 0;
@@ -150,8 +162,29 @@ test('starts a ride from fixture data with no console errors and no network', as
   expect(furthest).toBeGreaterThan(before.x + 20);
   expect(fastest).toBeGreaterThan(0);
 
-  // --- Nothing may have errored, nothing may have left the box --------------
-  expect(pageErrors, `uncaught page errors:\n${pageErrors.join('\n')}`).toEqual([]);
-  expect(consoleErrors, `console errors:\n${consoleErrors.join('\n')}`).toEqual([]);
-  expect(external, `the smoke test must not reach the network, but saw:\n${external.join('\n')}`).toEqual([]);
+  // --- Nothing may have errored, nothing may have left the box ----------------
+  assertClean(consoleErrors, pageErrors, external);
+});
+
+test('shows a clear error state when the track index is missing', async ({ page }) => {
+  const { consoleErrors, pageErrors, external } = listen(page);
+  await mockThirdParties(page, external);
+
+  // The frozen index is gone: no tracks may be invented to fill the hole. A 503
+  // (rather than an abort) keeps the browser from logging a resource error —
+  // the app's own error state is what this test asserts.
+  await page.route('**/tracks/index.json', (route) =>
+    route.fulfill({ status: 503, body: 'Service Unavailable' }),
+  );
+  await page.goto('/');
+
+  // The card says plainly that the feed is down, and offers a retry.
+  await expect(page.getByText(/TRACK FEED UNAVAILABLE/)).toBeVisible();
+  await expect(page.getByRole('button', { name: /retry/i })).toBeVisible();
+  // ...and no phantom race is offered anywhere.
+  await expect(page.getByRole('button', { name: /enter race/i })).toHaveCount(0);
+
+  // The browser itself reports the failed request as a resource error; that
+  // single expected message is the only console noise allowed.
+  assertClean(consoleErrors, pageErrors, external, [/^Failed to load resource/]);
 });

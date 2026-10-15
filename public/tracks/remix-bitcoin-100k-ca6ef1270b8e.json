@@ -1,0 +1,92 @@
+{
+  "id": "remix-bitcoin-100k-ca6ef1270b8e",
+  "version": 1,
+  "kind": "remix",
+  "source": "remix",
+  "sourceId": "remix-bitcoin-100k",
+  "slug": "will-bitcoin-reach-100000",
+  "question": "Will Bitcoin reach $100,000 before end of year?",
+  "category": "REMIX",
+  "status": "closed",
+  "resolution": null,
+  "probability": 0.86,
+  "change24h": null,
+  "volume24h": null,
+  "liquidity": null,
+  "endDate": null,
+  "series": [
+    {
+      "t": 1788220800,
+      "p": 0.22
+    },
+    {
+      "t": 1788456436,
+      "p": 0.28
+    },
+    {
+      "t": 1788692073,
+      "p": 0.35
+    },
+    {
+      "t": 1788927709,
+      "p": 0.42
+    },
+    {
+      "t": 1789163345,
+      "p": 0.38
+    },
+    {
+      "t": 1789398982,
+      "p": 0.52
+    },
+    {
+      "t": 1789634618,
+      "p": 0.65
+    },
+    {
+      "t": 1789870255,
+      "p": 0.78
+    },
+    {
+      "t": 1790105891,
+      "p": 0.72
+    },
+    {
+      "t": 1790341527,
+      "p": 0.8
+    },
+    {
+      "t": 1790577164,
+      "p": 0.85
+    },
+    {
+      "t": 1790812800,
+      "p": 0.86
+    }
+  ],
+  "sparkline": [
+    0.22,
+    0.28,
+    0.35,
+    0.42,
+    0.38,
+    0.52,
+    0.65,
+    0.78,
+    0.72,
+    0.8,
+    0.85,
+    0.86
+  ],
+  "stats": {
+    "points": 12,
+    "volatility": 0.06307545003164239,
+    "maxDrop": 0.06000000000000005,
+    "maxRise": 0.14,
+    "range": 0.64,
+    "spanDays": 30
+  },
+  "difficulty": "INSANE",
+  "hash": "ca6ef1270b8e79b9cd80a4c06a54178039853d10a7298a7035ce672b231355f9",
+  "createdAt": "2026-10-15T15:11:30.951Z"
+}
