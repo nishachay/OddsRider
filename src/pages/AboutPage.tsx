@@ -30,6 +30,7 @@ export default function AboutPage() {
             About the races
           </h1>
           <p className="font-sans text-sm text-dim leading-relaxed">
+            You&apos;re not riding money — you&apos;re riding what the crowd believes.
             OddsRider is a free browser game that turns real Polymarket probability charts into
             rideable motocross tracks. Pick a market, ride what the crowd believes — every rally
             is a climb, every crash is a cliff. Ride the YES side uphill, or flip to the NO side

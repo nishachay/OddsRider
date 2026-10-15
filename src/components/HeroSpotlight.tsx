@@ -27,8 +27,9 @@ function pad(n: number): string {
 
 function StagePoster({ market }: { market: RideableMarket }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-[#0a0a0b]">
-      <span className="font-mono text-[11px] tracking-[0.3em] text-dim animate-pulse uppercase">
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0a0a0b]">
+      <div className="shimmer h-[3px] w-56" />
+      <span className="font-mono text-[11px] tracking-[0.3em] text-dim uppercase">
         Rolling out {market.category} track…
       </span>
     </div>
@@ -161,6 +162,9 @@ export default function ArcadeStage({ markets, featured, live, onRide, onPreview
               <span className="block font-display font-bold text-xl sm:text-2xl text-ink leading-snug pt-3">
                 {selected.question}
               </span>
+              <span className="block font-sans text-xs text-dim pt-1.5 max-w-md">
+                You&apos;re not riding money — you&apos;re riding what the crowd believes.
+              </span>
 
               <div className="flex items-end gap-2 pt-1">
                 <span
@@ -185,7 +189,7 @@ export default function ArcadeStage({ markets, featured, live, onRide, onPreview
               <div className="flex flex-wrap items-center gap-4 pointer-events-auto">
                 <button
                   onClick={() => onRide(selected)}
-                  className="px-8 py-4 bg-toxic text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 transition-all cursor-pointer shadow-[0_0_24px_rgba(182,255,0,0.45)]"
+                  className="px-8 py-4 bg-toxic text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 active:scale-[0.98] transition-all ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer shadow-[0_0_24px_rgba(182,255,0,0.45)]"
                 >
                   Enter race {pad(selIndex + 1)}
                 </button>
@@ -218,7 +222,8 @@ export default function ArcadeStage({ markets, featured, live, onRide, onPreview
                     data-sel={active}
                     onClick={() => setSelId(m.id)}
                     onDoubleClick={() => onRide(m)}
-                    className={`w-full flex items-center gap-3 pl-0 pr-3 py-2.5 border-b border-[#1a1c22] text-left transition-colors cursor-pointer ${
+                    style={{ animationDelay: `${Math.min(i, 10) * 50}ms` }}
+                    className={`rise w-full flex items-center gap-3 pl-0 pr-3 py-2.5 border-b border-[#1a1c22] text-left transition-colors ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer ${
                       active ? 'bg-[#101113]' : 'hover:bg-[#101113]/60'
                     }`}
                   >
@@ -284,7 +289,7 @@ export function SearchStrip({ query, onQueryChange, onSearch }: SearchStripProps
         />
         <button
           type="submit"
-          className="font-mono text-xs font-bold tracking-[0.2em] uppercase text-toxic border-b-2 border-toxic px-1 py-2 hover:bg-toxic hover:text-bg transition-all cursor-pointer"
+          className="font-mono text-xs font-bold tracking-[0.2em] uppercase text-toxic border-b-2 border-toxic px-1 py-2 hover:bg-toxic hover:text-bg active:scale-[0.98] transition-all cursor-pointer"
         >
           Find →
         </button>
@@ -299,7 +304,7 @@ export function SearchStrip({ query, onQueryChange, onSearch }: SearchStripProps
               onQueryChange(chip);
               onSearch(chip);
             }}
-            className="text-dim hover:text-toxic transition-colors cursor-pointer"
+            className="text-dim hover:text-toxic active:scale-[0.98] transition-all cursor-pointer"
           >
             <span className="text-[#3b414f] mr-1">0{i + 1}</span>
             {chip}

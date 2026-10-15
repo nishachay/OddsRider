@@ -77,7 +77,8 @@ export default function MarketCard({ market, index, onRideYes, onRideNo, onPrevi
   return (
     <div
       onClick={() => onPreview(market)}
-      className="group relative flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6 px-4 sm:px-5 py-4 border-t border-[#232529] hover:bg-[#101113] transition-colors cursor-pointer select-none"
+      style={{ animationDelay: `${Math.min(index, 8) * 60}ms` }}
+      className="rise group relative flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6 px-4 sm:px-5 py-4 border-t border-[#232529] hover:bg-[#101113] transition-colors ease-[cubic-bezier(0.16,1,0.3,1)] cursor-pointer select-none"
     >
       <span className="absolute left-0 top-0 h-full w-[3px] bg-toxic opacity-0 group-hover:opacity-100 transition-opacity" />
 
@@ -117,7 +118,7 @@ export default function MarketCard({ market, index, onRideYes, onRideNo, onPrevi
             e.stopPropagation();
             onRideYes(market);
           }}
-          className="px-4 py-2.5 lg:py-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase bg-toxic/10 text-toxic border border-toxic/40 hover:bg-toxic hover:text-bg transition-all cursor-pointer text-center"
+          className="px-4 py-2.5 lg:py-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase bg-toxic/10 text-toxic border border-toxic/40 hover:bg-toxic hover:text-bg active:scale-[0.98] transition-all cursor-pointer text-center"
         >
           Yes ∧
         </button>
@@ -126,7 +127,7 @@ export default function MarketCard({ market, index, onRideYes, onRideNo, onPrevi
             e.stopPropagation();
             onRideNo(market);
           }}
-          className="px-4 py-2.5 lg:py-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase bg-crimson/10 text-crimson border border-crimson/40 hover:bg-crimson hover:text-bg transition-all cursor-pointer text-center"
+          className="px-4 py-2.5 lg:py-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase bg-crimson/10 text-crimson border border-crimson/40 hover:bg-crimson hover:text-bg active:scale-[0.98] transition-all cursor-pointer text-center"
         >
           No ∨
         </button>

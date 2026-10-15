@@ -61,7 +61,7 @@ public/assets/game/  processed PNGs   public/assets2/  original AI sources (neve
 
 ## Design language (race-day program — the old terminal spec is retired)
 
-Site chrome is a **race-meet program**, not the old boxed terminal: Anton poster headlines/odds (`font-poster`, loaded via Google Fonts in `index.html`), Space Grotesk questions, Geist Mono data; toxic `#b6ff00` / crimson `#ff3355` on near-black; scrolling odds ticker + live UTC clock for aliveness; numbered racecard rows (not grids); full-bleed YES/NO actions; no corner reticles, no `[ bracket ]` buttons. `docs/DESIGN_SYSTEM.md` is **superseded** for site chrome — its honesty/palette core still applies to the in-game HUD, which is untouched and must stay that way.
+Site chrome is a **race-meet program**, not the old boxed terminal: Anton poster headlines/odds (`font-poster`, loaded via Google Fonts in `index.html`), Space Grotesk questions, Geist Mono data; toxic `#b6ff00` / crimson `#ff3355` on near-black; scrolling odds ticker + live UTC clock for aliveness; numbered racecard rows (not grids); full-bleed YES/NO actions; no corner reticles, no `[ bracket ]` buttons. Motion system (`index.css`, CSS-only — no animation deps): expo easing `cubic-bezier(0.16,1,0.3,1)`, `.rise` stagger reveals on rows/rail (transform+opacity only), `active:scale` press states on CTAs, `.shimmer` skeleton for the stage loader; glow shadows only on the single arcade CTA. `docs/DESIGN_SYSTEM.md` is **superseded** for site chrome — its honesty/palette core still applies to the in-game HUD, which is untouched and must stay that way.
 
 ## Headless verification (no display on this box)
 

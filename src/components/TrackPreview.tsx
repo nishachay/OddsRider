@@ -207,14 +207,14 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
       <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 border border-[#232529] divide-y sm:divide-y-0 sm:divide-x divide-[#232529]">
         <button
           onClick={() => onLaunchRide(market, false, timeframe)}
-          className="py-4 bg-toxic text-bg font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-toxic/90 transition-all cursor-pointer text-center shadow-[0_0_20px_rgba(182,255,0,0.35)]"
+          className="py-4 bg-toxic text-bg font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-toxic/90 active:scale-[0.99] transition-all cursor-pointer text-center"
         >
           Ride yes ∧
         </button>
 
         <button
           onClick={() => onLaunchRide(market, true, timeframe)}
-          className="py-4 bg-transparent text-crimson font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-crimson hover:text-bg transition-all cursor-pointer text-center"
+          className="py-4 bg-transparent text-crimson font-mono font-bold text-xs tracking-[0.18em] uppercase hover:bg-crimson hover:text-bg active:scale-[0.99] transition-all cursor-pointer text-center"
         >
           Ride no ∨
         </button>

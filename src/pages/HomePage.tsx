@@ -4,11 +4,13 @@ import Navbar from '../components/Navbar';
 import ArcadeStage, { SearchStrip } from '../components/HeroSpotlight';
 import DailyChallenge from '../components/DailyChallenge';
 import MarketGrid from '../components/MarketGrid';
+import MarketCard from '../components/MarketCard';
 import Footer from '../components/Footer';
 import { useMarkets } from '../data/marketsContext';
 import {
   extractPolymarketSlug,
   filterMarketsLocal,
+  getBiggestMovers,
   getDailyChallenge,
   isLiveList,
   resolvePolymarketUrl,
@@ -51,6 +53,50 @@ function TickerTape({ markets, onPreview }: { markets: RideableMarket[]; onPrevi
         })}
       </div>
     </div>
+  );
+}
+
+// Biggest 24h swings: the reason to open the tab today. Live markets with
+// known deltas only — legendary history never qualifies as "moving now".
+function MoversSection({
+  movers,
+  onRideYes,
+  onRideNo,
+  onPreview,
+}: {
+  movers: RideableMarket[];
+  onRideYes: (m: RideableMarket) => void;
+  onRideNo: (m: RideableMarket) => void;
+  onPreview: (m: RideableMarket) => void;
+}) {
+  if (movers.length < 2) return null;
+  return (
+    <section className="w-full max-w-6xl mx-auto px-4 pt-12 select-none">
+      <div className="flex items-end justify-between gap-4">
+        <h2 className="font-poster uppercase leading-none text-4xl sm:text-5xl text-ink">
+          Biggest <span className="text-crimson">movers</span>
+        </h2>
+        <span className="font-mono text-[10px] text-dim tracking-[0.18em] pb-1 whitespace-nowrap uppercase">
+          <span className="inline-block w-2 h-2 bg-crimson animate-pulse mr-2" />
+          24H swings
+        </span>
+      </div>
+      <p className="font-sans text-xs text-dim pt-2">
+        Something moved. Ride it before the crowd changes its mind.
+      </p>
+      <div className="border-b border-[#232529] mt-4">
+        {movers.map((m, i) => (
+          <MarketCard
+            key={m.id}
+            market={m}
+            index={i + 1}
+            onRideYes={onRideYes}
+            onRideNo={onRideNo}
+            onPreview={onPreview}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -193,8 +239,10 @@ export default function HomePage() {
   const heroFeaturedMarket = markets[0] ?? null;
   const live = !loading && isLiveList(markets);
   const searchingMode = searchQuery.trim() !== '' || searching || searchResults !== null;
+  const movers = getBiggestMovers(markets);
   const onPreview = useCallback((m: RideableMarket) => navigate(`/preview/${m.id}`), [navigate]);
   const onRideYes = useCallback((m: RideableMarket) => navigate(ridePath(m, false)), [navigate]);
+  const onRideNo = useCallback((m: RideableMarket) => navigate(ridePath(m, true)), [navigate]);
 
   return (
     <div className="w-full flex flex-col min-h-screen">
@@ -219,6 +267,13 @@ export default function HomePage() {
             runSearch(q);
           }}
           onSearch={handleSearchSubmit}
+        />
+
+        <MoversSection
+          movers={movers}
+          onRideYes={onRideYes}
+          onRideNo={onRideNo}
+          onPreview={onPreview}
         />
 
         <HomeStrip stats={stats} />

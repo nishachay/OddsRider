@@ -127,6 +127,15 @@ export function simpleHash(s: string): number {
   return Math.abs(h);
 }
 
+// Biggest 24h movers: live, non-legendary markets with a known delta,
+// ranked by absolute swing. Unknown deltas never qualify — no guessing.
+export function getBiggestMovers(markets: RideableMarket[], n = 4): RideableMarket[] {
+  return markets
+    .filter((m) => m.category !== 'LEGENDARY' && m.probDelta !== null)
+    .sort((a, b) => Math.abs(b.probDelta ?? 0) - Math.abs(a.probDelta ?? 0))
+    .slice(0, n);
+}
+
 // Deterministic per-day challenge so everyone rides the same market.
 export function getDailyChallenge(
   markets: RideableMarket[],

@@ -63,7 +63,7 @@ export default function DailyChallenge({ market, dateStr, onRide }: DailyChallen
           </div>
           <button
             onClick={() => onRide(market)}
-            className="px-6 py-4 bg-amber-400 text-bg font-mono text-xs font-bold tracking-[0.16em] uppercase hover:bg-amber-300 transition-all cursor-pointer"
+            className="px-6 py-4 bg-amber-400 text-bg font-mono text-xs font-bold tracking-[0.16em] uppercase hover:bg-amber-300 active:scale-[0.98] transition-all cursor-pointer"
           >
             Enter →
           </button>
