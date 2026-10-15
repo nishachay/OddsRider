@@ -4,10 +4,13 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Ride the odds. Real Polymarket probability charts as rideable terrain.",
+  "packageManager": "pnpm@12.10.1",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:smoke": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
@@ -26,6 +29,7 @@
     "playwright": "^1.62.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.4"
   }
 }
