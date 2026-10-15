@@ -30,7 +30,9 @@ export const gammaMarketRowSchema = z.object({
   outcomes: listish.optional(),
   outcomePrices: listish.optional(),
   clobTokenIds: listish.optional(),
+  startDate: z.string().optional(),
   endDate: z.string().optional(),
+  sportsMarketType: z.string().optional(),
   oneDayPriceChange: numericish.optional(),
   priceChange24h: numericish.optional(),
   dayPriceChange: numericish.optional(),
@@ -45,6 +47,28 @@ export const clobHistorySchema = z.object({
   history: z.array(z.object({ t: z.number(), p: z.number() })).optional(),
 });
 
+export function parseHistory(payload: unknown): PricePoint[] {
+  const parsed = clobHistorySchema.safeParse(payload);
+  if (!parsed.success) return [];
+  return (parsed.data.history ?? []).filter(
+    (point) => Number.isFinite(point.t) && Number.isFinite(point.p),
+  );
+}
+
+/** Explicit CLOB windows cap at 15 days; split longer spans into chunks. */
+export const HISTORY_CHUNK_SECONDS = 14 * 86400;
+
+export function chunkRange(startTs: number, endTs: number): Array<[number, number]> {
+  const chunks: Array<[number, number]> = [];
+  let cursor = Math.floor(startTs);
+  const end = Math.floor(endTs);
+  while (cursor < end) {
+    chunks.push([cursor, Math.min(cursor + HISTORY_CHUNK_SECONDS, end)]);
+    cursor += HISTORY_CHUNK_SECONDS;
+  }
+  return chunks;
+}
+
 export interface SourceMarket {
   source: 'polymarket';
   sourceId: string;
@@ -57,7 +81,10 @@ export interface SourceMarket {
   change24h: number | null;
   volume24h: number | null;
   liquidity: number | null;
+  startDate: string | null;
   endDate: string | null;
+  /** e.g. "moneyline" — set only on sports markets. Absent otherwise. */
+  sportsMarketType: string | null;
   tags: string[];
   /** Kept for future features (plan §8). Raw source ids, never displayed. */
   externalIds: Record<string, string>;
@@ -161,7 +188,9 @@ export function toSourceMarket(row: unknown): SourceMarket | null {
     change24h,
     volume24h: parseNumberish(raw.volume24hr) ?? parseNumberish(raw.volumeNum) ?? parseNumberish(raw.volume),
     liquidity: parseNumberish(raw.liquidityNum) ?? parseNumberish(raw.liquidity),
+    startDate: raw.startDate ?? null,
     endDate: raw.endDate ?? null,
+    sportsMarketType: raw.sportsMarketType ?? null,
     tags,
     externalIds: {
       yesTokenId: tokens[yesIndex],
@@ -184,23 +213,40 @@ export interface SourceAdapter {
   listTrending(limit: number): Promise<SourceMarket[]>;
   /** Recently closed markets, highest total volume first. */
   listClosedByVolume(limit: number): Promise<SourceMarket[]>;
+  /** Markets matching a slug, from the events and markets endpoints. */
+  listBySlug(slug: string): Promise<SourceMarket[]>;
   /** Full price history for a market's YES token. */
   getHistory(market: SourceMarket, interval?: string): Promise<PricePoint[]>;
+  /**
+   * History for an explicit window (unix seconds, inclusive). The documented
+   * path for settled markets: `interval=max` with a fine fidelity serves an
+   * empty page for old tokens instead of their history.
+   */
+  getHistoryRange(market: SourceMarket, startTs: number, endTs: number): Promise<PricePoint[]>;
 }
 
 export function extractMarketRows(payload: unknown): unknown[] {
-  if (Array.isArray(payload)) return payload;
+  // An event carries its binary markets in a nested `markets` array — both
+  // at the top level (`{ events: [...] }`) and inside array responses
+  // (`/events?slug=` returns `[event]`).
+  const flatten = (items: unknown[]): unknown[] => {
+    const rows: unknown[] = [];
+    for (const item of items) {
+      const nested =
+        item !== null && typeof item === 'object'
+          ? (item as { markets?: unknown }).markets
+          : undefined;
+      if (Array.isArray(nested)) rows.push(...nested);
+      else rows.push(item);
+    }
+    return rows;
+  };
+
+  if (Array.isArray(payload)) return flatten(payload);
   if (payload && typeof payload === 'object') {
     const obj = payload as { markets?: unknown; events?: unknown };
-    if (Array.isArray(obj.markets)) return obj.markets;
-    if (Array.isArray(obj.events)) {
-      const rows: unknown[] = [];
-      for (const event of obj.events) {
-        const markets = (event as { markets?: unknown }).markets;
-        if (Array.isArray(markets)) rows.push(...markets);
-      }
-      return rows;
-    }
+    if (Array.isArray(obj.markets)) return flatten(obj.markets);
+    if (Array.isArray(obj.events)) return flatten(obj.events);
   }
   return [];
 }
@@ -262,16 +308,40 @@ export function createPolymarketSource(options: PolymarketSourceOptions): Source
     listClosedByVolume: (limit) =>
       listMarkets('closed=true&order=volumeNum&ascending=false', limit),
 
+    async listBySlug(slug: string) {
+      const [fromEvents, fromMarkets] = await Promise.all([
+        request(`${gammaBase}/events?slug=${encodeURIComponent(slug)}`).then(extractMarketRows),
+        request(`${gammaBase}/markets?slug=${encodeURIComponent(slug)}`).then(extractMarketRows),
+      ]);
+      const markets: SourceMarket[] = [];
+      const seen = new Set<string>();
+      for (const row of [...fromEvents, ...fromMarkets]) {
+        const market = toSourceMarket(row);
+        // Both endpoints can return the same market; freeze it once.
+        const key = `${market?.sourceId}::${market?.yesTokenId}`;
+        if (market && !seen.has(key)) {
+          seen.add(key);
+          markets.push(market);
+        }
+      }
+      return markets;
+    },
+
     async getHistory(market, interval = 'max') {
       if (!market.yesTokenId) return [];
       const payload = await request(
         `${clobBase}/prices-history?market=${encodeURIComponent(market.yesTokenId)}&interval=${interval}&fidelity=60`,
       );
-      const parsed = clobHistorySchema.safeParse(payload);
-      if (!parsed.success) return [];
-      return (parsed.data.history ?? []).filter(
-        (point) => Number.isFinite(point.t) && Number.isFinite(point.p),
+      return parseHistory(payload);
+    },
+
+    async getHistoryRange(market, startTs, endTs) {
+      if (!market.yesTokenId) return [];
+      if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) return [];
+      const payload = await request(
+        `${clobBase}/prices-history?market=${encodeURIComponent(market.yesTokenId)}&startTs=${Math.floor(startTs)}&endTs=${Math.floor(endTs)}&fidelity=60`,
       );
+      return parseHistory(payload);
     },
   };
 }
@@ -283,6 +353,41 @@ export const DEFAULT_RIDEABLE_FILTERS = {
   maxProbability: 0.97,
   minVolume24h: 50_000,
 } as const;
+
+/**
+ * Final outcome of a settled market from its official last price. The band is
+ * deliberately strict: anything that did not settle at the rails reports
+ * null (ambiguous) instead of a guessed resolution.
+ */
+export const RESOLUTION_YES_AT_OR_ABOVE = 0.99;
+export const RESOLUTION_NO_AT_OR_BELOW = 0.01;
+
+export function resolutionFromClose(finalProbability: number | null): 'YES' | 'NO' | null {
+  if (finalProbability === null || !Number.isFinite(finalProbability)) return null;
+  if (finalProbability >= RESOLUTION_YES_AT_OR_ABOVE) return 'YES';
+  if (finalProbability <= RESOLUTION_NO_AT_OR_BELOW) return 'NO';
+  return null;
+}
+
+/**
+ * Pick which binary leg of a settled event to freeze. An explicit `contains`
+ * hint wins (case-insensitive question match, for famous legs); otherwise the
+ * most-traded closed leg — the one the crowd cared about. Open legs never
+ * qualify. Returns null when nothing settled exists.
+ */
+export function selectClosedTarget(
+  candidates: SourceMarket[],
+  contains?: string,
+): SourceMarket | null {
+  const closed = candidates.filter((market) => market.status === 'closed');
+  if (closed.length === 0) return null;
+  if (contains) {
+    const needle = contains.toLowerCase();
+    const hit = closed.find((market) => market.question.toLowerCase().includes(needle));
+    if (hit) return hit;
+  }
+  return closed.slice().sort((a, b) => (b.volume24h ?? 0) - (a.volume24h ?? 0))[0] ?? null;
+}
 
 export function isRideableMarket(
   market: SourceMarket,
@@ -300,4 +405,18 @@ export function selectRideableMarkets(
   filters?: { minProbability: number; maxProbability: number; minVolume24h: number },
 ): SourceMarket[] {
   return markets.filter((market) => isRideableMarket(market, filters));
+}
+
+/**
+ * Single-game sports markets expire the same day and have no business on the
+ * card (they also miscategorise as TECH). Gamma marks them with
+ * `sportsMarketType` ("moneyline", "totals", …); anything carrying the field
+ * is out, everything else stays.
+ */
+export function isSportsMarket(market: SourceMarket): boolean {
+  return market.sportsMarketType !== null && market.sportsMarketType !== '';
+}
+
+export function filterSportsMarkets(markets: SourceMarket[]): SourceMarket[] {
+  return markets.filter((market) => !isSportsMarket(market));
 }

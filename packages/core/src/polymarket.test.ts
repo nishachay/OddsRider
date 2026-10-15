@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import gammaFixtures from '../fixtures/gamma-markets.json';
 import clobFixtures from '../fixtures/clob-history.json';
+// Complete recorded Gamma row (Leverkusen moneyline, 2026-10-15): real data.
+import sportsRow from '../fixtures/gamma-sports-row.json';
 import {
   categoryFromTags,
+  chunkRange,
   createPolymarketSource,
   extractMarketRows,
+  filterSportsMarkets,
+  HISTORY_CHUNK_SECONDS,
   isRideableMarket,
+  isSportsMarket,
   DEFAULT_RIDEABLE_FILTERS,
   parseListish,
   parseNumberish,
   parseProbability,
+  resolutionFromClose,
+  selectClosedTarget,
   selectRideableMarkets,
   toSourceMarket,
   type FetchImpl,
@@ -75,6 +83,13 @@ describe('extractMarketRows', () => {
     ]);
   });
 
+  it('flattens events nested inside an array response', () => {
+    // `/events?slug=` returns `[event]` — the event itself is not a market.
+    expect(
+      extractMarketRows([{ id: 9, title: 'An event', markets: [{ id: 1 }, { id: 2 }] }]),
+    ).toEqual([{ id: 1 }, { id: 2 }]);
+  });
+
   it('returns nothing for an unusable payload', () => {
     expect(extractMarketRows({ nope: true })).toEqual([]);
     expect(extractMarketRows('nope')).toEqual([]);
@@ -82,12 +97,12 @@ describe('extractMarketRows', () => {
 });
 
 describe('toSourceMarket', () => {
-  it('maps a fixture row', () => {
+  it('maps a recorded row', () => {
     const parsed = market(0);
-    expect(parsed.sourceId).toBe('100001');
-    expect(parsed.probability).toBeCloseTo(0.62, 6);
-    expect(parsed.volume24h).toBe(4_200_000);
-    expect(parsed.change24h).toBeCloseTo(0.04, 6);
+    expect(parsed.sourceId).toBe('5126779');
+    expect(parsed.probability).toBeCloseTo(0.125, 6);
+    expect(parsed.volume24h).toBeCloseTo(2_108_416.46, 2);
+    expect(parsed.change24h).toBeCloseTo(-0.05, 6);
     expect(parsed.yesTokenId).toBe(yesToken(0));
     expect(parsed.status).toBe('open');
   });
@@ -195,13 +210,13 @@ describe('createPolymarketSource (recorded fixtures, no live calls)', () => {
   it('lists trending markets from the recorded payload', async () => {
     const markets = await source.listTrending(24);
     expect(markets).toHaveLength(2);
-    expect(markets[0].sourceId).toBe('100001');
+    expect(markets[0].sourceId).toBe('5126779');
     expect(calls[0]).toContain('/markets?active=true&closed=false&order=volume24hr');
   });
 
   it('reads price history for a market token', async () => {
     const history = await source.getHistory(market(0));
-    expect(history).toHaveLength(48);
+    expect(history).toHaveLength(385);
     expect(calls[calls.length - 1]).toContain('/prices-history');
   });
 
@@ -223,5 +238,111 @@ describe('createPolymarketSource (recorded fixtures, no live calls)', () => {
       attempts: 1,
     });
     expect(await weird.getHistory(market(0))).toEqual([]);
+  });
+
+  it('requests an explicit window for ranged history', async () => {
+    const history = await source.getHistoryRange(market(0), 1_700_000_000, 1_700_086_400);
+    expect(history).toHaveLength(385);
+    const last = calls[calls.length - 1];
+    expect(last).toContain('startTs=1700000000');
+    expect(last).toContain('endTs=1700086400');
+    expect(last).not.toContain('interval=');
+  });
+
+  it('refuses an inverted or unusable range instead of guessing', async () => {
+    const before = calls.length;
+    expect(await source.getHistoryRange(market(0), 200, 100)).toEqual([]);
+    expect(await source.getHistoryRange(market(0), Number.NaN, 100)).toEqual([]);
+    expect(calls.length).toBe(before);
+  });
+
+  it('resolves a slug through both the events and markets endpoints', async () => {
+    const markets = await source.listBySlug('a-market');
+    expect(markets.length).toBeGreaterThan(0);
+    expect(calls.some((url) => url.includes('/events?slug=a-market'))).toBe(true);
+    expect(calls.some((url) => url.includes('/markets?slug=a-market'))).toBe(true);
+  });
+
+  it('returns nothing when a slug resolves nowhere', async () => {
+    const empty = createPolymarketSource({
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => [] }),
+      attempts: 1,
+    });
+    expect(await empty.listBySlug('no-such-market')).toEqual([]);
+  });
+});
+
+describe('chunkRange', () => {
+  it('covers the whole span in capped chunks', () => {
+    const chunks = chunkRange(0, HISTORY_CHUNK_SECONDS * 2 + 100);
+    expect(chunks).toHaveLength(3);
+    expect(chunks[0][0]).toBe(0);
+    expect(chunks[chunks.length - 1][1]).toBe(HISTORY_CHUNK_SECONDS * 2 + 100);
+    for (const [from, to] of chunks) {
+      expect(to - from).toBeLessThanOrEqual(HISTORY_CHUNK_SECONDS);
+    }
+  });
+
+  it('returns nothing for an empty span', () => {
+    expect(chunkRange(100, 100)).toEqual([]);
+    expect(chunkRange(200, 100)).toEqual([]);
+  });
+});
+
+describe('selectClosedTarget', () => {
+  const yes = { ...market(0), status: 'closed' as const, question: 'Will rates drop 25 bps?', volume24h: 10 };
+  const no = { ...market(1), status: 'closed' as const, question: 'Will rates drop 50 bps?', volume24h: 999 };
+  const open = { ...market(0), status: 'open' as const, question: 'Will rates drop 25 bps?', volume24h: 1e9 };
+
+  it('prefers the famous leg when a hint matches', () => {
+    expect(selectClosedTarget([yes, no], '25 bps')?.question).toBe('Will rates drop 25 bps?');
+  });
+
+  it('falls back to the most-traded settled leg', () => {
+    expect(selectClosedTarget([yes, no])?.question).toBe('Will rates drop 50 bps?');
+  });
+
+  it('never picks an open market', () => {
+    expect(selectClosedTarget([open])).toBeNull();
+  });
+
+  it('returns null when nothing settled', () => {
+    expect(selectClosedTarget([])).toBeNull();
+  });
+});
+
+describe('sports filter (recorded moneyline response)', () => {
+  it('parses the recorded sports row', () => {
+    const parsed = toSourceMarket(sportsRow);
+    if (!parsed) throw new Error('recorded sports row did not parse');
+    expect(parsed.question).toBe('Will Bayer 04 Leverkusen win on 2026-10-15?');
+    expect(parsed.sportsMarketType).toBe('moneyline');
+  });
+
+  it('excludes the sports row but keeps real non-sports markets', () => {
+    const sports = toSourceMarket(sportsRow);
+    if (!sports) throw new Error('recorded sports row did not parse');
+    expect(isSportsMarket(sports)).toBe(true);
+    expect(isSportsMarket(market(0))).toBe(false);
+    expect(isSportsMarket(market(1))).toBe(false);
+    expect(filterSportsMarkets([market(0), sports, market(1)])).toHaveLength(2);
+  });
+
+  it('treats a missing field as non-sports, never as sports', () => {
+    expect(isSportsMarket({ ...market(0), sportsMarketType: null })).toBe(false);
+    expect(isSportsMarket({ ...market(0), sportsMarketType: '' })).toBe(false);
+  });
+});
+
+describe('resolutionFromClose', () => {
+  it('calls the rails, never the middle', () => {
+    expect(resolutionFromClose(1)).toBe('YES');
+    expect(resolutionFromClose(0.995)).toBe('YES');
+    expect(resolutionFromClose(0)).toBe('NO');
+    expect(resolutionFromClose(0.005)).toBe('NO');
+    expect(resolutionFromClose(0.62)).toBeNull();
+    expect(resolutionFromClose(0.5)).toBeNull();
+    expect(resolutionFromClose(null)).toBeNull();
+    expect(resolutionFromClose(Number.NaN)).toBeNull();
   });
 });

@@ -1,27 +1,27 @@
 # Adapter fixtures
 
-Test data only. **Not real market data.** Nothing here came from Polymarket and
-nothing here should ever be presented as live odds.
-
-These drive the Polymarket adapter tests in `packages/core` — the shape is
-faithful to the real Gamma + CLOB payloads so the parsing path under test is the
-same one the ingest uses, but the values are synthetic ("the fixture rate cut"),
-so a screenshot or a log line can never be mistaken for a real market.
+**Recorded from the live Polymarket API** (Gamma `/markets` + CLOB
+`/prices-history`) on 2026-10-15, captured via the ingest `--dump` artifact.
+Every value in these files is a genuine API response — nothing is hand-drawn
+or invented. If a value looks odd, the API really said that.
 
 | File | Shape |
 |---|---|
-| `gamma-markets.json` | Gamma `/markets` response (array of market rows) |
+| `gamma-markets.json` | 2 rows of a Gamma `/markets` response (array of market rows) |
 | `clob-history.json` | CLOB `/prices-history` responses, keyed by YES token id |
+| `gamma-sports-row.json` | 1 complete recorded Gamma row: a single-game moneyline market, for the sports filter test |
 
-`outcomes`, `outcomePrices` and `clobTokenIds` are JSON-encoded **strings**,
-exactly as Gamma sends them. Each token has 48 points spanning 30 days ending at
-the fixed timestamp `1790812800` (2026-10-01T00:00:00Z), so the fixtures never
-drift.
-
-The tests must keep passing with the adapter's own filters
-(`minVolume24h`, probability band, binary-only), so the fixtures satisfy them:
-`volume24hr >= 50000`, both outcomes present, a YES token, and at least 15
-history points with a range `>= 0.03`.
+- `outcomes`, `outcomePrices` and `clobTokenIds` are JSON-encoded **strings**,
+  exactly as Gamma sends them.
+- Market 0: Indiana data-center moratorium (probability 0.125, 385 history
+  points). Market 1: Fed October-2026 no-change (probability 0.725, 721 points).
+- The tests must keep passing with the adapter's own filters
+  (`minVolume24h`, probability band, binary-only), so the recorded markets
+  satisfy them: `volume24hr >= 50000`, both outcomes present, a YES token, and
+  at least 15 history points with a range `>= 0.03`.
 
 There is deliberately **no minimum market count**: the old "4 live markets or
 fall back to the curated list" rule is gone along with the silent fallback.
+
+To re-record: dispatch the ingest workflow (it uploads `ingest-dump` on every
+manual run), then take 2 binary rows plus their YES-token histories.

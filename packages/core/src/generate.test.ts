@@ -110,19 +110,11 @@ describe('canonicalSeries', () => {
 describe('trackIdFor / slugifyKey', () => {
   it('produces a readable, safe id', () => {
     expect(slugifyKey('Will BTC hit 100k? (2026)')).toBe('will-btc-hit-100k-2026');
-    expect(trackIdFor('live', '123456', 'a'.repeat(64))).toBe('123456-aaaaaaaaaaaa');
-  });
-
-  it('marks remix tracks in the id', () => {
-    expect(trackIdFor('remix', 'btc-crash', 'b'.repeat(64))).toBe('remix-btc-crash-bbbbbbbbbbbb');
-  });
-
-  it('never doubles the remix prefix', () => {
-    expect(trackIdFor('remix', 'remix-btc', 'b'.repeat(64))).toBe('remix-btc-bbbbbbbbbbbb');
+    expect(trackIdFor('123456', 'a'.repeat(64))).toBe('123456-aaaaaaaaaaaa');
   });
 
   it('never returns an empty key', () => {
-    expect(trackIdFor('live', '!!!', 'c'.repeat(64))).toBe('market-cccccccccccc');
+    expect(trackIdFor('!!!', 'c'.repeat(64))).toBe('market-cccccccccccc');
   });
 });
 

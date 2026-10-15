@@ -27,7 +27,7 @@ async function track(
 ): Promise<TrackV1> {
   const input: TrackInput = {
     kind,
-    source: kind === 'remix' ? 'remix' : 'polymarket',
+    source: 'polymarket',
     sourceId,
     slug: `slug-${sourceId}`,
     question: `Will market ${sourceId} do the thing?`,
@@ -78,15 +78,15 @@ describe('dedupeNewest', () => {
     expect(list.map((t) => t.sourceId)).toEqual(['1', '2']);
   });
 
-  it('treats a remix and a live track with the same source id as different', async () => {
+  it('treats a closed and a live track with the same source id as different', async () => {
     const live = await track('shared', { kind: 'live' });
-    const remix = await track('shared', { kind: 'remix', offset: 0.2 });
-    expect(dedupeNewest([summarize(live), summarize(remix)])).toHaveLength(2);
+    const closed = await track('shared', { kind: 'closed', offset: 0.2 });
+    expect(dedupeNewest([summarize(live), summarize(closed)])).toHaveLength(2);
   });
 
   it('never drops a kind when only one exists', async () => {
-    const remix = await track('only-remix', { kind: 'remix' });
-    expect(dedupeNewest([summarize(remix)])).toHaveLength(1);
+    const closed = await track('only-closed', { kind: 'closed' });
+    expect(dedupeNewest([summarize(closed)])).toHaveLength(1);
   });
 });
 
@@ -137,5 +137,24 @@ describe('planIngest', () => {
     const plan = planIngest([], snapshots, { keepPerSource: 1 });
     expect(plan.tracks).toHaveLength(1);
     expect(plan.prune).toHaveLength(1);
+  });
+
+  it('lists each market once in the index: the newest snapshot', async () => {
+    const snapshots = [
+      await track('1', { offset: 0, createdAt: '2026-09-01T00:00:00.000Z' }),
+      await track('1', { offset: 0.05, createdAt: '2026-09-15T00:00:00.000Z' }),
+      await track('1', { offset: 0.1, createdAt: '2026-10-01T00:00:00.000Z' }),
+      await track('2', { createdAt: '2026-09-20T00:00:00.000Z' }),
+    ];
+    const plan = planIngest([], snapshots);
+
+    // Files keep both retained snapshots; the index (what Home renders)
+    // lists market 1 once, at its newest snapshot.
+    expect(plan.tracks).toHaveLength(KEEP_PER_SOURCE + 1);
+    expect(plan.index.tracks).toHaveLength(2);
+    const keys = plan.index.tracks.map((t) => `${t.kind}:${t.sourceId}`);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(plan.index.tracks.find((t) => t.sourceId === '1')?.id).toBe(snapshots[2].id);
+    expect(plan.index.generatedAt).toBe('2026-10-01T00:00:00.000Z');
   });
 });

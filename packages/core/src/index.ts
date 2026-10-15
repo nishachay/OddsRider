@@ -13,7 +13,6 @@ export * from './stats.ts';
 export * from './categorize.ts';
 export * from './window.ts';
 export * from './generate.ts';
-export * from './remix.ts';
 export * from './banned.ts';
 export * from './polymarket.ts';
 export * from './ingest.ts';

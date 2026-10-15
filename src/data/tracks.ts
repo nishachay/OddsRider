@@ -40,9 +40,11 @@ export interface RideableMarket {
   sourceId: string;
   kind: TrackKind;
   volumeNum: number;
-  /** '—' when the source published no volume (always, for remix). */
+  /** '—' when the source published no volume. */
   volumeFormatted: string;
   category: Category;
+  /** Final outcome for settled tracks (strict rails rule), else null. */
+  resolution: 'YES' | 'NO' | null;
   /** Official last-trade probability at freeze time. Never derived. */
   currentProb: number;
   /** Official 24h change at freeze time, or null when unknown (UI shows "—"). */
@@ -55,7 +57,7 @@ export interface RideableMarket {
   stats: TrackStats;
   points: number;
   createdAt: string;
-  /** True only for tradeable markets. Remix is never live. */
+  /** True only for tradeable markets. Settled tracks are never live. */
   live: boolean;
 }
 
@@ -93,6 +95,7 @@ export function toRideableMarket(summary: TrackSummary): RideableMarket {
     volumeNum: summary.volume24h ?? 0,
     volumeFormatted: summary.volume24h == null ? '—' : formatVolume(summary.volume24h),
     category: summary.category,
+    resolution: summary.resolution ?? null,
     currentProb: summary.probability,
     probDelta: summary.change24h,
     resolutionDate: formatDate(summary.endDate),
@@ -235,14 +238,13 @@ export function getBiggestMovers(markets: RideableMarket[], n = 4): RideableMark
 }
 
 // Deterministic per-day challenge so everyone rides the same track. Live
-// tracks first; remix only headlines when nothing real is published.
+// tracks first; settled tracks headline only when nothing live is published.
 export function getDailyChallenge(
   markets: RideableMarket[],
   dateStr: string = new Date().toISOString().slice(0, 10),
 ): RideableMarket | null {
   const live = markets.filter((m) => m.kind === 'live');
-  const pool = live.length > 0 ? live : markets.filter((m) => m.kind !== 'remix');
-  const list = pool.length > 0 ? pool : markets;
+  const list = live.length > 0 ? live : markets;
   if (list.length === 0) return null;
   return list[simpleHash(dateStr) % list.length];
 }
@@ -251,7 +253,7 @@ export interface HomePageData {
   dailyChallenge: RideableMarket | null;
   trending: RideableMarket[];
   legendary: RideableMarket[];
-  remix: RideableMarket[];
+  closed: RideableMarket[];
   byCategory: Record<string, RideableMarket[]>;
   all: RideableMarket[];
   live: boolean;
@@ -263,7 +265,7 @@ export function getHomePageData(markets: RideableMarket[]): HomePageData {
     .slice()
     .sort((a, b) => b.volumeNum - a.volumeNum);
   const legendary = markets.filter((m) => m.category === 'LEGENDARY');
-  const remix = markets.filter((m) => m.kind === 'remix');
+  const closed = markets.filter((m) => m.kind === 'closed');
   const byCategory: Record<string, RideableMarket[]> = {};
   for (const m of markets) {
     if (!byCategory[m.category]) byCategory[m.category] = [];
@@ -273,7 +275,7 @@ export function getHomePageData(markets: RideableMarket[]): HomePageData {
     dailyChallenge: getDailyChallenge(markets),
     trending,
     legendary,
-    remix,
+    closed,
     byCategory,
     all: markets,
     live: isLiveList(markets),

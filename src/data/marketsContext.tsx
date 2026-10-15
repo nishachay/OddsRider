@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  fetchTrack,
   fetchTrackIndex,
   sameFeed,
   toRideableMarket,
@@ -84,10 +85,37 @@ export function useMarket(idOrSlug: string | undefined): {
   market: RideableMarket | null;
   loading: boolean;
 } {
-  const { markets, loading } = useMarkets();
-  if (!idOrSlug) return { market: null, loading };
-  return {
-    market: markets.find((m) => m.id === idOrSlug || m.slug === idOrSlug) ?? null,
-    loading,
-  };
+  const { markets, loading: listLoading } = useMarkets();
+  const [standalone, setStandalone] = useState<RideableMarket | null>(null);
+  const [standaloneLoading, setStandaloneLoading] = useState(false);
+
+  const fromList = idOrSlug ? (markets.find((m) => m.id === idOrSlug || m.slug === idOrSlug) ?? null) : null;
+
+  useEffect(() => {
+    // The index lists each market once (newest snapshot), but retained files
+    // stay on disk: a shared link to an older snapshot resolves here, straight
+    // from its frozen file. Slugs only resolve through the index.
+    if (!idOrSlug || fromList || listLoading) return;
+    let cancelled = false;
+    setStandalone(null);
+    setStandaloneLoading(true);
+    fetchTrack(idOrSlug).then(
+      (track) => {
+        if (!cancelled) {
+          setStandalone(toRideableMarket(track));
+          setStandaloneLoading(false);
+        }
+      },
+      () => {
+        if (!cancelled) setStandaloneLoading(false);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [idOrSlug, fromList, listLoading]);
+
+  if (fromList) return { market: fromList, loading: listLoading };
+  if (standalone) return { market: standalone, loading: false };
+  return { market: null, loading: listLoading || standaloneLoading };
 }

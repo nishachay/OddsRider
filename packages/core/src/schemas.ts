@@ -22,15 +22,15 @@ export const trackStatsSchema = z.object({
   spanDays: z.number().finite().nonnegative(),
 });
 
-export const trackKindSchema = z.enum(['live', 'legendary', 'remix']);
+export const trackKindSchema = z.enum(['live', 'closed']);
 export const difficultySchema = z.enum(['EASY', 'MEDIUM', 'HARD', 'INSANE', 'NEW']);
-export const categorySchema = z.enum(['POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY', 'REMIX']);
+export const categorySchema = z.enum(['POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY']);
 
 export const trackSummarySchema = z.object({
   id: z.string().min(3),
   version: z.literal(1),
   kind: trackKindSchema,
-  source: z.enum(['polymarket', 'remix']),
+  source: z.enum(['polymarket']),
   sourceId: z.string().min(1),
   slug: z.string().min(1),
   question: z.string().min(1),
@@ -47,6 +47,12 @@ export const trackSummarySchema = z.object({
   difficulty: difficultySchema,
   hash: z.string().regex(/^[0-9a-f]{64}$/, 'hash must be a sha256 hex digest'),
   createdAt: z.string().min(1),
+}).superRefine((summary, ctx) => {
+  // A settled track without a final YES/NO is corrupt data: the ingest must
+  // fail loudly instead of publishing it, so the schema rejects it here.
+  if (summary.kind === 'closed' && summary.resolution !== 'YES' && summary.resolution !== 'NO') {
+    ctx.addIssue({ code: 'custom', message: 'closed tracks require resolution YES or NO' });
+  }
 });
 
 export const trackV1Schema = trackSummarySchema.extend({
