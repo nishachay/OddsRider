@@ -1,7 +1,7 @@
 ﻿import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import type { RideableMarket } from '../data/polymarket';
+import type { RideableMarket } from '../data/tracks';
 import { bus, EV } from '../game/bus';
-import { fetchRideForMarket } from '../data/polymarket';
+import { fetchRideForTrack } from '../data/tracks';
 
 const PhaserGame = lazy(() => import('../game/PhaserGame'));
 
@@ -79,7 +79,7 @@ export default function ArcadeStage({ markets, featured, live, onRide, onPreview
     const g = ++gen.current;
     const t = window.setTimeout(
       () => {
-        fetchRideForMarket(m, false, 'max')
+        fetchRideForTrack(m, false, 'ALL')
           .then((ride) => {
             if (gen.current === g) {
               applied.current = m.id;

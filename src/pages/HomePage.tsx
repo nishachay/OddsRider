@@ -8,21 +8,19 @@ import MarketCard from '../components/MarketCard';
 import Footer from '../components/Footer';
 import { useMarkets } from '../data/marketsContext';
 import {
-  extractPolymarketSlug,
-  filterMarketsLocal,
+  extractTrackSlug,
+  filterTracksLocal,
   getBiggestMovers,
   getDailyChallenge,
   isLiveList,
-  resolvePolymarketUrl,
-  searchMarkets,
   type RideableMarket,
-} from '../data/polymarket';
+} from '../data/tracks';
 import { getPlayerStats, type PlayerStats } from '../data/playerStorage';
 
 export function ridePath(market: RideableMarket, inverted = false, timeframe?: string): string {
   const params = new URLSearchParams();
   if (inverted) params.set('side', 'no');
-  if (timeframe && timeframe !== 'LIVE') params.set('tf', timeframe);
+  if (timeframe && timeframe !== 'ALL') params.set('tf', timeframe);
   const qs = params.toString();
   return `/ride/${market.id}${qs ? `?${qs}` : ''}`;
 }
@@ -124,7 +122,7 @@ function HomeStrip({ stats }: { stats: PlayerStats }) {
   }
 
   const steps: Array<[string, string, string]> = [
-    ['01', 'Pick a race', 'Live Polymarket contracts, sorted by 24H volume.'],
+    ['01', 'Pick a race', 'Frozen odds tracks, sorted by 24H volume.'],
     ['02', 'Ride the curve', 'Green rallies climb. Red selloffs drop. NO inverts the track.'],
     ['03', 'Beat your best', 'Scores live on your device. New feature race drops 00:00 UTC.'],
   ];
@@ -148,7 +146,7 @@ function HomeStrip({ stats }: { stats: PlayerStats }) {
 export default function HomePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { markets, loading, ingestMarket } = useMarkets();
+  const { markets, loading } = useMarkets();
   const [activeCategory, setActiveCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<RideableMarket[] | null>(null);
@@ -179,26 +177,13 @@ export default function HomePage() {
         setSearchResults(null);
         return;
       }
-      // Instant local hits first; live Gamma upgrades when it answers.
-      setSearchResults(filterMarketsLocal(q, markets));
+      // Local-only: the browser never queries Polymarket. A pasted track URL
+      // matches by slug; anything else is a text search over frozen tracks.
       setSearching(true);
-      debounce.current = window.setTimeout(async () => {
-        try {
-          const live = await searchMarkets(q, markets);
-          setSearchResults((prev) => {
-            if (live.length === 0) return prev;
-            const same =
-              prev !== null &&
-              prev.length === live.length &&
-              prev.every((m, i) => m.id === live[i].id);
-            return same ? prev : live;
-          });
-        } catch {
-          // Local results already showing
-        } finally {
-          setSearching(false);
-        }
-      }, 400);
+      debounce.current = window.setTimeout(() => {
+        setSearchResults(filterTracksLocal(q, markets));
+        setSearching(false);
+      }, 200);
     },
     [markets],
   );
@@ -213,25 +198,20 @@ export default function HomePage() {
   }, []);
 
   const handleSearchSubmit = useCallback(
-    async (q: string) => {
+    (q: string) => {
       setSearchQuery(q);
-      if (extractPolymarketSlug(q)) {
-        setSearching(true);
-        try {
-          const resolved = await resolvePolymarketUrl(q);
-          if (resolved) {
-            ingestMarket(resolved);
-            navigate(`/preview/${resolved.id}`);
-            return;
-          }
-        } finally {
-          setSearching(false);
+      const slug = extractTrackSlug(q);
+      if (slug) {
+        const match = markets.find((m) => m.slug === slug || m.id === slug);
+        if (match) {
+          navigate(`/preview/${match.id}`);
+          return;
         }
       }
       runSearch(q);
       document.getElementById('card')?.scrollIntoView({ behavior: 'smooth' });
     },
-    [ingestMarket, navigate, runSearch],
+    [markets, navigate, runSearch],
   );
 
   const todayStr = new Date().toISOString().slice(0, 10);

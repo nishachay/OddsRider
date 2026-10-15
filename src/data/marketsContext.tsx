@@ -1,44 +1,29 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  fetchAllMarkets,
-  getCachedMarkets,
-  CURATED_POLYMARKET_FEED,
+  fetchTrackIndex,
+  sameFeed,
+  toRideableMarket,
+  TrackFeedError,
   type FeedError,
   type RideableMarket,
-} from './polymarket';
+} from './tracks';
 
 interface MarketsValue {
   markets: RideableMarket[];
   loading: boolean;
   feedError: FeedError | null;
   reload: () => void;
-  ingestMarket: (m: RideableMarket) => void;
 }
 
 const MarketsContext = createContext<MarketsValue>({
-  markets: CURATED_POLYMARKET_FEED,
+  markets: [],
   loading: true,
   feedError: null,
   reload: () => {},
-  ingestMarket: () => {},
 });
 
-// Same feed = same ids and same odds: skip the state update so canvases,
-// countdowns, and scroll position survive a background refresh.
-function sameFeed(a: RideableMarket[], b: RideableMarket[]): boolean {
-  return (
-    a.length === b.length &&
-    a.every(
-      (m, i) =>
-        m.id === b[i]?.id &&
-        m.currentProb === b[i]?.currentProb &&
-        m.probDelta === b[i]?.probDelta,
-    )
-  );
-}
-
 export function MarketsProvider({ children }: { children: ReactNode }) {
-  const [markets, setMarkets] = useState<RideableMarket[]>(() => getCachedMarkets() ?? CURATED_POLYMARKET_FEED);
+  const [markets, setMarkets] = useState<RideableMarket[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedError, setFeedError] = useState<FeedError | null>(null);
   const busy = useRef(false);
@@ -47,9 +32,18 @@ export function MarketsProvider({ children }: { children: ReactNode }) {
     if (busy.current) return;
     busy.current = true;
     try {
-      const { markets: data, error } = await fetchAllMarkets();
+      const index = await fetchTrackIndex();
+      if (index.tracks.length === 0) {
+        setFeedError('TRACKS_EMPTY');
+        return;
+      }
+      const data = index.tracks.map(toRideableMarket);
       if (data.length > 0) setMarkets((prev) => (sameFeed(prev, data) ? prev : data));
-      setFeedError(error === 'OK' ? null : error);
+      setFeedError(null);
+    } catch (error) {
+      // A failed refresh never fabricates tracks and never wipes the last
+      // good list: the UI shows the error and offers a retry.
+      setFeedError(error instanceof TrackFeedError ? error.code : 'TRACKS_UNREACHABLE');
     } finally {
       busy.current = false;
     }
@@ -60,7 +54,8 @@ export function MarketsProvider({ children }: { children: ReactNode }) {
     refresh().then(() => {
       if (!cancelled) setLoading(false);
     });
-    // Live odds without reloads: silent refresh every 60s while visible.
+    // Frozen index, cheap to re-check: refresh every 60s while visible so a
+    // newly published ingest appears without a reload.
     const t = window.setInterval(() => {
       if (!document.hidden) void refresh();
     }, 60000);
@@ -74,12 +69,8 @@ export function MarketsProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const ingestMarket = useCallback((m: RideableMarket) => {
-    setMarkets((prev) => (prev.some((x) => x.id === m.id) ? prev : [m, ...prev]));
-  }, []);
-
   return (
-    <MarketsContext.Provider value={{ markets, loading, feedError, reload, ingestMarket }}>
+    <MarketsContext.Provider value={{ markets, loading, feedError, reload }}>
       {children}
     </MarketsContext.Provider>
   );
@@ -94,14 +85,9 @@ export function useMarket(idOrSlug: string | undefined): {
   loading: boolean;
 } {
   const { markets, loading } = useMarkets();
-  const find = useCallback(
-    (list: RideableMarket[]) =>
-      list.find((m) => m.id === idOrSlug || m.slug === idOrSlug) ?? null,
-    [idOrSlug],
-  );
-  const fromLive = idOrSlug ? find(markets) : null;
-  if (fromLive) return { market: fromLive, loading };
   if (!idOrSlug) return { market: null, loading };
-  const fromCurated = find(CURATED_POLYMARKET_FEED);
-  return { market: fromCurated, loading };
+  return {
+    market: markets.find((m) => m.id === idOrSlug || m.slug === idOrSlug) ?? null,
+    loading,
+  };
 }

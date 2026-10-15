@@ -1,4 +1,4 @@
-﻿import type { RideableMarket } from '../data/polymarket';
+﻿import type { RideableMarket } from '../data/tracks';
 
 interface RaceRowProps {
   market: RideableMarket;
@@ -94,7 +94,7 @@ export default function MarketCard({ market, index, onRideYes, onRideNo, onPrevi
           {market.category} · <span className={GOING[market.difficulty] ?? 'text-dim'}>{market.difficulty}</span>
           {' · '}
           {market.volumeFormatted}
-          {!market.live && ' · Cached'}
+          {market.kind === 'remix' ? ' · REMIX' : market.kind === 'legendary' ? ' · CLOSED' : ''}
         </span>
       </div>
 

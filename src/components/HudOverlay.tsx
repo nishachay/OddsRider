@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bus, EV } from "../game/bus";
 import ResultModal from "./ResultModal";
 import TouchControls from "./TouchControls";
-import type { Difficulty } from "../data/polymarket";
+import type { Difficulty } from "../data/tracks";
 
 const TOXIC = "#b6ff00";
 const CRIMSON = "#ff3355";

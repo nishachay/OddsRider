@@ -68,12 +68,12 @@ export default function PreviewPage() {
           </>
         ) : loading ? (
           <div className="w-full max-w-4xl mx-auto px-4 py-24 text-center font-mono text-xs text-dim">
-            LOADING POLYMARKET CONTRACT...
+            LOADING FROZEN TRACK...
           </div>
         ) : (
           <div className="w-full max-w-4xl mx-auto px-4 py-24 text-center flex flex-col items-center gap-4">
             <p className="font-mono text-xs text-dim">
-              CONTRACT NOT FOUND: {marketId}
+              TRACK NOT FOUND: {marketId}
             </p>
             <Link
               to="/"

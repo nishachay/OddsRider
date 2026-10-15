@@ -1,4 +1,4 @@
-﻿import type { RideableMarket } from '../data/polymarket';
+﻿import type { RideableMarket } from '../data/tracks';
 import { useMarkets } from '../data/marketsContext';
 import MarketCard from './MarketCard';
 
@@ -16,11 +16,12 @@ interface MarketGridProps {
   onPreview: (market: RideableMarket) => void;
 }
 
-const DIVISIONS = ['ALL', 'POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY'];
+const DIVISIONS = ['ALL', 'POLITICS', 'CRYPTO', 'MACRO', 'TECH', 'LEGENDARY', 'REMIX'];
 
 const FEED_REASON: Record<string, string> = {
-  GAMMA_UNREACHABLE: 'GAMMA API UNREACHABLE — CHECK VPN, AD-BLOCK, OR REGIONAL BLOCK.',
-  INSUFFICIENT_LIVE: 'NOT ENOUGH LIVE CONTRACTS ANSWERED — TRY AGAIN SHORTLY.',
+  TRACKS_UNREACHABLE: 'TRACK INDEX UNREACHABLE — CHECK YOUR CONNECTION AND RETRY.',
+  TRACKS_INVALID: 'TRACK INDEX FAILED VALIDATION — THE PUBLISHED DATA IS MALFORMED.',
+  TRACKS_EMPTY: 'NO TRACKS PUBLISHED YET — THE NEXT INGEST WILL FILL THE CARD.',
 };
 
 function RaceList({
@@ -64,10 +65,10 @@ export default function MarketGrid({
   onPreview,
 }: MarketGridProps) {
   const { reload, feedError } = useMarkets();
-  // Legendary tracks run in their own race — never duplicate them
+  // Legendary and remix tracks run in their own races — never duplicate them
   // inside the main card.
   const filtered = markets.filter((m) => {
-    if (activeCategory === 'ALL') return m.category !== 'LEGENDARY';
+    if (activeCategory === 'ALL') return m.category !== 'LEGENDARY' && m.kind !== 'remix';
     if (m.category !== activeCategory) return false;
     if (searchQuery.trim() !== '') {
       const q = searchQuery.toLowerCase();
@@ -81,6 +82,7 @@ export default function MarketGrid({
   });
 
   const legendary = markets.filter((m) => m.category === 'LEGENDARY');
+  const remix = markets.filter((m) => m.kind === 'remix');
   const showSearch = searchQuery.trim() !== '' || searching || searchResults !== null;
   const results = searchResults ?? filtered;
 
@@ -90,7 +92,11 @@ export default function MarketGrid({
       <div className="flex flex-col gap-5">
         <div className="flex items-end justify-between gap-4">
           <h2 className="font-poster uppercase leading-none text-4xl sm:text-5xl text-ink">
-            {activeCategory === 'LEGENDARY' ? 'Legendary crashes' : "Today's card"}
+            {activeCategory === 'LEGENDARY'
+              ? 'Legendary crashes'
+              : activeCategory === 'REMIX'
+                ? 'Remix tracks'
+                : "Today's card"}
           </h2>
           <span className="font-mono text-[10px] text-dim tracking-[0.18em] pb-1 whitespace-nowrap">
             SORTED BY 24H VOLUME
@@ -118,8 +124,8 @@ export default function MarketGrid({
       {!live && (
         <div className="border border-amber-400/40 border-l-4 border-l-amber-400 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-400 flex flex-wrap items-center justify-between gap-2">
           <span>
-            LIVE FEED UNAVAILABLE — SHOWING CACHED MARKETS.{' '}
-            {FEED_REASON[feedError ?? 'GAMMA_UNREACHABLE']}
+            TRACK FEED UNAVAILABLE.{' '}
+            {FEED_REASON[feedError ?? 'TRACKS_UNREACHABLE']}
           </span>
           <button
             onClick={reload}
@@ -135,7 +141,7 @@ export default function MarketGrid({
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h3 className="font-mono text-xs font-bold tracking-[0.2em] text-ink uppercase">
-              {searching ? 'Searching Polymarket…' : `Results for "${searchQuery}" (${results.length})`}
+              {searching ? 'Searching tracks…' : `Results for "${searchQuery}" (${results.length})`}
             </h3>
             <button
               onClick={onClearSearch}
@@ -147,7 +153,7 @@ export default function MarketGrid({
 
           {results.length === 0 && searching ? (
             <div className="border-y border-[#232529] p-12 text-center font-mono text-xs text-dim animate-pulse">
-              QUERYING LIVE MARKETS…
+              SEARCHING FROZEN TRACKS…
             </div>
           ) : results.length === 0 ? (
             <div className="border-y border-[#232529] p-12 text-center font-mono text-xs text-dim">
@@ -174,6 +180,19 @@ export default function MarketGrid({
                 Legendary crashes
               </h3>
               <RaceList items={legendary} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
+            </section>
+          )}
+
+          {/* ── Remix: hand-drawn fiction, never market data ── */}
+          {activeCategory !== 'REMIX' && remix.length > 0 && (
+            <section className="flex flex-col gap-4 pt-2">
+              <h3 className="font-poster uppercase leading-none text-3xl sm:text-4xl text-dim">
+                Remix tracks
+              </h3>
+              <p className="font-mono text-[10px] tracking-[0.18em] text-dim uppercase">
+                Hand-drawn shapes for practice — not market data, never on the live card.
+              </p>
+              <RaceList items={remix} onRideYes={onRideYes} onRideNo={onRideNo} onPreview={onPreview} />
             </section>
           )}
         </>

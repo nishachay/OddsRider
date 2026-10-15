@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react';
-import type { RideableMarket } from '../data/polymarket';
+import type { RideableMarket } from '../data/tracks';
 
 interface TrackPreviewProps {
   market: RideableMarket;
@@ -11,7 +11,7 @@ const TOXIC = '#b6ff00';
 const CRIMSON = '#ff3355';
 
 export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPreviewProps) {
-  const [timeframe, setTimeframe] = useState<string>('LIVE');
+  const [timeframe, setTimeframe] = useState<string>('ALL');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const deltaUp = (market.probDelta ?? 0) >= 0;
@@ -40,7 +40,7 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
       return;
     }
 
-    // 1. Draw Polymarket Probability Grid Guides
+    // 1. Draw probability grid guides
     ctx.strokeStyle = '#232529';
     ctx.lineWidth = 1;
     ctx.fillStyle = '#7c7f86';
@@ -153,7 +153,7 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
       {/* ── 3. Track chart ── */}
       <div className="border border-[#232529] bg-[#101113] mt-6">
         <div className="flex items-center gap-5 px-6 pt-4 font-mono text-xs">
-          {['LIVE', '24H', '7D', 'ALL'].map((tf) => (
+          {['ALL', '24H', '7D'].map((tf) => (
             <button
               key={tf}
               onClick={() => setTimeframe(tf)}
@@ -192,13 +192,17 @@ export default function TrackPreview({ market, onLaunchRide, onBack }: TrackPrev
           </div>
 
           <div className="flex flex-col border-t sm:border-t-0 border-[#232529] pt-4 sm:pt-0 sm:border-l">
-            <span className="text-lg font-bold text-ink tabular-nums">32°</span>
-            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Max slope angle</span>
+            <span className="text-lg font-bold text-crimson tabular-nums">
+              −{(market.stats.maxDrop * 100).toFixed(1)}%
+            </span>
+            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Max drop, frozen series</span>
           </div>
 
           <div className="flex flex-col border-t sm:border-t-0 border-[#232529] pt-4 sm:pt-0 sm:border-l">
-            <span className="text-lg font-bold text-ink tabular-nums">24,000 PX</span>
-            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Race distance</span>
+            <span className="text-lg font-bold text-toxic tabular-nums">
+              +{(market.stats.maxRise * 100).toFixed(1)}%
+            </span>
+            <span className="text-[9.5px] text-dim uppercase font-sans font-bold tracking-wider mt-0.5">Max rise, frozen series</span>
           </div>
         </div>
       </div>

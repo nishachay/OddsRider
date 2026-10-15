@@ -10,11 +10,13 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:smoke": "playwright test"
+    "test:smoke": "playwright test",
+    "ingest": "node --experimental-strip-types scripts/ingest.ts"
   },
   "dependencies": {
     "@fontsource-variable/archivo": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
+    "@oddsrider/core": "workspace:*",
     "lil-gui": "^0.21.0",
     "phaser": "3.90.0",
     "react": "^19.2.0",
@@ -30,6 +32,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "vite": "^8.2.2",
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.4",
+    "zod": "^4.6.7"
   }
 }

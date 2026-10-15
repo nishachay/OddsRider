@@ -1,0 +1,77 @@
+{
+  "id": "remix-svb-depositors-0f812aadbf96",
+  "version": 1,
+  "kind": "remix",
+  "source": "remix",
+  "sourceId": "remix-svb-depositors",
+  "slug": "svb-depositors-made-whole",
+  "question": "Will Silicon Valley Bank depositors be made whole? (Mar 2023)",
+  "category": "REMIX",
+  "status": "closed",
+  "resolution": null,
+  "probability": 0.99,
+  "change24h": null,
+  "volume24h": null,
+  "liquidity": null,
+  "endDate": null,
+  "series": [
+    {
+      "t": 1677456000,
+      "p": 0.9
+    },
+    {
+      "t": 1677607200,
+      "p": 0.7
+    },
+    {
+      "t": 1677758400,
+      "p": 0.35
+    },
+    {
+      "t": 1677909600,
+      "p": 0.2
+    },
+    {
+      "t": 1678060800,
+      "p": 0.18
+    },
+    {
+      "t": 1678212000,
+      "p": 0.45
+    },
+    {
+      "t": 1678363200,
+      "p": 0.75
+    },
+    {
+      "t": 1678514400,
+      "p": 0.95
+    },
+    {
+      "t": 1678665600,
+      "p": 0.99
+    }
+  ],
+  "sparkline": [
+    0.9,
+    0.7,
+    0.35,
+    0.2,
+    0.18,
+    0.45,
+    0.75,
+    0.95,
+    0.99
+  ],
+  "stats": {
+    "points": 9,
+    "volatility": 0.22047888220870496,
+    "maxDrop": 0.35,
+    "maxRise": 0.3,
+    "range": 0.81,
+    "spanDays": 14
+  },
+  "difficulty": "INSANE",
+  "hash": "0f812aadbf966688e22e5a27245b1774306a97403997bca46b596168c2dc3084",
+  "createdAt": "2026-10-15T15:11:30.951Z"
+}
