@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { PALETTE, WORLD } from '../constants';
 import type { Terrain, TerrainPoint } from '../terrain';
 
-const MONO = 'JetBrains Mono, monospace';
+const MONO = 'Geist Mono, monospace';
 
 export class TrackRenderer {
   private scene: Phaser.Scene;

@@ -13,7 +13,7 @@ import { TrackRenderer } from '../track/TrackRenderer';
 import { RideScore } from '../score';
 import { FinishCelebration } from '../finish';
 
-const MONO = 'JetBrains Mono, monospace';
+const MONO = 'Geist Mono, monospace';
 const SEGMENT_THICKNESS = 26;
 
 interface Gate {
