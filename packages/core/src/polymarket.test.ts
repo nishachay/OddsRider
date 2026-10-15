@@ -13,6 +13,7 @@ import {
   parseNumberish,
   parseProbability,
   resolutionFromClose,
+  selectClosedTarget,
   selectRideableMarkets,
   toSourceMarket,
   type FetchImpl,
@@ -281,6 +282,28 @@ describe('chunkRange', () => {
   it('returns nothing for an empty span', () => {
     expect(chunkRange(100, 100)).toEqual([]);
     expect(chunkRange(200, 100)).toEqual([]);
+  });
+});
+
+describe('selectClosedTarget', () => {
+  const yes = { ...market(0), status: 'closed' as const, question: 'Will rates drop 25 bps?', volume24h: 10 };
+  const no = { ...market(1), status: 'closed' as const, question: 'Will rates drop 50 bps?', volume24h: 999 };
+  const open = { ...market(0), status: 'open' as const, question: 'Will rates drop 25 bps?', volume24h: 1e9 };
+
+  it('prefers the famous leg when a hint matches', () => {
+    expect(selectClosedTarget([yes, no], '25 bps')?.question).toBe('Will rates drop 25 bps?');
+  });
+
+  it('falls back to the most-traded settled leg', () => {
+    expect(selectClosedTarget([yes, no])?.question).toBe('Will rates drop 50 bps?');
+  });
+
+  it('never picks an open market', () => {
+    expect(selectClosedTarget([open])).toBeNull();
+  });
+
+  it('returns null when nothing settled', () => {
+    expect(selectClosedTarget([])).toBeNull();
   });
 });
 

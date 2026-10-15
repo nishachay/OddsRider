@@ -29,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildTrack,
   chunkRange,
+  clampProbability,
   createPolymarketSource,
   filterBlocked,
   isRideableMarket,
@@ -38,6 +39,7 @@ import {
   parseTrack,
   planIngest,
   resolutionFromClose,
+  selectClosedTarget,
   type FetchImpl,
   type SourceMarket,
   type TrackInput,
@@ -190,16 +192,9 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
       warn(`skipping "${spec.slug}": lookup failed (${error instanceof Error ? error.message : String(error)})`);
       continue;
     }
-    const market =
-      candidates
-        .filter((row) => row.status === 'closed')
-        .sort((a, b) => (b.volume24h ?? 0) - (a.volume24h ?? 0))[0] ?? candidates[0];
+    const market = selectClosedTarget(candidates, spec.pick);
     if (!market) {
       warn(`skipping "${spec.slug}": slug resolved nowhere`);
-      continue;
-    }
-    if (market.status !== 'closed') {
-      warn(`skipping "${market.slug}": still open, not a settled track`);
       continue;
     }
     if (market.yesTokenId === null) {
@@ -228,7 +223,6 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
       warn(`skipping "${market.slug}": range too flat to ride`);
       continue;
     }
-    const finalProbability = series[series.length - 1].p;
     tracks.push(
       await buildTrack(
         {
@@ -239,7 +233,7 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
           question: market.question,
           category: market.category,
           status: 'closed',
-          resolution: resolutionFromClose(finalProbability),
+          resolution: resolutionFromClose(clampProbability(market.probability)),
           probability: market.probability,
           change24h: market.change24h,
           volume24h: market.volume24h,

@@ -13,6 +13,12 @@ export interface ClosedMarketSpec {
   slug: string;
   /** Why this one is worth riding. */
   note: string;
+  /**
+   * Optional question substring picking the famous leg of a multi-outcome
+   * event (e.g. the 25bps bracket of a Fed decision). Without it, the
+   * most-traded settled leg wins.
+   */
+  pick?: string;
 }
 
 export const CLOSED_MARKETS: ClosedMarketSpec[] = [
@@ -31,6 +37,7 @@ export const CLOSED_MARKETS: ClosedMarketSpec[] = [
   {
     slug: 'fed-interest-rates-december-2024',
     note: 'Fed December 2024 decision brackets ($58.8M event volume) — the 25bps-cut leg resolved YES. Event slug: sub-market slugs do not resolve on Gamma.',
+    pick: '25 bps',
   },
   {
     slug: 'bitcoin-new-all-time-high-in-2024',

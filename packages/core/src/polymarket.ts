@@ -351,7 +351,7 @@ export const DEFAULT_RIDEABLE_FILTERS = {
 } as const;
 
 /**
- * Final outcome of a settled market from its last frozen price. The band is
+ * Final outcome of a settled market from its official last price. The band is
  * deliberately strict: anything that did not settle at the rails reports
  * null (ambiguous) instead of a guessed resolution.
  */
@@ -363,6 +363,26 @@ export function resolutionFromClose(finalProbability: number | null): 'YES' | 'N
   if (finalProbability >= RESOLUTION_YES_AT_OR_ABOVE) return 'YES';
   if (finalProbability <= RESOLUTION_NO_AT_OR_BELOW) return 'NO';
   return null;
+}
+
+/**
+ * Pick which binary leg of a settled event to freeze. An explicit `contains`
+ * hint wins (case-insensitive question match, for famous legs); otherwise the
+ * most-traded closed leg — the one the crowd cared about. Open legs never
+ * qualify. Returns null when nothing settled exists.
+ */
+export function selectClosedTarget(
+  candidates: SourceMarket[],
+  contains?: string,
+): SourceMarket | null {
+  const closed = candidates.filter((market) => market.status === 'closed');
+  if (closed.length === 0) return null;
+  if (contains) {
+    const needle = contains.toLowerCase();
+    const hit = closed.find((market) => market.question.toLowerCase().includes(needle));
+    if (hit) return hit;
+  }
+  return closed.slice().sort((a, b) => (b.volume24h ?? 0) - (a.volume24h ?? 0))[0] ?? null;
 }
 
 export function isRideableMarket(
