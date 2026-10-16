@@ -137,7 +137,7 @@ export default function ResultModal({ isOpen, result, onRetry, onOpenLobby, ride
     
     const text = [
       `ODDSRIDER // ${statusStr}`,
-      `Market: ${result.marketQuestion ?? 'Polymarket Event'}`,
+      `Market: ${result.marketQuestion ?? 'Race track'}`,
       `Time: ${timeObj.main}${timeObj.ms} | Score: ${result.score.toLocaleString()} | Odds: ${probStr}`,
       `${rideUrl ?? 'https://oddsrider.com'}`
     ].join('\n');
@@ -210,7 +210,7 @@ export default function ResultModal({ isOpen, result, onRetry, onOpenLobby, ride
             SETTLED CONTRACT
           </span>
           <span className="text-[13px] font-medium leading-[1.38] text-ink/90">
-            {result.marketQuestion ?? 'Polymarket Event'}
+            {result.marketQuestion ?? 'Race track'}
           </span>
 
           {/* Hero Neon Chart in Modal */}

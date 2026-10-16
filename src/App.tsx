@@ -1,8 +1,9 @@
 ﻿import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { MarketsProvider } from './data/marketsContext';
-import HomePage from './pages/HomePage';
-import PreviewPage from './pages/PreviewPage';
+import TitleScreen from './pages/TitleScreen';
+import TracksPage from './pages/TracksPage';
+import DailyPage from './pages/DailyPage';
 import RidePage from './pages/RidePage';
 import AboutPage from './pages/AboutPage';
 
@@ -21,8 +22,9 @@ export default function App() {
         <MarketsProvider>
           <ScrollToTop />
           <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/preview/:marketId" element={<PreviewPage />} />
+            <Route path="/" element={<TitleScreen />} />
+            <Route path="/tracks" element={<TracksPage />} />
+            <Route path="/daily" element={<DailyPage />} />
             <Route path="/ride/:marketId" element={<RidePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />

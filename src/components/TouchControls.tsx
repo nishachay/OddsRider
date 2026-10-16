@@ -39,8 +39,8 @@ function HoldButton({
 
   return (
     <button
-      className={`pointer-events-auto font-mono text-[10px] font-bold tracking-widest uppercase border border-[#232529] bg-[#12141a]/85 text-dim active:text-toxic active:border-toxic/60 py-3 select-none ${
-        wide ? 'px-6' : 'px-4'
+      className={`pointer-events-auto font-mono text-[11px] font-bold tracking-widest uppercase border border-[#232529] bg-[#12141a]/85 text-dim active:text-toxic active:border-toxic/60 py-4 select-none min-h-[60px] min-w-[60px] ${
+        wide ? 'px-7' : 'px-5'
       }`}
       style={{ touchAction: 'none' }}
       onPointerDown={down}
@@ -63,7 +63,7 @@ function JumpButton() {
 
   return (
     <button
-      className="pointer-events-auto font-mono text-[10px] font-bold tracking-widest uppercase border border-[#232529] bg-[#12141a]/85 text-dim active:text-toxic active:border-toxic/60 px-4 py-3 select-none"
+      className="pointer-events-auto font-mono text-[11px] font-bold tracking-widest uppercase border border-[#232529] bg-[#12141a]/85 text-dim active:text-toxic active:border-toxic/60 px-5 py-4 select-none min-h-[60px] min-w-[60px]"
       style={{ touchAction: 'none' }}
       onPointerDown={tap}
       onContextMenu={(e) => e.preventDefault()}

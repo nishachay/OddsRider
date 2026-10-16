@@ -8,7 +8,9 @@ import {
   getBiggestMovers,
   getDailyChallenge,
   getHomePageData,
+  getTitleFeature,
   isLiveList,
+  momentumUp,
   rideIntervalFromParam,
   sameFeed,
   simpleHash,
@@ -101,8 +103,19 @@ describe('simpleHash', () => {
   });
 });
 
-describe('isLiveList', () => {
-  it('is true only when a live track is listed', () => {
+describe('momentumUp', () => {
+  it('reads 24h direction, never level', () => {
+    expect(momentumUp(0.02)).toBe(true);
+    expect(momentumUp(-0.3)).toBe(false);
+    expect(momentumUp(0)).toBe(true);
+  });
+
+  it('defaults unknown deltas to rising, like the terrain renderer', () => {
+    expect(momentumUp(null)).toBe(true);
+  });
+});
+
+describe('isLiveList', () => {  it('is true only when a live track is listed', () => {
     expect(isLiveList([view(), view({ kind: 'closed', resolution: 'NO' })])).toBe(true);
     expect(isLiveList([view({ kind: 'closed', resolution: 'NO' })])).toBe(false);
     expect(isLiveList([])).toBe(false);
@@ -143,6 +156,26 @@ describe('getDailyChallenge', () => {
 
   it('returns null when there is nothing to ride', () => {
     expect(getDailyChallenge([], '2026-10-15')).toBeNull();
+  });
+});
+
+describe('getTitleFeature', () => {
+  it('differs from the daily pick while choice exists', () => {
+    const pool = [view({ id: 'a' }), view({ id: 'b' }), view({ id: 'c' })];
+    for (let day = 1; day <= 28; day++) {
+      const date = `2026-10-${String(day).padStart(2, '0')}`;
+      expect(getTitleFeature(pool, date)?.id).not.toBe(getDailyChallenge(pool, date)?.id);
+      expect(getTitleFeature(pool, date)?.id).toBe(getTitleFeature(pool, date)?.id);
+    }
+  });
+
+  it('falls back to the only track when there is no choice', () => {
+    const pool = [view({ id: 'a' })];
+    expect(getTitleFeature(pool, '2026-10-15')?.id).toBe('a');
+  });
+
+  it('returns null when there is nothing to ride', () => {
+    expect(getTitleFeature([], '2026-10-15')).toBeNull();
   });
 });
 

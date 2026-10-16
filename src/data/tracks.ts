@@ -228,6 +228,14 @@ export function isLiveList(markets: RideableMarket[]): boolean {
   return markets.some((m) => m.kind === 'live');
 }
 
+// One colour rule for every odds number and every track line, mirroring the
+// in-game terrain renderer (`seg.rising ? toxic : crimson` in
+// terrain.ts/trackRenderer: a segment is toxic when probability does not
+// fall). Unknown or flat deltas count as rising, same as the renderer.
+export function momentumUp(probDelta: number | null): boolean {
+  return (probDelta ?? 0) >= 0;
+}
+
 // Biggest 24h movers: live tracks with a known delta, ranked by absolute
 // swing. Unknown deltas never qualify — no guessing.
 export function getBiggestMovers(markets: RideableMarket[], n = 4): RideableMarket[] {
@@ -235,6 +243,20 @@ export function getBiggestMovers(markets: RideableMarket[], n = 4): RideableMark
     .filter((m) => m.kind === 'live' && m.probDelta !== null)
     .sort((a, b) => Math.abs(b.probDelta ?? 0) - Math.abs(a.probDelta ?? 0))
     .slice(0, n);
+}
+
+// The title's featured ride: the daily's neighbour, so the two screens never
+// headline the same track while choice exists. Same pool and order as
+// getDailyChallenge, shifted by one — deterministic per date.
+export function getTitleFeature(
+  markets: RideableMarket[],
+  dateStr: string = new Date().toISOString().slice(0, 10),
+): RideableMarket | null {
+  const live = markets.filter((m) => m.kind === 'live');
+  const list = live.length > 0 ? live : markets;
+  if (list.length === 0) return null;
+  if (list.length === 1) return list[0];
+  return list[(simpleHash(dateStr) + 1) % list.length];
 }
 
 // Deterministic per-day challenge so everyone rides the same track. Live

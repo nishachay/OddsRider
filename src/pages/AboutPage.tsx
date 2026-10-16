@@ -1,6 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
+import { Link } from 'react-router-dom';
+import TopStrip from '../components/TopStrip';
 
 function Section({ num, title, children }: { num: string; title: string; children: React.ReactNode }) {
   const id = title.toLowerCase().replace(/[^a-z]+/g, '-');
@@ -15,24 +14,22 @@ function Section({ num, title, children }: { num: string; title: string; childre
 }
 
 export default function AboutPage() {
-  const navigate = useNavigate();
-
   return (
     <div className="w-full flex flex-col min-h-screen">
-      <Navbar onGoHome={() => navigate('/')} />
+      <TopStrip />
 
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-12 flex flex-col gap-10 select-none">
         <div className="flex flex-col gap-3">
           <span className="font-mono text-[10px] font-bold tracking-[0.3em] text-toxic uppercase">
-            Motocross meets prediction markets
+            Motocross meets crowd odds
           </span>
           <h1 className="font-poster uppercase text-5xl sm:text-6xl text-ink leading-[0.9]">
             About the races
           </h1>
           <p className="font-sans text-sm text-dim leading-relaxed">
-            You&apos;re not riding money — you&apos;re riding what the crowd believes.
-            OddsRider is a free browser game that turns real Polymarket probability charts into
-            rideable motocross tracks. Pick a market, ride what the crowd believes — every rally
+            You&apos;re riding what the crowd believes.
+            OddsRider is a free browser game that turns real probability charts into
+            rideable motocross tracks. Pick a track, ride what the crowd believes — every rally
             is a climb, every crash is a cliff. Ride the YES side uphill, or flip to the NO side
             and ride the same history inverted.
           </p>
@@ -77,28 +74,26 @@ export default function AboutPage() {
 
         <Section num="05" title="Available tracks">
           <p>
-            The feed pulls live high-volume contracts across Politics, Crypto, Macro, and Tech,
-            sorted by 24H volume. Legendary crashes replay history's most violent collapses —
-            death spirals and V-shaped recoveries rated INSANE. You can also paste any
-            Polymarket link into the home search to generate its track on the spot.
+            The card lists live tracks alongside settled classics — famous resolved
+            markets with their final YES or NO shown on the card. Tracks are frozen
+            snapshots published by a scheduled ingest, so the same track always
+            rides the same.
           </p>
         </Section>
 
-        <Section num="06" title="Disclaimer">
+        <Section num="06" title="Free game">
           <p>
-            OddsRider is a game. Nothing here is financial advice, and nothing here is betting —
-            no real money, no positions, no payouts. Market data is shown for entertainment as
-            terrain. OddsRider is not affiliated with Polymarket.
+            OddsRider is a game. Nothing here is financial advice, and there is
+            nothing at stake — just tracks to ride.
           </p>
         </Section>
 
         <Section num="07" title="Data honesty">
           <p>
-            Market discovery uses Polymarket's public Gamma API and price histories come from the
-            public CLOB API. Probabilities shown are last-trade prices. A 24H change shows "—"
-            when it can't be computed, and a market with no history simply has no track — we
-            never fabricate odds. When the live feed is unreachable, the site says it is showing
-            cached markets.
+            Probabilities shown are the final recorded prices from frozen snapshots. A 24H
+            change shows "—" when it can&apos;t be computed, and a track with no
+            history simply doesn&apos;t exist — odds are never fabricated. When the
+            track index is unreachable, the site says so instead of guessing.
           </p>
         </Section>
 
@@ -112,12 +107,7 @@ export default function AboutPage() {
         <Section num="09" title="Questions">
           <p>
             <span className="text-ink font-bold">Is it free?</span> Yes — free forever, no
-            account, no wallet, no ads.
-          </p>
-          <p>
-            <span className="text-ink font-bold">Why does it say "cached"?</span> Your browser
-            couldn't reach the live Polymarket feed, so you're riding the last saved snapshot.
-            Reconnect and reload for live odds.
+            account, no ads.
           </p>
           <p>
             <span className="text-ink font-bold">What does riding NO do?</span> It inverts the
@@ -130,11 +120,9 @@ export default function AboutPage() {
           to="/"
           className="self-start font-mono text-xs font-bold tracking-[0.2em] text-toxic border-b-2 border-toxic/40 px-1 py-2 hover:bg-toxic hover:text-bg transition-colors uppercase"
         >
-          ← Back to the card
+          ← Back to title
         </Link>
       </main>
-
-      <Footer />
     </div>
   );
 }
