@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import MiniTrack from '../components/MiniTrack';
 import { useMarkets } from '../data/marketsContext';
-import { getHomePageData, type RideableMarket } from '../data/tracks';
+import { getHomePageData, momentumUp, type RideableMarket } from '../data/tracks';
 
 function rideUrl(market: RideableMarket, inverted: boolean): string {
   return `/ride/${market.id}${inverted ? '?side=no' : ''}`;
@@ -27,9 +27,8 @@ function TrackRow({
   // One colour rule for the whole row, mirroring the in-game track renderer
   // (`seg.rising ? toxic : crimson`): the 24h direction colours BOTH the
   // silhouette and the number. A 77% that fell today reads red; a 23% that
-  // climbed reads green — momentum, not level.
-  const deltaUp = (market.probDelta ?? 0) >= 0;
-  const momentum = deltaUp ? 'text-toxic' : 'text-crimson';
+  // climbed reads green — momentum, not level. See momentumUp.
+  const momentum = momentumUp(market.probDelta) ? 'text-toxic' : 'text-crimson';
 
   return (
     <div className="rise group relative flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6 px-4 sm:px-5 py-4 border-t border-[#232529] hover:bg-[#101113] transition-colors ease-[cubic-bezier(0.16,1,0.3,1)] select-none">
@@ -66,7 +65,7 @@ function TrackRow({
       </div>
 
       <div className="w-full sm:w-44 shrink-0 opacity-90 group-hover:opacity-100 transition-opacity">
-        <MiniTrack pts={market.sparkline} deltaUp={deltaUp} />
+        <MiniTrack pts={market.sparkline} deltaUp={momentumUp(market.probDelta)} />
       </div>
 
       <div className="flex lg:flex-col items-baseline lg:items-end gap-x-2 shrink-0 lg:w-24">

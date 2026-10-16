@@ -228,6 +228,14 @@ export function isLiveList(markets: RideableMarket[]): boolean {
   return markets.some((m) => m.kind === 'live');
 }
 
+// One colour rule for every odds number and every track line, mirroring the
+// in-game terrain renderer (`seg.rising ? toxic : crimson` in
+// terrain.ts/trackRenderer: a segment is toxic when probability does not
+// fall). Unknown or flat deltas count as rising, same as the renderer.
+export function momentumUp(probDelta: number | null): boolean {
+  return (probDelta ?? 0) >= 0;
+}
+
 // Biggest 24h movers: live tracks with a known delta, ranked by absolute
 // swing. Unknown deltas never qualify — no guessing.
 export function getBiggestMovers(markets: RideableMarket[], n = 4): RideableMarket[] {

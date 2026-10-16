@@ -10,6 +10,7 @@ import {
   getHomePageData,
   getTitleFeature,
   isLiveList,
+  momentumUp,
   rideIntervalFromParam,
   sameFeed,
   simpleHash,
@@ -102,8 +103,19 @@ describe('simpleHash', () => {
   });
 });
 
-describe('isLiveList', () => {
-  it('is true only when a live track is listed', () => {
+describe('momentumUp', () => {
+  it('reads 24h direction, never level', () => {
+    expect(momentumUp(0.02)).toBe(true);
+    expect(momentumUp(-0.3)).toBe(false);
+    expect(momentumUp(0)).toBe(true);
+  });
+
+  it('defaults unknown deltas to rising, like the terrain renderer', () => {
+    expect(momentumUp(null)).toBe(true);
+  });
+});
+
+describe('isLiveList', () => {  it('is true only when a live track is listed', () => {
     expect(isLiveList([view(), view({ kind: 'closed', resolution: 'NO' })])).toBe(true);
     expect(isLiveList([view({ kind: 'closed', resolution: 'NO' })])).toBe(false);
     expect(isLiveList([])).toBe(false);

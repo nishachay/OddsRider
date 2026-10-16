@@ -41,6 +41,13 @@ export class RideScene extends Phaser.Scene {
 
   private muted = loadMuted();
   private wasGrounded = false;
+  private attractLiftY = 0;
+  // Guards the boot race: the shell may emit a ride before or after the
+  // scene's own fallback fetch resolves. First application wins; the
+  // fallback never overwrites an already-applied ride.
+  private rideApplied = false;
+  // Attract-mode camera lift (world units): framing only, so the bike rides
+  // in the upper band above the title panel. Zero on playable rides.
   private acc = 0;
   private crashHandled = false;
   private nextSpeedEmitAt = 0;
@@ -110,9 +117,11 @@ export class RideScene extends Phaser.Scene {
   }
 
   private applyRide(ride: Ride): void {
+    this.rideApplied = true;
     // Attract mode pulls back for a wide showroom shot; the follow lerp
     // only moves scroll, so zoom persists. Playable rides stay at 1.
     this.cameras.main.setZoom(ride.attract === true ? 0.62 : 1);
+    this.attractLiftY = ride.attract === true ? 350 : 0;
     const terrain = buildTerrain(ride.series);
     this.terrain = terrain;
     this.rideDifficulty = ride.market.difficulty;
@@ -149,6 +158,7 @@ export class RideScene extends Phaser.Scene {
       grounded: () => this.bike.grounded,
       crashed: () => this.bike.crashed,
       nitro: () => this.bike.nitro,
+      zoom: () => this.cameras.main.zoom,
       prob: () => (this.terrain ? probabilityAt(this.terrain.points, this.bike.x) : null),
       score: () => this.score.total,
       simMs: () => this.score.timeMs,
@@ -172,7 +182,8 @@ export class RideScene extends Phaser.Scene {
   private async loadRide(): Promise<void> {
     try {
       const ride = await fetchRide();
-      this.applyRide(ride);
+      // Never overwrite a ride the shell already delivered (attract race).
+      if (!this.rideApplied) this.applyRide(ride);
     } catch (err) {
       console.warn('loadRide failed', err);
       bus.emit(EV.MARKET, null);
@@ -361,7 +372,7 @@ export class RideScene extends Phaser.Scene {
       const dir = Math.sign(this.bike.chassis.velocity.x) || 1;
       const look = dir * Math.min(spd * 0.22, 220);
       tx = this.bike.chassis.position.x + look;
-      ty = this.bike.chassis.position.y - 40;
+      ty = this.bike.chassis.position.y - 40 + this.attractLiftY;
     }
     cam.scrollX += (tx - cam.width / 2 - cam.scrollX) * 0.08;
     cam.scrollY += (ty - cam.height / 2 - cam.scrollY) * 0.08;

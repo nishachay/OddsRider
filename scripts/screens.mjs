@@ -17,6 +17,17 @@ async function stubThirdParties(page) {
   });
 }
 
+async function waitForRide(page, timeoutMs) {
+  // The attract bike must be visibly underway, not parked at spawn. Headless
+  // GPUs tick slowly, so wait for real progress (with a hard cap) rather
+  // than a fixed delay.
+  await page
+    .waitForFunction(() => window.__oddsrider && window.__oddsrider.x() > 1150, null, {
+      timeout: timeoutMs,
+    })
+    .catch(() => {});
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const server = spawn('pnpm', ['preview'], { stdio: 'ignore', detached: true });
@@ -35,7 +46,8 @@ async function main() {
     await stubThirdParties(desktop);
     await desktop.goto(BASE + '/');
     await desktop.getByText(/press any key/i).waitFor({ timeout: 30000 });
-    await desktop.waitForTimeout(2500);
+    // Let the attract bike ride visibly underway before the shot.
+    await waitForRide(desktop, 60000);
     await desktop.screenshot({ path: `${OUT}/title-desktop.png` });
     await desktop.goto(BASE + '/tracks');
     await desktop.getByText(/pick your track/i).waitFor({ timeout: 15000 });
@@ -57,7 +69,8 @@ async function main() {
       await stubThirdParties(wide);
       await wide.goto(BASE + '/');
       await wide.getByText(/press any key/i).waitFor({ timeout: 30000 });
-      await wide.waitForTimeout(2500);
+      // Let the attract bike ride visibly underway before the shot.
+      await waitForRide(wide, 60000);
       await wide.screenshot({ path: `${OUT}/${name}.png` });
       await wide.close();
     }
@@ -71,7 +84,8 @@ async function main() {
     await stubThirdParties(phone);
     await phone.goto(BASE + '/');
     await phone.getByText(/press any key/i).waitFor({ timeout: 30000 });
-    await phone.waitForTimeout(2500);
+    // Let the attract bike ride visibly underway before the shot.
+    await waitForRide(phone, 60000);
     await phone.screenshot({ path: `${OUT}/title-phone.png` });
     await phone.goto(BASE + '/tracks');
     await phone.getByText(/pick your track/i).waitFor({ timeout: 15000 });

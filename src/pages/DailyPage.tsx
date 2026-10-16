@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import MiniTrack from '../components/MiniTrack';
 import { useMarkets } from '../data/marketsContext';
-import { getDailyChallenge, type RideableMarket } from '../data/tracks';
+import { getDailyChallenge, momentumUp, type RideableMarket } from '../data/tracks';
 import { getMarketBest as getBest } from '../data/playerStorage';
 
 function utcToday(): string {
@@ -43,8 +43,7 @@ export default function DailyPage() {
   const best = pick ? getBest(pick.id) : null;
 
   const pct = pick ? Math.round(pick.currentProb * 100) : 0;
-  const up = (pick?.currentProb ?? 0) >= 0.5;
-  const deltaUp = ((pick?.probDelta ?? 0) >= 0);
+  const up = momentumUp(pick?.probDelta ?? null);
 
   return (
     <div className="w-full flex flex-col min-h-screen bg-[#0a0a0b] text-[#f0f0f2]">
@@ -105,7 +104,7 @@ export default function DailyPage() {
               </button>
             </div>
             <div className="border-t border-[#3a2f12] pt-4 flex flex-col gap-2">
-              <MiniTrack pts={pick.sparkline} deltaUp={deltaUp} />
+              <MiniTrack pts={pick.sparkline} deltaUp={up} />
               <p className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
                 Today&apos;s terrain · W gas · A/D lean · Space jump · Shift nitro
               </p>
