@@ -80,6 +80,9 @@ export const TUNING = {
 
   jumpVelocity: 6.5,
   jumpCooldownMs: 350,
+  /** Fixed-step twin of jumpCooldownMs (350ms at 60Hz): identical inputs must
+   *  jump on identical steps or replays diverge across wall-clock timings. */
+  jumpCooldownSteps: 21,
   coyoteSteps: 6,
 
   nitroDrain: 0.5,

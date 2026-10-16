@@ -11,6 +11,13 @@ export interface DriveInput {
   leanFwd: boolean;
   nitro: boolean;
   jumpQueued: boolean;
+  /**
+   * Recording metadata only — whether nitro was actually burning this step.
+   * Never read by the physics; the recorder writes it, replays read it back
+   * so nitro-burn awards land on the exact same step regardless of frame
+   * grouping. Optional so every existing construction site keeps working.
+   */
+  burning?: boolean;
 }
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -53,7 +60,10 @@ export class Bike {
   private headHitEdge = false;
   private invertedMs = 0;
   private coyote = 0;
-  private lastJumpAt = -1e9;
+  // Jump cooldown in fixed steps, not wall milliseconds: identical input
+  // sequences must jump on identical steps or replays diverge.
+  private stepCount = 0;
+  private lastJumpStep = -1e9;
   private jumpQ = false;
 
   private nitroTank = 1;
@@ -65,6 +75,26 @@ export class Bike {
   private spawnX: number;
   private spawnY: number;
   private killY: number;
+  /**
+   * Pristine geometry per body, snapshotted at construction. Vertices and
+   * axes accumulate floating-point drift from every translate/rotate, so a
+   * reset that merely moves bodies back starts from differently-rounded
+   * geometry each time — enough for stiff suspension contacts to diverge
+   * within a dozen steps. Restoring the pristine copy makes every reset
+   * bit-identical (replay-exact).
+   */
+  private pristine = new Map<
+    Body,
+    {
+      position: { x: number; y: number };
+      angle: number;
+      parts: Array<{
+        position: { x: number; y: number };
+        vertices: Array<{ x: number; y: number }>;
+        axes: Array<{ x: number; y: number }>;
+      }>;
+    }
+  >();
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     this.scene = scene;
@@ -140,6 +170,18 @@ export class Bike {
       pinHead(BIKE.headDx + BIKE.headAnchorSpread),
     ];
     world.add(this.parts);
+
+    for (const body of [chassis, back, front, head]) {
+      this.pristine.set(body, {
+        position: { x: body.position.x, y: body.position.y },
+        angle: body.angle,
+        parts: (body.parts ?? []).map((part) => ({
+          position: { x: part.position.x, y: part.position.y },
+          vertices: (part.vertices ?? []).map((v) => ({ x: v.x, y: v.y })),
+          axes: (part.axes ?? []).map((a) => ({ x: a.x, y: a.y })),
+        })),
+      });
+    }
 
     world.on('collisionstart', this.onCollision, this);
     world.on('collisionend', this.onCollisionEnd, this);
@@ -293,9 +335,8 @@ export class Bike {
     // --- jump ---
     if (this.jumpQ) {
       this.jumpQ = false;
-      const now = this.scene.time.now;
-      if ((this.grounded || this.coyote > 0) && now - this.lastJumpAt > TUNING.jumpCooldownMs) {
-        this.lastJumpAt = now;
+      if ((this.grounded || this.coyote > 0) && this.stepCount - this.lastJumpStep > TUNING.jumpCooldownSteps) {
+        this.lastJumpStep = this.stepCount;
         for (const b of [chassis, this.rearWheel, this.frontWheel, this.head]) {
           B.setVelocity(b, { x: b.velocity.x, y: Math.min(b.velocity.y, -TUNING.jumpVelocity) });
         }
@@ -304,6 +345,7 @@ export class Bike {
 
     // --- step the world ---
     this.scene.matter.world.step(STEP_MS);
+    this.stepCount += 1;
 
     // --- post-step state ---
     this.enforceIntegrity();
@@ -361,9 +403,11 @@ export class Bike {
       collisionFilter: { group, category: 0x0001, mask: 0xffffffff },
     });
     B.setAngle(body, a);
-    // Launch reflects actual crash speed — fast crash = ragdoll flies far
+    // Launch reflects actual crash speed — fast crash = ragdoll flies far.
+    // The flourish varies per crash but never randomly: derive it from the
+    // crash step so identical runs eject identically (replay-exact).
     B.setVelocity(body, { x: cv.x * 0.8 + Math.cos(a) * 2.75 + 1.5, y: cv.y * 0.6 - 5.5 });
-    B.setAngularVelocity(body, 0.3 + Math.random() * 0.25);
+    B.setAngularVelocity(body, 0.3 + ((this.stepCount * 37) % 25) / 100);
     world.add(body);
     this.ragdollBody = body;
   }
@@ -446,8 +490,54 @@ export class Bike {
     B.setAngularVelocity(this.chassis, 0);
   }
 
+  /** Test/debug hook: move the whole bike to an absolute position without
+   *  touching the spawn point (future resets still return to spawn). */
+  moveTo(x: number, y: number): void {
+    const B = this.scene.matter.body;
+    const dx = x - this.chassis.position.x;
+    const dy = y - this.chassis.position.y;
+    for (const b of [this.chassis, this.rearWheel, this.frontWheel, this.head]) {
+      B.setPosition(b, { x: b.position.x + dx, y: b.position.y + dy });
+      B.setVelocity(b, { x: 0, y: 0 });
+      B.setAngularVelocity(b, 0);
+    }
+  }
+
   reset(): void {
     const B = this.scene.matter.body;
+    // construction leaves rounding drift, so moving drifted bodies back
+    // starts each run from a microscopically different shape. Pristine +
+    // identical deltas below = bit-identical resets.
+    for (const b of [this.chassis, this.rearWheel, this.frontWheel, this.head]) {
+      const saved = this.pristine.get(b);
+      if (saved) {
+        // Restore the exact construction state first, so every placement
+        // below applies identical deltas (bit-identical resets).
+        b.position.x = saved.position.x;
+        b.position.y = saved.position.y;
+        b.angle = saved.angle;
+        for (const [i, part] of (b.parts ?? []).entries()) {
+          const s = saved.parts[i];
+          if (!s) continue;
+          part.position.x = s.position.x;
+          part.position.y = s.position.y;
+          (part.vertices ?? []).forEach((v, j) => {
+            const sv = s.vertices[j];
+            if (sv) {
+              v.x = sv.x;
+              v.y = sv.y;
+            }
+          });
+          (part.axes ?? []).forEach((a, j) => {
+            const sa = s.axes[j];
+            if (sa) {
+              a.x = sa.x;
+              a.y = sa.y;
+            }
+          });
+        }
+      }
+    }
     const place = (b: Body, ox: number, oy: number): void => {
       const tx = this.spawnX + ox;
       const ty = this.spawnY + oy;
@@ -463,12 +553,22 @@ export class Bike {
     place(this.rearWheel, BIKE.backDx, BIKE.wheelDy);
     place(this.frontWheel, BIKE.frontDx, BIKE.wheelDy);
     place(this.head, BIKE.headDx, BIKE.headDy);
+    for (const b of [this.chassis, this.rearWheel, this.frontWheel, this.head]) {
+      // The position solver warm-starts from the previous impulse: clear it
+      // or identical resets diverge within steps (replay-exactness).
+      b.positionImpulse.x = 0;
+      b.positionImpulse.y = 0;
+    }
     if (this.ragdollBody) {
       this.scene.matter.world.remove(this.ragdollBody);
       this.ragdollBody = null;
     }
     this.ejected = false;
     this.nitroTank = 1;
+    this.nitroLatch = false;
+    this.jumpQ = false;
+    this.stepCount = 0;
+    this.lastJumpStep = -1e9;
     this.contacts = 0;
     this.backContacts = 0;
     this.frontContacts = 0;

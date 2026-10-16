@@ -200,9 +200,12 @@ export async function fetchRideForTrack(
       currentProb: track.probability,
       probDelta: track.change24h,
       difficulty: track.difficulty,
+      id: track.id,
+      trackHash: track.hash,
     },
     series,
     inverted,
+    interval,
   };
 
   activeRideStore.current = ride;

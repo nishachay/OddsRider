@@ -16,3 +16,4 @@ export * from './generate.ts';
 export * from './banned.ts';
 export * from './polymarket.ts';
 export * from './ingest.ts';
+export * from './replay.ts';

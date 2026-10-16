@@ -94,6 +94,8 @@ export interface Ride {
   market: RideMarketFacts;
   series: PricePoint[];
   inverted?: boolean;
+  /** Which frozen window was sliced for this ride (replays rebuild it). */
+  interval?: RideInterval;
   /** Attract-mode backdrop zoom on the home stage. Never set on the ride page. */
   attract?: boolean;
 }
@@ -103,4 +105,7 @@ export interface RideMarketFacts {
   currentProb: number;
   probDelta: number | null;
   difficulty: Difficulty;
+  /** Frozen track id + hash: what the recorder stamps every run with. */
+  id: string;
+  trackHash: string;
 }

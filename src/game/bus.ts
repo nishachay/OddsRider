@@ -46,6 +46,12 @@ export const EV = {
   RESTART: 'game:restart',
   GROUNDED: 'hud:grounded',
   LAND: 'hud:land',
+  REPLAY_START: 'replay:start',
+  REPLAY_SEEK: 'replay:seek',
+  REPLAY_PAUSE: 'replay:pause',
+  REPLAY_DONE: 'replay:done',
+  REPLAY_STOP: 'replay:stop',
+  GHOST_SET: 'ghost:set',
   LOAD_MARKET: 'game:load-market',
   OPEN_LOBBY: 'game:open-lobby',
 } as const;

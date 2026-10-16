@@ -13,6 +13,26 @@ import type { Terrain } from '../terrain';
 import { TrackRenderer } from '../track/TrackRenderer';
 import { RideScore } from '../score';
 import { FinishCelebration } from '../finish';
+import { GhostRenderer } from '../ghost';
+import {
+  ReplayDriver,
+  RunRecorder,
+  toDriveInput,
+  type ReplayStartOptions,
+  type RunResult,
+} from '../replay';
+import type { SharePayload } from '@oddsrider/core';
+import type { GhostSnapshot } from '@oddsrider/core';
+
+/** Forced brake once the run is over (score finished). */
+const FINISH_BRAKE: DriveInput = {
+  gas: false,
+  brake: true,
+  leanBack: false,
+  leanFwd: false,
+  nitro: false,
+  jumpQueued: false,
+};
 
 const MONO = 'Geist Mono, monospace';
 const SEGMENT_THICKNESS = 26;
@@ -33,6 +53,8 @@ export class RideScene extends Phaser.Scene {
   private flatGround: MatterJS.BodyType | null = null;
   private flatGfx: Phaser.GameObjects.Graphics | null = null;
   private groundBodies: MatterJS.BodyType[] = [];
+  private endWall: MatterJS.BodyType | null = null;
+  private endWallGfx: Phaser.GameObjects.GameObject[] = [];
   private startGate!: Gate;
   private finishFx: FinishCelebration | null = null;
   private resultTimer: Phaser.Time.TimerEvent | null = null;
@@ -57,6 +79,19 @@ export class RideScene extends Phaser.Scene {
   private nextGroundedEmitAt = 0;
   private score = new RideScore();
   private parked = false;
+
+  // Recording + replay (Phase 3). The recorder captures the exact drive
+  // state consumed per fixed step; a driver feeds it back wall-clock-free.
+  // Physics untouched — only input sourcing changes.
+  private recorder: RunRecorder | null = null;
+  private replayDriver: ReplayDriver | null = null;
+  private stepCount = 0;
+  private runSnapshots: GhostSnapshot[] = [];
+  private endMarker: { step: number; timeMs: number; x: number; outcome: 'crash' | 'finish' } | null = null;
+  private lastRideMeta: { trackId: string; trackHash: string; inverted: boolean; interval: 'ALL' | '24H' | '7D' } | null = null;
+  private ghost: GhostRenderer | null = null;
+  private offReplay: Array<() => void> = [];
+  private offGhost: (() => void) | null = null;
 
   // Trick detection state (angle in radians, positive = nose down)
   private trickAirMs = 0;
@@ -88,12 +123,29 @@ export class RideScene extends Phaser.Scene {
 
     this.bike = new Bike(this, WORLD.spawnX + 450, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
+    this.ghost = new GhostRenderer(this);
     this.inputMgr = new InputManager();
 
     // Store handle so we can remove it on shutdown — prevents duplicate listeners on hot reload
     if (this.offRestart) this.offRestart();
     this.offRestart = bus.on(EV.RESTART, () => this.doReset(true));
     const offLoadMarket = bus.on<Ride>(EV.LOAD_MARKET, (ride) => this.applyRide(ride));
+    this.offReplay = [
+      bus.on<{ payload: SharePayload; opts?: ReplayStartOptions }>(EV.REPLAY_START, ({ payload, opts }) =>
+        this.startReplay(payload, opts ?? {}),
+      ),
+      bus.on<{ step: number }>(EV.REPLAY_SEEK, ({ step }) => this.seekReplay(step)),
+      bus.on<{ paused: boolean }>(EV.REPLAY_PAUSE, ({ paused }) => {
+        if (this.replayDriver) this.replayDriver.paused = paused;
+      }),
+      bus.on<void>(EV.REPLAY_STOP, () => {
+        this.replayDriver = null;
+      }),
+    ];
+    if (this.offGhost) this.offGhost();
+    this.offGhost = bus.on<{ snapshots: GhostSnapshot[] | null }>(EV.GHOST_SET, ({ snapshots }) => {
+      this.ghost?.setSnapshots(snapshots);
+    });
     // Detach on shutdown AND destroy: game.destroy() tears down systems
     // via destroy (not shutdown), so shutdown-only cleanup leaks bus and
     // input listeners into the next mounted game. Detach is idempotent.
@@ -101,6 +153,11 @@ export class RideScene extends Phaser.Scene {
       this.inputMgr.destroy();
       if (this.offRestart) { this.offRestart(); this.offRestart = null; }
       offLoadMarket();
+      for (const off of this.offReplay) off();
+      this.offReplay = [];
+      if (this.offGhost) { this.offGhost(); this.offGhost = null; }
+      this.ghost?.destroy();
+      this.ghost = null;
     };
     this.events.once('shutdown', detach);
     this.events.once('destroy', detach);
@@ -145,8 +202,119 @@ export class RideScene extends Phaser.Scene {
       currentProb: ride.market.currentProb,
       probDelta: ride.market.probDelta,
     });
+    this.lastRideMeta = {
+      trackId: ride.market.id,
+      trackHash: ride.market.trackHash,
+      inverted: ride.inverted === true,
+      interval: ride.interval ?? 'ALL',
+    };
+    this.replayDriver = null;
     this.doReset(true);
     this.matter.world.resume();
+  }
+
+  /** Rear-hub pose for ghost snapshots. */
+  private poseNow(): { t: number; x: number; y: number; a: number } {
+    return {
+      t: this.score.timeMs,
+      x: this.bike.rearWheel.position.x,
+      y: this.bike.rearWheel.position.y,
+      a: this.bike.chassis.angle,
+    };
+  }
+
+  private snapPose(): void {
+    const pose = this.poseNow();
+    this.runSnapshots.push({ t: pose.t, x: pose.x, y: pose.y, a: pose.a });
+  }
+
+  /** Result payload from the frozen end marker (crash/finish moment), never
+   *  from settled-ragdoll positions seconds later. */
+  private resultPayload(finished: boolean): RunResult {
+    const marker = this.endMarker ?? {
+      step: this.stepCount,
+      timeMs: this.score.timeMs,
+      x: this.bike.x,
+      outcome: finished ? ('finish' as const) : ('crash' as const),
+    };
+    const span = WORLD.finishX - this.rideSpawnX;
+    const progress = span > 0 ? Math.min(1, Math.max(0, (marker.x - this.rideSpawnX) / span)) : 0;
+    const meta = this.lastRideMeta;
+    const recording: SharePayload =
+      this.recorder !== null
+        ? this.recorder.toSharePayload({ endStep: marker.step, outcome: marker.outcome, endX: marker.x })
+        : {
+            trackId: meta?.trackId ?? 'unknown',
+            trackHashPrefix: (meta?.trackHash ?? '').slice(0, 16).padEnd(16, '0'),
+            inverted: meta?.inverted ?? false,
+            interval: meta?.interval ?? 'ALL',
+            events: [[0, 0]],
+            endStep: Math.max(marker.step, 1),
+            outcome: marker.outcome,
+            endX: marker.x,
+          };
+    return {
+      finished,
+      score: this.score.total,
+      timeMs: this.score.timeMs,
+      difficulty: this.rideDifficulty,
+      progress,
+      recording,
+      snapshots: this.runSnapshots.filter((s) => s.t <= marker.timeMs),
+    };
+  }
+
+  /** Start wall-clock-free playback of a recording (replay viewer, loops). */
+  private startReplay(payload: SharePayload, opts: ReplayStartOptions): void {
+    const driver = ReplayDriver.fromPayload(payload);
+    driver.timeScale = opts.timeScale ?? 1;
+    driver.quiet = opts.quiet ?? true;
+    driver.paused = opts.paused ?? false;
+    driver.onDone = () => bus.emit(EV.REPLAY_DONE);
+    // Drain stale edge-triggered queues so a leftover jump/reset/mute from
+    // live play can't fire mid-replay.
+    this.inputMgr.consumeJump();
+    this.inputMgr.takeReset();
+    this.inputMgr.takeMute();
+    this.replayDriver = driver;
+    this.doReset(true);
+    const fromStep = Math.max(0, Math.min(opts.fromStep ?? 0, payload.endStep));
+    if (fromStep > 0) this.fastForwardTo(driver, fromStep);
+  }
+
+  /** Seek by resetting and re-simulating (score-accurate, render-free). */
+  private seekReplay(step: number): void {
+    const driver = this.replayDriver;
+    if (!driver) return;
+    const target = Math.max(0, Math.min(step, driver.endStep));
+    this.doReset(true);
+    driver.resetNotified();
+    if (target > 0) this.fastForwardTo(driver, target);
+  }
+
+  /** Step the world synchronously to a target step: same per-step sequence
+   *  as the live loop (verbatim drives, score, tricks), minus rendering and
+   *  transient bus noise. */
+  private fastForwardTo(driver: ReplayDriver, targetStep: number): void {
+    let guard = 0;
+    while (this.stepCount < targetStep && guard++ < 250_000) {
+      const idx = this.stepCount;
+      const rec = driver.inputAt(idx);
+      const drive: DriveInput = this.score.finished ? { ...FINISH_BRAKE } : toDriveInput(rec);
+      if (
+        !this.score.started &&
+        (drive.gas || drive.brake || drive.leanBack || drive.leanFwd || drive.nitro || drive.jumpQueued)
+      ) {
+        this.score.begin();
+      }
+      this.bike.step(drive);
+      this.stepCount++;
+      if (!this.bike.crashed) this.score.step(STEP_MS, this.bike.x);
+      if (!this.bike.crashed && !this.score.finished) {
+        this.detectTricks(STEP_MS, rec.burning);
+      }
+      if (this.stepCount % 6 === 0) this.snapPose();
+    }
   }
 
   private exposeDebug(): void {
@@ -176,6 +344,36 @@ export class RideScene extends Phaser.Scene {
         chassisY: this.bike.chassis.position.y,
       }),
       reset: () => this.doReset(true),
+      stepCount: () => this.stepCount,
+      replayStep: () => (this.replayDriver ? this.stepCount : -1),
+      ghosts: () => this.ghost?.count ?? 0,
+      /** Live recording so far (inputs + ghost poses). */
+      recording: () => {
+        const marker = this.endMarker;
+        const endStep = marker?.step ?? this.stepCount;
+        return {
+          recording: this.recorder
+            ? this.recorder.toSharePayload({
+                endStep,
+                outcome: marker?.outcome ?? (this.bike.crashed ? 'crash' : 'finish'),
+                endX: marker?.x ?? this.bike.x,
+              })
+            : null,
+          snapshots: this.runSnapshots.filter((s) => s.t <= (marker?.timeMs ?? this.score.timeMs)),
+          endStep,
+        };
+      },
+      /** Start a deterministic replay of a recording (headless tests). */
+      replayRun: (payload: SharePayload) => this.startReplay(payload, {}),
+      /** Place the bike above a track position (test hook for screenshots). */
+      teleport: (x: number) => {
+        const y = this.trackRenderer.groundYAt(x) - 120;
+        this.bike.moveTo(x, y);
+      },
+      /** Enter the genuine crash-handling path (test hook for result UX). */
+      forceCrash: () => {
+        this.bike.crashed = true;
+      },
     };
   }
 
@@ -234,9 +432,19 @@ export class RideScene extends Phaser.Scene {
 
     const wallX = WORLD.finishX + TERRAIN.runout + 60;
     const wallY = this.trackRenderer.groundYAt(wallX);
-    this.add.rectangle(wallX, wallY - 200, 80, 400, PALETTE.surface).setDepth(0);
-    this.add.line(wallX - 40, wallY, 0, 0, 0, -400, PALETTE.surfaceLine).setOrigin(0, 1).setDepth(1);
-    this.matter.add.rectangle(wallX, wallY - 200, 80, 400, {
+    // Idempotent: re-applying a ride must not stack duplicate walls (extra
+    // static bodies change contact solving — and leak visuals).
+    if (this.endWall) {
+      this.matter.world.remove(this.endWall);
+      this.endWall = null;
+    }
+    for (const obj of this.endWallGfx) obj.destroy();
+    this.endWallGfx = [];
+    this.endWallGfx.push(
+      this.add.rectangle(wallX, wallY - 200, 80, 400, PALETTE.surface).setDepth(0),
+      this.add.line(wallX - 40, wallY, 0, 0, 0, -400, PALETTE.surfaceLine).setOrigin(0, 1).setDepth(1),
+    );
+    this.endWall = this.matter.add.rectangle(wallX, wallY - 200, 80, 400, {
       isStatic: true,
       friction: 0.4,
       restitution: 0,
@@ -300,63 +508,109 @@ export class RideScene extends Phaser.Scene {
 
     // fixed-step accumulator — physics never varies with frame rate
     const dt = Math.min(deltaMs, 100);
-    this.acc += dt;
-    let steps = 0;
-    const jump = this.inputMgr.consumeJump();
-    const firstRead = this.inputMgr.read();
-    if (!this.score.started && (firstRead.gas || firstRead.brake || firstRead.leanBack || firstRead.leanFwd || firstRead.nitro || jump)) {
-      this.score.begin();
+    const driver = this.replayDriver;
+    const replayHeld = driver !== null && (driver.paused || driver.isDone(this.stepCount));
+    if (replayHeld) {
+      // Paused or past the recorded end: hold the frame, don't burn steps.
+      this.acc = 0;
+    } else {
+      this.acc += dt * (driver?.timeScale ?? 1);
     }
-    while (this.acc >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
-      const input = this.inputMgr.read();
-      const drive: DriveInput = this.score.finished
-        ? { gas: false, brake: true, leanBack: false, leanFwd: false, nitro: false, jumpQueued: false }
-        : { ...input, jumpQueued: jump && steps === 0 };
+    let steps = 0;
+    const jump = driver ? false : this.inputMgr.consumeJump();
+    const liveFirst = driver ? null : this.inputMgr.read();
+    // The end check runs per step (not per update): rAF timing decides how
+    // many steps an update runs, so stopping mid-update would overshoot the
+    // recorded end by a wall-dependent amount.
+    const held = () => driver !== null && (driver.paused || driver.isDone(this.stepCount));
+    while (!held() && this.acc >= STEP_MS && steps < MAX_STEPS_PER_FRAME) {
+      const idx = this.stepCount;
+      let drive: DriveInput;
+      let burning: boolean;
+      if (driver) {
+        // Wall-clock-free: the exact drive this step consumed when recorded.
+        const rec = driver.inputAt(idx);
+        drive = this.score.finished ? { ...FINISH_BRAKE } : toDriveInput(rec);
+        burning = rec.burning;
+      } else {
+        const input = this.inputMgr.read();
+        drive = this.score.finished
+          ? { ...FINISH_BRAKE }
+          : { ...input, jumpQueued: jump && steps === 0 };
+        burning = liveFirst !== null && liveFirst.nitro && this.bike.nitro > 0;
+        if (!this.endMarker) {
+          this.recorder?.record(
+            idx,
+            {
+              gas: drive.gas,
+              brake: drive.brake,
+              leanBack: drive.leanBack,
+              leanFwd: drive.leanFwd,
+              nitro: drive.nitro,
+              jump: drive.jumpQueued,
+              burning,
+            },
+            this.poseNow(),
+          );
+        }
+      }
+      if (
+        !this.score.started &&
+        (drive.gas || drive.brake || drive.leanBack || drive.leanFwd || drive.nitro || drive.jumpQueued)
+      ) {
+        this.score.begin();
+      }
       this.bike.step(drive);
       this.acc -= STEP_MS;
       steps++;
+      this.stepCount++;
+      if (this.stepCount % 6 === 0) this.snapPose();
+      if (driver && !this.bike.crashed && !this.score.finished) {
+        this.detectTricks(STEP_MS, burning);
+      }
     }
     if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
+    // Replay end: hand control to the shell (end card, loop seek).
+    driver?.checkDone(this.stepCount);
     // Only tick score while alive — stops timer after crash
     if (!this.bike.crashed) this.score.step(steps * STEP_MS, this.bike.x);
-    if (!this.bike.crashed && !this.score.finished) {
-      this.detectTricks(steps * STEP_MS, firstRead.nitro && this.bike.nitro > 0);
+    if (!driver && !this.bike.crashed && !this.score.finished) {
+      this.detectTricks(steps * STEP_MS, liveFirst !== null && liveFirst.nitro && this.bike.nitro > 0);
     }
     if (this.parked) this.bike.park();
 
     this.trackRenderer.update();
     this.bikeRenderer.render(this.bike);
+    if (this.ghost) this.ghost.update(this.score.timeMs);
 
     if (this.bike.crashed && !this.crashHandled) {
       this.crashHandled = true;
       this.score.applyCrash();
-      bus.emit(EV.CRASH);
-      bus.emit(EV.COMBO, 1);
+      this.endMarker = { step: this.stepCount, timeMs: this.score.timeMs, x: this.bike.x, outcome: 'crash' };
+      if (!this.replayDriver?.quiet) {
+        bus.emit(EV.CRASH);
+        bus.emit(EV.COMBO, 1);
+      }
       // Snapshot the camera target at the moment of crash — avoids camera chasing the bouncing ragdoll
       this.crashCamX = this.bike.chassis.position.x;
       this.crashCamY = this.bike.chassis.position.y;
-      this.resultTimer = this.time.delayedCall(1400, () => {
-        bus.emit(EV.RESULT, {
-          finished: false,
-          score: this.score.total,
-          timeMs: this.score.timeMs,
-          difficulty: this.rideDifficulty,
-        });
-      });
+      this.resultTimer = this.replayDriver?.quiet
+        ? null
+        : this.time.delayedCall(1400, () => {
+            bus.emit(EV.RESULT, this.resultPayload(false));
+          });
     }
 
     if (!this.score.finished && !this.bike.crashed && this.bike.x >= WORLD.finishX) {
       this.score.applyFinish();
+      this.endMarker = { step: this.stepCount, timeMs: this.score.timeMs, x: this.bike.x, outcome: 'finish' };
       this.finishFx?.cross();
-      this.resultTimer = this.time.delayedCall(1100, () => {
-        this.parked = true;
-        bus.emit(EV.RESULT, {
-          finished: true,
-          score: this.score.total,
-          timeMs: this.score.timeMs,
-          difficulty: this.rideDifficulty,
-        });
-      });
+      this.resultTimer = this.replayDriver?.quiet
+        ? null
+        : this.time.delayedCall(1100, () => {
+            this.parked = true;
+            bus.emit(EV.RESULT, this.resultPayload(true));
+          });
     }
 
     // camera: lerp follow with velocity lookahead
@@ -484,6 +738,7 @@ export class RideScene extends Phaser.Scene {
   }
 
   private popup(text: string, points: number): void {
+    if (this.replayDriver?.quiet) return;
     this.popupId += 1;
     bus.emit(EV.POPUP, { id: this.popupId, text, points });
     bus.emit(EV.COMBO, this.score.combo);
@@ -494,6 +749,45 @@ export class RideScene extends Phaser.Scene {
       this.resultTimer.destroy();
       this.resultTimer = null;
     }
+    // A reset starts a new run: replay/drive state restarts from step 0.
+    this.stepCount = 0;
+    this.acc = 0;
+    this.endMarker = null;
+    this.runSnapshots = [];
+    this.recorder = this.lastRideMeta
+      ? new RunRecorder(
+          this.lastRideMeta.trackId,
+          this.lastRideMeta.trackHash,
+          this.lastRideMeta.inverted,
+          this.lastRideMeta.interval,
+        )
+      : null;
+    // Pristine collision state: stale pairs from before the reset would
+    // otherwise resolve differently than a fresh run (replay-exactness).
+    // Detector state rebuilds from current bounds every update.
+    const engine = this.matter.world.engine as unknown as {
+      pairs?: { table: Record<string, unknown>; list: unknown[] };
+      world?: { isModified: boolean };
+    } | undefined;
+    if (engine?.pairs) {
+      engine.pairs.table = {};
+      engine.pairs.list = [];
+    }
+    // The position solver warm-starts from each body's impulse cache,
+    // including static terrain — clear every cached impulse or identical
+    // resets diverge within steps (replay-exactness).
+    for (const body of [...this.groundBodies, this.flatGround, this.endWall]) {
+      if (body) {
+        body.positionImpulse.x = 0;
+        body.positionImpulse.y = 0;
+      }
+    }
+    // Re-seed the detector's body order canonically: it sorts bodies in
+    // place every update, so a stale order (with tied bounds) resolves
+    // contacts differently than a fresh run.
+    if (engine?.world) {
+      engine.world.isModified = true;
+    }
     this.crashHandled = false;
     this.parked = false;
     this.trickAirMs = 0;
@@ -502,8 +796,11 @@ export class RideScene extends Phaser.Scene {
     this.speedDemonMs = 0;
     this.nitroMs = 0;
     this.rotAcc = 0;
+    this.popupId = 0;
     if (full) this.score.fullReset();
     this.bike.reset();
+    // Sync AFTER the bike moves: post-reset angle is exactly 0.
+    this.lastTrickAngle = this.bike.angle;
     this.acc = 0;
     this.crashCamX = this.bike.x;
     this.crashCamY = this.bike.y;
