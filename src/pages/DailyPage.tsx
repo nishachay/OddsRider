@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
+import MiniTrack from '../components/MiniTrack';
 import { useMarkets } from '../data/marketsContext';
 import { getDailyChallenge, type RideableMarket } from '../data/tracks';
 import { getMarketBest as getBest } from '../data/playerStorage';
@@ -43,6 +44,7 @@ export default function DailyPage() {
 
   const pct = pick ? Math.round(pick.currentProb * 100) : 0;
   const up = (pick?.currentProb ?? 0) >= 0.5;
+  const deltaUp = ((pick?.probDelta ?? 0) >= 0);
 
   return (
     <div className="w-full flex flex-col min-h-screen bg-[#0a0a0b] text-[#f0f0f2]">
@@ -76,30 +78,38 @@ export default function DailyPage() {
             </button>
           </div>
         ) : pick ? (
-          <section className="border border-[#3a2f12] bg-[#12100a] border-l-4 border-l-amber-400 px-5 sm:px-8 py-6 flex flex-col lg:flex-row lg:items-center gap-6 justify-between">
-            <div className="flex flex-col gap-2 min-w-0">
-              <span className="font-mono text-[10px] font-extrabold tracking-[0.24em] text-amber-400 uppercase">
-                Feature race · {pick.kind === 'closed' && pick.resolution ? `Resolved ${pick.resolution}` : pick.live ? 'Live track' : 'Settled track'}
-              </span>
-              <p className="font-display font-bold text-xl sm:text-2xl text-ink leading-snug">
-                {pick.question}
-              </p>
-              <span className="font-mono text-[11px] text-dim tabular-nums">
-                <span className={`text-base font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>{pct}%</span>{' '}
-                YES ·{' '}
-                {best && best.plays > 0 ? (
-                  <>YOUR BEST {best.best.toLocaleString()} · {best.plays} RIDE{best.plays === 1 ? '' : 'S'}</>
-                ) : (
-                  <>NO RIDES YET — SET THE LINE</>
-                )}
-              </span>
+          <section className="border border-[#3a2f12] bg-[#12100a] border-l-4 border-l-amber-400 px-5 sm:px-8 py-6 flex flex-col gap-5">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-6 justify-between">
+              <div className="flex flex-col gap-2 min-w-0">
+                <span className="font-mono text-[10px] font-extrabold tracking-[0.24em] text-amber-400 uppercase">
+                  Feature race · {pick.kind === 'closed' && pick.resolution ? `Resolved ${pick.resolution}` : pick.live ? 'Live track' : 'Settled track'}
+                </span>
+                <p className="font-display font-bold text-xl sm:text-2xl text-ink leading-snug">
+                  {pick.question}
+                </p>
+                <span className="font-mono text-[11px] text-dim tabular-nums">
+                  <span className={`text-base font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>{pct}%</span>{' '}
+                  YES ·{' '}
+                  {best && best.plays > 0 ? (
+                    <>YOUR BEST {best.best.toLocaleString()} · {best.plays} RIDE{best.plays === 1 ? '' : 'S'}</>
+                  ) : (
+                    <>NO RIDES YET — SET THE LINE</>
+                  )}
+                </span>
+              </div>
+              <button
+                onClick={() => navigate(`/ride/${pick.id}`)}
+                className="shrink-0 px-8 py-4 bg-amber-400 text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-amber-300 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                Ride →
+              </button>
             </div>
-            <button
-              onClick={() => navigate(`/ride/${pick.id}`)}
-              className="shrink-0 px-8 py-4 bg-amber-400 text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-amber-300 active:scale-[0.98] transition-all cursor-pointer"
-            >
-              Ride →
-            </button>
+            <div className="border-t border-[#3a2f12] pt-4 flex flex-col gap-2">
+              <MiniTrack pts={pick.sparkline} deltaUp={deltaUp} />
+              <p className="font-mono text-[10px] tracking-[0.2em] text-dim uppercase">
+                Today&apos;s terrain · W gas · A/D lean · Space jump · Shift nitro
+              </p>
+            </div>
           </section>
         ) : (
           <p className="font-mono text-xs text-dim uppercase tracking-[0.18em] py-16 text-center">

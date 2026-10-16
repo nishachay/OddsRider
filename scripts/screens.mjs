@@ -47,6 +47,21 @@ async function main() {
     await desktop.screenshot({ path: `${OUT}/daily-desktop.png` });
     await desktop.close();
 
+    // Wide viewports: title overlap check (hero text must sit below the world
+    // on its solid backing at every size).
+    for (const [name, width, height] of [
+      ['title-1440', 1440, 900],
+      ['title-1920', 1920, 1080],
+    ]) {
+      const wide = await browser.newPage({ viewport: { width, height } });
+      await stubThirdParties(wide);
+      await wide.goto(BASE + '/');
+      await wide.getByText(/press any key/i).waitFor({ timeout: 30000 });
+      await wide.waitForTimeout(2500);
+      await wide.screenshot({ path: `${OUT}/${name}.png` });
+      await wide.close();
+    }
+
     // Phone (touch, portrait)
     const phone = await browser.newPage({
       viewport: { width: 390, height: 844 },

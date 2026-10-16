@@ -1,54 +1,12 @@
 import { useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
+import MiniTrack from '../components/MiniTrack';
 import { useMarkets } from '../data/marketsContext';
 import { getHomePageData, type RideableMarket } from '../data/tracks';
 
-const TOXIC = '#b6ff00';
-const CRIMSON = '#ff3355';
-
 function rideUrl(market: RideableMarket, inverted: boolean): string {
   return `/ride/${market.id}${inverted ? '?side=no' : ''}`;
-}
-
-// Tiny terrain silhouette drawn from the frozen preview series. Real data,
-// downsampled at ingest — never invented.
-function MiniTrack({ pts, deltaUp }: { pts: number[] | null; deltaUp: boolean }) {
-  const W = 220;
-  const H = 44;
-  if (!pts || pts.length < 2) {
-    return (
-      <div className="w-full h-11 flex items-center font-mono text-[9px] font-bold tracking-[0.2em] text-dim">
-        NO FORM
-      </div>
-    );
-  }
-  const min = Math.min(...pts);
-  const max = Math.max(...pts);
-  const range = Math.max(0.01, max - min);
-  const color = deltaUp ? TOXIC : CRIMSON;
-  const line = pts
-    .map((p, i) => {
-      const x = (i / (pts.length - 1)) * W;
-      const y = H - 4 - ((p - min) / range) * (H - 8);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block w-full h-11 overflow-hidden" aria-hidden="true">
-      <polygon points={`0,${H} ${line} ${W},${H}`} fill={deltaUp ? 'rgba(182,255,0,0.07)' : 'rgba(255,51,85,0.07)'} />
-      <polyline
-        points={line}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
 }
 
 function TrackRow({
@@ -66,8 +24,12 @@ function TrackRow({
 }) {
   const navigate = useNavigate();
   const probPct = Math.round(market.currentProb * 100);
-  const chanceUp = market.currentProb >= 0.5;
+  // One colour rule for the whole row, mirroring the in-game track renderer
+  // (`seg.rising ? toxic : crimson`): the 24h direction colours BOTH the
+  // silhouette and the number. A 77% that fell today reads red; a 23% that
+  // climbed reads green — momentum, not level.
   const deltaUp = (market.probDelta ?? 0) >= 0;
+  const momentum = deltaUp ? 'text-toxic' : 'text-crimson';
 
   return (
     <div className="rise group relative flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6 px-4 sm:px-5 py-4 border-t border-[#232529] hover:bg-[#101113] transition-colors ease-[cubic-bezier(0.16,1,0.3,1)] select-none">
@@ -95,12 +57,11 @@ function TrackRow({
         </button>
         <span className="font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
           {market.category} · {market.difficulty}
-          {' · '}
           {market.kind === 'closed'
             ? market.resolution
-              ? `Resolved ${market.resolution}`
-              : 'Settled'
-            : market.volumeFormatted}
+              ? ` · Resolved ${market.resolution}`
+              : ' · Settled'
+            : ''}
         </span>
       </div>
 
@@ -109,7 +70,7 @@ function TrackRow({
       </div>
 
       <div className="flex lg:flex-col items-baseline lg:items-end gap-x-2 shrink-0 lg:w-24">
-        <span className={`font-poster text-4xl leading-none tabular-nums ${chanceUp ? 'text-toxic' : 'text-crimson'}`}>
+        <span className={`font-poster text-4xl leading-none tabular-nums ${momentum}`}>
           {probPct}
           <span className="text-lg text-dim">%</span>
         </span>
@@ -118,15 +79,17 @@ function TrackRow({
       <div className="grid grid-cols-2 lg:flex gap-2 shrink-0">
         <button
           onClick={() => navigate(rideUrl(market, false))}
+          title="Ride the track as it happened"
           className="min-h-[48px] px-4 py-2.5 lg:py-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase bg-toxic/10 text-toxic border border-toxic/40 hover:bg-toxic hover:text-bg active:scale-[0.98] transition-all cursor-pointer text-center"
         >
-          Ride ∧
+          Ride yes ∧
         </button>
         <button
           onClick={() => navigate(rideUrl(market, true))}
+          title="Ride the same track mirrored — rallies become descents"
           className="min-h-[48px] px-4 py-2.5 lg:py-2 font-mono text-[10px] font-bold tracking-[0.14em] uppercase bg-crimson/10 text-crimson border border-crimson/40 hover:bg-crimson hover:text-bg active:scale-[0.98] transition-all cursor-pointer text-center"
         >
-          Ride ∨
+          Ride no ∨
         </button>
       </div>
     </div>
@@ -217,7 +180,7 @@ export default function TracksPage() {
           </p>
         ) : (
           <>
-            <Group title="Live" note="Trading now" items={data.trending} startIndex={0} />
+            <Group title="Live" note="Still moving" items={data.trending} startIndex={0} />
             <Group title="Settled" note="Final results" items={data.closed} startIndex={data.trending.length} />
           </>
         )}

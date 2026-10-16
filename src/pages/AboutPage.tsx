@@ -27,7 +27,7 @@ export default function AboutPage() {
             About the races
           </h1>
           <p className="font-sans text-sm text-dim leading-relaxed">
-            You&apos;re not riding money — you&apos;re riding what the crowd believes.
+            You&apos;re riding what the crowd believes.
             OddsRider is a free browser game that turns real probability charts into
             rideable motocross tracks. Pick a track, ride what the crowd believes — every rally
             is a climb, every crash is a cliff. Ride the YES side uphill, or flip to the NO side
@@ -83,15 +83,14 @@ export default function AboutPage() {
 
         <Section num="06" title="Free game">
           <p>
-            OddsRider is a game. Nothing here is financial advice, and nothing here
-            involves money — no positions, no payouts, no prizes. Market data is
-            shown for entertainment as terrain.
+            OddsRider is a game. Nothing here is financial advice, and there is
+            nothing at stake — just tracks to ride.
           </p>
         </Section>
 
         <Section num="07" title="Data honesty">
           <p>
-            Probabilities shown are last-trade prices from frozen snapshots. A 24H
+            Probabilities shown are the final recorded prices from frozen snapshots. A 24H
             change shows "—" when it can&apos;t be computed, and a track with no
             history simply doesn&apos;t exist — odds are never fabricated. When the
             track index is unreachable, the site says so instead of guessing.
@@ -108,7 +107,7 @@ export default function AboutPage() {
         <Section num="09" title="Questions">
           <p>
             <span className="text-ink font-bold">Is it free?</span> Yes — free forever, no
-            account, no wallet, no ads.
+            account, no ads.
           </p>
           <p>
             <span className="text-ink font-bold">What does riding NO do?</span> It inverts the

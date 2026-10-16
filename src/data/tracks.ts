@@ -237,6 +237,20 @@ export function getBiggestMovers(markets: RideableMarket[], n = 4): RideableMark
     .slice(0, n);
 }
 
+// The title's featured ride: the daily's neighbour, so the two screens never
+// headline the same track while choice exists. Same pool and order as
+// getDailyChallenge, shifted by one — deterministic per date.
+export function getTitleFeature(
+  markets: RideableMarket[],
+  dateStr: string = new Date().toISOString().slice(0, 10),
+): RideableMarket | null {
+  const live = markets.filter((m) => m.kind === 'live');
+  const list = live.length > 0 ? live : markets;
+  if (list.length === 0) return null;
+  if (list.length === 1) return list[0];
+  return list[(simpleHash(dateStr) + 1) % list.length];
+}
+
 // Deterministic per-day challenge so everyone rides the same track. Live
 // tracks first; settled tracks headline only when nothing live is published.
 export function getDailyChallenge(

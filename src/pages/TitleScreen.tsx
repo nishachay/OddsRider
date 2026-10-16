@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import { bus, EV } from '../game/bus';
 import { useMarkets } from '../data/marketsContext';
-import { fetchRideForTrack, getDailyChallenge, type RideableMarket } from '../data/tracks';
+import { fetchRideForTrack, getTitleFeature, type RideableMarket } from '../data/tracks';
 
 const PhaserGame = lazy(() => import('../game/PhaserGame'));
 
@@ -18,7 +18,7 @@ export default function TitleScreen() {
   const navigate = useNavigate();
   const { markets, loading, reload } = useMarkets();
   const featured: RideableMarket | null = useMemo(
-    () => getDailyChallenge(markets, todayStr()),
+    () => getTitleFeature(markets, todayStr()),
     [markets],
   );
   const started = useRef(false);
@@ -105,66 +105,72 @@ export default function TitleScreen() {
 
       <div className="absolute inset-0 flex flex-col pointer-events-none">
         <div className="pointer-events-auto">
-          <TopStrip />
+          <TopStrip hideWordmark />
         </div>
 
-        <div className="flex-1 flex flex-col justify-end max-w-6xl mx-auto w-full px-4 pb-8 sm:pb-10">
-          {featured ? (
-            <div className="flex flex-col gap-3 max-w-2xl">
-              <span className="font-mono text-[10px] font-bold tracking-[0.3em] uppercase">
-                <span className={`inline-block w-2 h-2 mr-2 ${featured.live ? 'bg-toxic animate-pulse' : 'bg-dim'}`} />
-                <span className={featured.live ? 'text-toxic' : 'text-dim'}>
-                  {featured.live ? 'Live track' : 'Settled track'} · {featured.category}
-                  {featured.kind === 'closed' && featured.resolution ? ` · Resolved ${featured.resolution}` : ''}
+        <div className="flex-1" />
+
+        {/* Solid backing: the hero text sits fully below the world — no ground
+            line or bike ever crosses it, at any viewport. */}
+        <div className="pointer-events-none w-full bg-[#0a0a0b] border-t border-[#1a1c22]">
+          <div className="max-w-6xl mx-auto w-full px-4 py-6 sm:py-7 flex flex-col">
+            {featured ? (
+              <div className="flex flex-col gap-3 max-w-2xl">
+                <span className="font-mono text-[10px] font-bold tracking-[0.3em] uppercase">
+                  <span className={`inline-block w-2 h-2 mr-2 ${featured.live ? 'bg-toxic animate-pulse' : 'bg-dim'}`} />
+                  <span className={featured.live ? 'text-toxic' : 'text-dim'}>
+                    {featured.live ? 'Live track' : 'Settled track'} · {featured.category}
+                    {featured.kind === 'closed' && featured.resolution ? ` · Resolved ${featured.resolution}` : ''}
+                  </span>
                 </span>
-              </span>
-              <h1 className="font-poster uppercase leading-[0.95] text-5xl sm:text-7xl text-ink">
-                Odds<span className="text-toxic">rider</span>
-              </h1>
-              <p className="font-display font-bold text-lg sm:text-xl text-ink leading-snug">
-                {featured.question}
-              </p>
-              <p className="font-mono text-xs text-dim tabular-nums">
-                <span className={`text-2xl font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>{pct}%</span>{' '}
-                YES · {deltaLabel} 24H
-              </p>
-              <div className="pt-2 flex flex-col gap-3">
-                <button
-                  onClick={goRide}
-                  className="pointer-events-auto w-fit px-10 py-4 bg-toxic text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 active:scale-[0.98] transition-all cursor-pointer shadow-[0_0_24px_rgba(182,255,0,0.45)]"
-                >
-                  Enter race
-                </button>
-                <span className="prompt-pulse font-mono text-[11px] font-bold tracking-[0.28em] text-dim uppercase">
-                  Press any key · Tap to ride
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 max-w-2xl">
-              <h1 className="font-poster uppercase leading-[0.95] text-5xl sm:text-7xl text-ink">
-                Odds<span className="text-toxic">rider</span>
-              </h1>
-              {loading ? (
-                <div className="shimmer h-[3px] w-56" />
-              ) : (
-                <>
-                  <p className="font-mono text-xs text-dim uppercase tracking-[0.18em]">
-                    No tracks published yet — check back soon.
-                  </p>
+                <h1 className="font-poster uppercase leading-[0.95] text-5xl sm:text-7xl text-ink">
+                  Odds<span className="text-toxic">rider</span>
+                </h1>
+                <p className="font-display font-bold text-lg sm:text-xl text-ink leading-snug">
+                  {featured.question}
+                </p>
+                <p className="font-mono text-xs text-dim tabular-nums">
+                  <span className={`text-2xl font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>{pct}%</span>{' '}
+                  YES · {deltaLabel} 24H
+                </p>
+                <div className="pt-2 flex flex-col gap-3">
                   <button
-                    onClick={reload}
-                    className="pointer-events-auto w-fit px-6 py-3 font-mono text-xs font-bold tracking-[0.16em] uppercase border border-toxic/40 text-toxic hover:bg-toxic hover:text-bg transition-all cursor-pointer"
+                    onClick={goRide}
+                    className="pointer-events-auto w-fit px-10 py-4 bg-toxic text-bg font-mono text-sm font-bold tracking-[0.16em] uppercase hover:bg-toxic/90 active:scale-[0.98] transition-all cursor-pointer shadow-[0_0_24px_rgba(182,255,0,0.45)]"
                   >
-                    Retry →
+                    Enter race
                   </button>
-                </>
-              )}
-            </div>
-          )}
-          <p className="hidden sm:block font-mono text-[10px] tracking-[0.2em] text-dim pt-4 uppercase">
-            W gas · A/D lean · Space jump · Free · No account
-          </p>
+                  <span className="prompt-pulse font-mono text-[11px] font-bold tracking-[0.28em] text-dim uppercase">
+                    Press any key · Tap to ride
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 max-w-2xl">
+                <h1 className="font-poster uppercase leading-[0.95] text-5xl sm:text-7xl text-ink">
+                  Odds<span className="text-toxic">rider</span>
+                </h1>
+                {loading ? (
+                  <div className="shimmer h-[3px] w-56" />
+                ) : (
+                  <>
+                    <p className="font-mono text-xs text-dim uppercase tracking-[0.18em]">
+                      No tracks published yet — check back soon.
+                    </p>
+                    <button
+                      onClick={reload}
+                      className="pointer-events-auto w-fit px-6 py-3 font-mono text-xs font-bold tracking-[0.16em] uppercase border border-toxic/40 text-toxic hover:bg-toxic hover:text-bg transition-all cursor-pointer"
+                    >
+                      Retry →
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+            <p className="hidden sm:block font-mono text-[10px] tracking-[0.2em] text-dim pt-4 uppercase">
+              W gas · A/D lean · Space jump · Free · No account
+            </p>
+          </div>
         </div>
       </div>
     </div>
