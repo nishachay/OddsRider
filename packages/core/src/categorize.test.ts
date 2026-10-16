@@ -59,3 +59,13 @@ describe('categorize — whole words only', () => {
     expect(categorize('Will the thing happen?')).toBe(DEFAULT_CATEGORY);
   });
 });
+
+describe('categorize — heads of government', () => {
+  it('puts prime minister questions in POLITICS', () => {
+    // Real live question from ingest that used to fall through to TECH.
+    expect(
+      categorize('Will Benjamin Netanyahu be the next Prime Minister of Israel?'),
+    ).toBe('POLITICS');
+    expect(categorize('Who will be the next German chancellor?')).toBe('POLITICS');
+  });
+});

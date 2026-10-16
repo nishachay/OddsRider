@@ -28,6 +28,8 @@ export const CATEGORY_KEYWORDS: Record<KeywordCategory, string[]> = {
     'nomination',
     'primary',
     'parliament',
+    'minister',
+    'chancellor',
     'vote',
     'votes',
     'referendum',
