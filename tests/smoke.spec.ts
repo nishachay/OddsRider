@@ -3,17 +3,17 @@ import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from 'playwright/test';
 
 // ---------------------------------------------------------------------------
-// Offline smoke test.
+// Offline smoke test for the arcade flow.
 //
 // This test never touches the network. The browser reads only our own frozen
 // `/tracks/*.json` (committed to the repo), Google Fonts is stubbed, and any
 // other external request — including any call to a Polymarket domain — is
 // aborted and reported as a failure.
 //
-// Scope: the app shell boots from the frozen index, a ride starts on a real
-// frozen track, the bike moves under its own power, the console stays clean,
-// and a missing index shows a clear error state instead of fake data.
-// Gameplay physics are not asserted here.
+// Scope: the title screen attract mode starts a ride from one keypress, the
+// level select opens a track, the daily screen is deterministic for a fixed
+// date, and missing/empty indexes show clear error states instead of fake
+// data. Gameplay physics are not asserted here.
 // ---------------------------------------------------------------------------
 
 interface TrackSummary {
@@ -35,8 +35,7 @@ function trackIndex(): TrackSummary[] {
 }
 
 const TRACKS = trackIndex();
-// Whatever the ingest published first is what the home stage features.
-const FEATURED: TrackSummary | null = TRACKS[0] ?? null;
+const IDS = new Set(TRACKS.map((t) => t.id));
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
 
@@ -116,45 +115,16 @@ function assertClean(
   expect(external, `the smoke test must not reach the network, but saw:\n${external.join('\n')}`).toEqual([]);
 }
 
-test('starts a ride from a frozen track with no console errors and no network', async ({ page }) => {
-  // No published tracks yet: there is nothing to ride, and inventing a ride
-  // is exactly what this suite forbids. The error-state test below covers it.
-  test.skip(
-    FEATURED === null,
-    'smoke: public/tracks/index.json has no published tracks — ride test skipped',
-  );
-  const featured = FEATURED as TrackSummary;
-  const { consoleErrors, pageErrors, external } = listen(page);
-  await mockThirdParties(page, external);
-
-  // --- Home: the frozen index must render, not a bundled fallback ------------
-  await page.goto('/');
-  await expect(page.getByText(featured.question).first()).toBeVisible();
-  await page.screenshot({ path: 'test-results/smoke-home.png' });
-
-  // --- Start the ride ---------------------------------------------------------
-  // The stage CTA drops straight into the game for the featured frozen track.
-  await page.getByRole('button', { name: /enter race/i }).click();
-  await expect(page).toHaveURL(new RegExp(`/ride/${featured.id}$`));
-
-  // --- The game boots and installs its debug handle ---------------------------
-  // (the game canvas is first in the DOM: Phaser mounts before the HUD, whose
-  // progress bar renders its own small canvas)
+// Wait out the 3-2-1-RIDE gate, then hold gas and watch the bike move.
+async function rideBriefly(page: Page): Promise<void> {
   await expect(page.locator('canvas').first()).toBeVisible();
   await page.waitForFunction(
     () => Boolean((window as unknown as { __oddsrider?: DebugHandle }).__oddsrider),
   );
-
-  // Let the 3-2-1-RIDE gate finish: it ends by resetting the bike to the start,
-  // so holding throttle through it would test nothing.
   await expect(page.getByText(/W GAS/)).toHaveCount(0);
   await page.waitForTimeout(1200);
 
   const before = await telemetry(page);
-  expect(Number.isFinite(before.x)).toBe(true);
-  expect(before.simMs).toBeGreaterThanOrEqual(0);
-
-  // --- Ride: hold throttle and watch the bike make progress -------------------
   await page.keyboard.down('w');
   let furthest = before.x;
   let fastest = 0;
@@ -168,13 +138,96 @@ test('starts a ride from a frozen track with no console errors and no network', 
   }
   await page.keyboard.up('w');
 
-  await page.screenshot({ path: 'test-results/smoke-ride.png' });
-
   expect(sawSimulation).toBeGreaterThan(before.simMs);
   expect(furthest).toBeGreaterThan(before.x + 20);
   expect(fastest).toBeGreaterThan(0);
+}
 
-  // --- Nothing may have errored, nothing may have left the box ----------------
+test('one keypress on the title starts a frozen-track ride', async ({ page }) => {
+  test.skip(
+    TRACKS.length === 0,
+    'smoke: public/tracks/index.json has no published tracks — ride test skipped',
+  );
+  const { consoleErrors, pageErrors, external } = listen(page);
+  await mockThirdParties(page, external);
+
+  // --- Title: attract mode boots behind the menu -----------------------------
+  await page.goto('/');
+  await expect(page.getByText(/press any key/i)).toBeVisible();
+  await expect(page.locator('canvas').first()).toBeVisible();
+  await page.screenshot({ path: 'test-results/smoke-home.png' });
+
+  // --- One keypress rides ------------------------------------------------------
+  await page.keyboard.press('x');
+  await expect(page).toHaveURL(/\/ride\/([A-Za-z0-9-]+)$/);
+  const rideId = page.url().split('/ride/')[1];
+  expect(IDS.has(rideId)).toBe(true);
+
+  await rideBriefly(page);
+  await page.screenshot({ path: 'test-results/smoke-ride.png' });
+
+  assertClean(consoleErrors, pageErrors, external);
+});
+
+test('level select opens a track by tap and by keyboard', async ({ page }) => {
+  test.skip(
+    TRACKS.length === 0,
+    'smoke: public/tracks/index.json has no published tracks — select test skipped',
+  );
+  const { consoleErrors, pageErrors, external } = listen(page);
+  await mockThirdParties(page, external);
+
+  await page.goto('/tracks');
+  const first = TRACKS.find((t) => t.kind === 'live') ?? TRACKS[0];
+  await expect(page.getByText(first.question).first()).toBeVisible();
+  await page.screenshot({ path: 'test-results/smoke-tracks.png' });
+
+  // Keyboard: arrows move between rows.
+  const row = page.getByRole('button', { name: first.question });
+  await row.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(async () => {
+    const focused = await page.evaluate(() => document.activeElement?.textContent?.slice(0, 40) ?? '');
+    expect(focused).not.toBe(first.question.slice(0, 40));
+  }).toPass();
+
+  // Tap: the row's question button rides the YES side.
+  await row.click();
+  await expect(page).toHaveURL(new RegExp(`/ride/${first.id}$`));
+
+  await rideBriefly(page);
+
+  assertClean(consoleErrors, pageErrors, external);
+});
+
+test('daily loads the same track for a fixed date', async ({ page }) => {
+  test.skip(
+    TRACKS.length === 0,
+    'smoke: public/tracks/index.json has no published tracks — daily test skipped',
+  );
+  const { consoleErrors, pageErrors, external } = listen(page);
+  await mockThirdParties(page, external);
+
+  const readPick = async (): Promise<string | null> =>
+    page.evaluate(() => {
+      const section = document.querySelector('main section');
+      return section?.querySelector('p')?.textContent?.trim() ?? null;
+    });
+
+  await page.goto('/daily?date=2026-10-15');
+  await expect(page.getByText('2026-10-15').first()).toBeVisible();
+  const firstPick = await readPick();
+  await page.screenshot({ path: 'test-results/smoke-daily.png' });
+
+  // Same date, reloaded: the same ride. Everyone gets this track today.
+  await page.reload();
+  await expect(page.getByText('2026-10-15').first()).toBeVisible();
+  const secondPick = await readPick();
+  expect(secondPick).toBe(firstPick);
+
+  // And the pick is a real frozen track.
+  expect(TRACKS.some((t) => t.question === firstPick)).toBe(true);
+
   assertClean(consoleErrors, pageErrors, external);
 });
 
@@ -190,8 +243,8 @@ test('shows a clear error state when the track index is missing', async ({ page 
   );
   await page.goto('/');
 
-  // The card says plainly that the feed is down, and offers a retry.
-  await expect(page.getByText(/TRACK FEED UNAVAILABLE/)).toBeVisible();
+  // The title says plainly that nothing is published, and offers a retry.
+  await expect(page.getByText(/no tracks published yet/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /retry/i })).toBeVisible();
   // ...and no phantom race is offered anywhere.
   await expect(page.getByRole('button', { name: /enter race/i })).toHaveCount(0);
@@ -215,7 +268,7 @@ test('says plainly when no tracks have been published yet', async ({ page }) => 
   );
   await page.goto('/');
 
-  await expect(page.getByText(/NO TRACKS PUBLISHED YET/)).toBeVisible();
+  await expect(page.getByText(/no tracks published yet/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /enter race/i })).toHaveCount(0);
 
   assertClean(consoleErrors, pageErrors, external);

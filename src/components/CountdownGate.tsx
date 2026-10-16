@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { bus, EV } from '../game/bus';
 
-const STEPS = ['3', '2', '1', 'RIDE'];
-
-export default function CountdownGate({ onDone }: { onDone: () => void }) {
+// 3-2-1-RIDE gate. `short` is a single RIDE flash for title-initiated rides,
+// where the player just asked to ride — direct loads keep the full count.
+export default function CountdownGate({ onDone, short = false }: { onDone: () => void; short?: boolean }) {
+  const STEPS = short ? ['RIDE'] : ['3', '2', '1', 'RIDE'];
   const [step, setStep] = useState(0);
 
   useEffect(() => {

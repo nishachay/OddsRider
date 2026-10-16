@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bus, EV } from "../game/bus";
 import ResultModal from "./ResultModal";
 import TouchControls from "./TouchControls";
+import { loadMuted } from "../game/audio";
 import type { Difficulty } from "../data/tracks";
 
 const TOXIC = "#b6ff00";
@@ -121,7 +122,7 @@ interface HudOverlayProps {
 
 export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
   const [speed, setSpeed] = useState(0);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMuted] = useState(loadMuted);
   const [nitro, setNitro] = useState(1);
   const [crashFlash, setCrashFlash] = useState(false);
   const [prob, setProb] = useState<number | null>(null);
@@ -363,7 +364,7 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
         </div>
 
 
-        {/* Bottom-Right: Polymarket Prediction Outcome Column */}
+        {/* Bottom-Right: Race Outcome Column */}
         <div className="flex flex-col items-end gap-1.5 max-w-[460px] text-right pl-6"
               style={{ borderRight: `2px solid ${heroColor}`, paddingRight: 12 }}>
 

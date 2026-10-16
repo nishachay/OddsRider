@@ -6,6 +6,7 @@ import type { DriveInput } from '../bike/Bike';
 import { BikeRenderer } from '../bike/BikeRenderer';
 import { InputManager } from '../input/InputManager';
 import { fetchRide } from '../../data/polymarket';
+import { loadMuted, storeMuted } from '../audio';
 import type { Ride, Difficulty } from '../../data/polymarket';
 import { buildTerrain, probabilityAt } from '../terrain';
 import type { Terrain } from '../terrain';
@@ -38,7 +39,8 @@ export class RideScene extends Phaser.Scene {
   private rideSpawnX = WORLD.spawnX;
   private offRestart: (() => void) | null = null;
 
-  private muted = false;
+  private muted = loadMuted();
+  private wasGrounded = false;
   private acc = 0;
   private crashHandled = false;
   private nextSpeedEmitAt = 0;
@@ -277,8 +279,13 @@ export class RideScene extends Phaser.Scene {
     if (this.inputMgr.takeReset()) this.doReset(true);
     if (this.inputMgr.takeMute()) {
       this.muted = !this.muted;
+      storeMuted(this.muted);
       bus.emit(EV.MUTE, this.muted);
     }
+    // Landing hook (additive): airborne → grounded transition feeds the
+    // landing sound. Physics untouched.
+    if (this.bike.grounded && !this.wasGrounded) bus.emit(EV.LAND);
+    this.wasGrounded = this.bike.grounded;
 
     // fixed-step accumulator — physics never varies with frame rate
     const dt = Math.min(deltaMs, 100);

@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import HudOverlay from '../components/HudOverlay';
 import CountdownGate from '../components/CountdownGate';
 import { audio } from '../game/audio';
@@ -13,6 +13,7 @@ const PhaserGame = lazy(() => import('../game/PhaserGame'));
 
 export default function RidePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { marketId } = useParams<{ marketId: string }>();
   const [searchParams] = useSearchParams();
   const { market, loading } = useMarket(marketId);
@@ -20,6 +21,8 @@ export default function RidePage() {
   const [noHistory, setNoHistory] = useState(false);
   const [retry, setRetry] = useState(0);
   const [gateOpen, setGateOpen] = useState(false);
+  // Title-initiated rides arrive hot: single-flash gate instead of 3-2-1.
+  const quick = (location.state as { quick?: boolean } | null)?.quick === true;
 
   const inverted = searchParams.get('side') === 'no';
   const interval: RideInterval = rideIntervalFromParam(searchParams.get('tf'));
@@ -130,7 +133,7 @@ export default function RidePage() {
         <PhaserGame />
       </Suspense>
       <HudOverlay onOpenLobby={() => navigate('/')} rideUrl={rideUrl} />
-      {!gateOpen && <CountdownGate onDone={openGate} />}
+      {!gateOpen && <CountdownGate onDone={openGate} short={quick} />}
       {loadError && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 font-mono text-[11px] text-crimson border border-crimson/50 bg-[#0a0a0b]/90 px-4 py-2">
           FAILED TO LOAD TRACK DATA
