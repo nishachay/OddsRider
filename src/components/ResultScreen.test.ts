@@ -79,7 +79,7 @@ describe('ResultScreen', () => {
     expect(html).not.toContain('New best');
   });
 
-  it('falls back when the run has no recording, and keeps ResultActions empty', () => {
+  it('falls back when the run has no recording, and shares a card when it has one', () => {
     const html = renderToString(
       createElement(ResultScreen, {
         result: data({ recording: null }),
@@ -89,6 +89,20 @@ describe('ResultScreen', () => {
       }),
     );
     expect(html).toContain('Replay unavailable');
-    expect(renderToString(createElement(ResultActions))).toBe('');
+    // Nothing to link or draw: the share row is present but inert.
+    expect(html).toContain('Save card (PNG)');
+    expect(html).toContain('Link + 1200×630 card');
+  });
+
+  it('reports what the share row actually did', () => {
+    expect(
+      renderToString(createElement(ResultActions, { state: 'idle', onSaveCard: noop })),
+    ).toContain('Link + 1200×630 card');
+    expect(
+      renderToString(createElement(ResultActions, { state: 'copied', onSaveCard: noop })),
+    ).toContain('Link copied');
+    expect(
+      renderToString(createElement(ResultActions, { state: 'failed', onSaveCard: noop })),
+    ).toContain('Share failed');
   });
 });

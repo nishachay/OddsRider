@@ -1,7 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { starsFor } from '../game/score';
 import { PlaybackCursor } from '../game/replay';
 import { BIKE } from '../game/constants';
+import {
+  downloadBlob,
+  shareCardBlob,
+  shareRun,
+  shareUrlFor,
+  type ShareState,
+} from '../utils/shareRun';
 import type { SharePayload } from '@oddsrider/core';
 import type { Difficulty } from '../data/tracks';
 import type { MarketBest } from '../data/playerStorage';
@@ -184,9 +191,37 @@ function ResultReplay({ recording, finished }: { recording: SharePayload; finish
   );
 }
 
-/** Placeholder for the share row; the sharing task fills it in. */
-export function ResultActions(): null {
-  return null;
+/** Share row: how the last link share went, plus the card download. */
+export function ResultActions({
+  state,
+  onSaveCard,
+  disabled = false,
+}: {
+  state: ShareState;
+  onSaveCard: () => void;
+  /** True when the run has no snapshots, so there is no link or card. */
+  disabled?: boolean;
+}) {
+  const status =
+    state === 'shared' ? 'Shared' : state === 'copied' ? 'Link copied' : state === 'failed' ? 'Share failed' : '';
+  const statusColor = state === 'failed' ? 'text-crimson' : 'text-toxic';
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border border-line bg-bg/40 px-3 py-2.5">
+      <span
+        aria-live="polite"
+        className={`font-mono text-[9px] font-bold tracking-[0.18em] uppercase ${statusColor}`}
+      >
+        {status || 'Link + 1200×630 card'}
+      </span>
+      <button
+        onClick={onSaveCard}
+        disabled={disabled}
+        className="cursor-pointer border border-line px-3 py-2 font-mono text-[10px] font-bold tracking-[0.14em] text-ink uppercase transition-all hover:border-toxic/60 hover:text-toxic active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Save card (PNG)
+      </button>
+    </div>
+  );
 }
 
 // Full result screen: what happened, where on the curve, the score, the last
@@ -210,6 +245,36 @@ export default function ResultScreen({ result, onRetry, onShare, onNextTrack }: 
     ? `Finished · ${formatTime(result.timeMs)}`
     : `Crashed at ${Math.round(result.progress * 100)}%${result.crashDate ? ` · ${result.crashDate}` : ''}`;
   const stars = starsFor(result.score, result.difficulty);
+
+  // The share link carries the whole recording; the card carries its frames.
+  const [shareState, setShareState] = useState<ShareState>('idle');
+  const cardInput = useMemo(() => {
+    if (!result.recording || result.recording.frames.length === 0) return null;
+    try {
+      return { payload: result.recording, question: result.question, url: shareUrlFor(result.recording) };
+    } catch {
+      return null;
+    }
+  }, [result.recording, result.question]);
+
+  const handleShare = useCallback(async () => {
+    if (!cardInput) {
+      onShare();
+      return;
+    }
+    const card = await shareCardBlob(cardInput);
+    setShareState(await shareRun({ ...cardInput, card }));
+    onShare();
+  }, [cardInput, onShare]);
+
+  const handleSaveCard = useCallback(async () => {
+    if (!cardInput) return;
+    const card = await shareCardBlob(cardInput);
+    if (card) downloadBlob(card, 'oddsrider-run.png');
+  }, [cardInput]);
+
+  const shareLabel =
+    shareState === 'shared' ? 'Shared' : shareState === 'copied' ? 'Link copied' : shareState === 'failed' ? 'Share failed' : 'Share';
 
   return (
     <div
@@ -270,7 +335,7 @@ export default function ResultScreen({ result, onRetry, onShare, onNextTrack }: 
           </div>
         )}
 
-        <ResultActions />
+        <ResultActions state={shareState} onSaveCard={handleSaveCard} disabled={!cardInput} />
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
@@ -284,10 +349,11 @@ export default function ResultScreen({ result, onRetry, onShare, onNextTrack }: 
             Retry · R
           </button>
           <button
-            onClick={onShare}
-            className="min-h-[52px] flex-1 cursor-pointer border border-line bg-transparent py-3.5 font-mono text-xs font-bold tracking-[0.16em] text-ink uppercase transition-all hover:border-toxic/60 hover:text-toxic active:scale-[0.99]"
+            onClick={handleShare}
+            disabled={!cardInput}
+            className="min-h-[52px] flex-1 cursor-pointer border border-line bg-transparent py-3.5 font-mono text-xs font-bold tracking-[0.16em] text-ink uppercase transition-all hover:border-toxic/60 hover:text-toxic active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Share
+            {shareLabel}
           </button>
           {onNextTrack && (
             <button
