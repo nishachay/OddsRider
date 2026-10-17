@@ -13,9 +13,16 @@ import type { Terrain } from '../terrain';
 import { TrackRenderer } from '../track/TrackRenderer';
 import { RideScore } from '../score';
 import { FinishCelebration } from '../finish';
+import { GhostRenderer } from '../ghost';
+import { RunRecorder, type RecordedPose, type RunResult } from '../replay';
+import type { GhostSnapshot, SharePayload } from '@oddsrider/core';
 
 const MONO = 'Geist Mono, monospace';
 const SEGMENT_THICKNESS = 26;
+/** Ghost keyframe cadence (ms of score time): 20 Hz, like the recorder. */
+const GHOST_SAMPLE_MS = 50;
+/** Physics steps per second of score time. */
+const STEPS_PER_SECOND = 1000 / STEP_MS;
 
 interface Gate {
   img: Phaser.GameObjects.Image;
@@ -58,6 +65,19 @@ export class RideScene extends Phaser.Scene {
   private score = new RideScore();
   private parked = false;
 
+  // Ghosts (read-only): the scene samples body poses while a run is alive and
+  // draws the player's saved best as a translucent, physics-free rider. No
+  // physics, tuning or stepping is touched — recording only reads poses.
+  private ghost: GhostRenderer | null = null;
+  private recorder: RunRecorder | null = null;
+  private lastGhostSampleMs = -1;
+  private rideMeta: {
+    trackId: string;
+    trackHash: string;
+    inverted: boolean;
+    interval: 'ALL' | '24H' | '7D';
+  } | null = null;
+
   // Trick detection state (angle in radians, positive = nose down)
   private trickAirMs = 0;
   private wheelieMs = 0;
@@ -88,12 +108,16 @@ export class RideScene extends Phaser.Scene {
 
     this.bike = new Bike(this, WORLD.spawnX + 450, WORLD.groundTopY - WORLD.spawnDy);
     this.bikeRenderer = new BikeRenderer(this);
+    this.ghost = new GhostRenderer(this);
     this.inputMgr = new InputManager();
 
     // Store handle so we can remove it on shutdown — prevents duplicate listeners on hot reload
     if (this.offRestart) this.offRestart();
     this.offRestart = bus.on(EV.RESTART, () => this.doReset(true));
     const offLoadMarket = bus.on<Ride>(EV.LOAD_MARKET, (ride) => this.applyRide(ride));
+    const offGhost = bus.on<{ snapshots: GhostSnapshot[] | null }>(EV.GHOST_SET, ({ snapshots }) =>
+      this.ghost?.setSnapshots(snapshots),
+    );
     // Detach on shutdown AND destroy: game.destroy() tears down systems
     // via destroy (not shutdown), so shutdown-only cleanup leaks bus and
     // input listeners into the next mounted game. Detach is idempotent.
@@ -101,6 +125,9 @@ export class RideScene extends Phaser.Scene {
       this.inputMgr.destroy();
       if (this.offRestart) { this.offRestart(); this.offRestart = null; }
       offLoadMarket();
+      offGhost();
+      this.ghost?.destroy();
+      this.ghost = null;
     };
     this.events.once('shutdown', detach);
     this.events.once('destroy', detach);
@@ -145,6 +172,14 @@ export class RideScene extends Phaser.Scene {
       currentProb: ride.market.currentProb,
       probDelta: ride.market.probDelta,
     });
+    this.rideMeta = {
+      trackId: ride.market.id,
+      trackHash: ride.market.trackHash,
+      inverted: ride.inverted === true,
+      interval: ride.interval ?? 'ALL',
+    };
+    this.recorder = null;
+    this.lastGhostSampleMs = -1;
     this.doReset(true);
     this.matter.world.resume();
   }

@@ -94,14 +94,24 @@ export function getMarketBest(marketId: string): MarketBest {
 const GHOST_KEY = 'oddsrider_ghosts_v1';
 const GHOST_TOGGLE_KEY = 'oddsrider_ghost_on';
 
+export type GhostInterval = 'ALL' | '24H' | '7D';
+
 /** A saved best run: full-fidelity snapshots for instant ghosts. */
 export interface GhostRun {
   trackId: string;
+  /** Side + window ride different terrain, so a ghost only races its own track. */
+  inverted: boolean;
+  interval: GhostInterval;
   score: number;
   timeMs: number;
   finished: boolean;
   savedAt: number;
   snapshots: Array<{ t: number; x: number; y: number; a: number }>;
+}
+
+/** Ghosts are keyed by terrain, not just market id: YES/NO and the window differ. */
+export function ghostKey(trackId: string, inverted = false, interval: GhostInterval = 'ALL'): string {
+  return `${trackId}${inverted ? ':NO' : ':YES'}:${interval}`;
 }
 
 function readGhosts(): Record<string, GhostRun> {
@@ -117,9 +127,10 @@ function readGhosts(): Record<string, GhostRun> {
 /** Save a ghost only when it beats the stored best (or none exists). */
 export function saveGhostRun(run: Omit<GhostRun, 'savedAt'>): boolean {
   const ghosts = readGhosts();
-  const prev = ghosts[run.trackId];
+  const key = ghostKey(run.trackId, run.inverted, run.interval);
+  const prev = ghosts[key];
   if (prev && prev.score >= run.score) return false;
-  ghosts[run.trackId] = { ...run, savedAt: Date.now() };
+  ghosts[key] = { ...run, savedAt: Date.now() };
   try {
     localStorage.setItem(GHOST_KEY, JSON.stringify(ghosts));
   } catch {
@@ -128,8 +139,8 @@ export function saveGhostRun(run: Omit<GhostRun, 'savedAt'>): boolean {
   return true;
 }
 
-export function getGhostRun(trackId: string): GhostRun | null {
-  return readGhosts()[trackId] ?? null;
+export function getGhostRun(trackId: string, inverted = false, interval: GhostInterval = 'ALL'): GhostRun | null {
+  return readGhosts()[ghostKey(trackId, inverted, interval)] ?? null;
 }
 
 export function ghostsEnabled(): boolean {
