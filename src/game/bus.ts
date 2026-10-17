@@ -46,6 +46,15 @@ export const EV = {
   RESTART: 'game:restart',
   GROUNDED: 'hud:grounded',
   LAND: 'hud:land',
+  // Phase 3 (additive): snapshot replays, enriched run results, ghosts.
+  // Emitted by the replay session, consumed by the React chrome and scenes.
+  RUN_RESULT: 'hud:run-result',
+  REPLAY_START: 'replay:start',
+  REPLAY_SEEK: 'replay:seek',
+  REPLAY_PAUSE: 'replay:pause',
+  REPLAY_DONE: 'replay:done',
+  REPLAY_STOP: 'replay:stop',
+  GHOST_SET: 'ghost:set',
   LOAD_MARKET: 'game:load-market',
   OPEN_LOBBY: 'game:open-lobby',
 } as const;

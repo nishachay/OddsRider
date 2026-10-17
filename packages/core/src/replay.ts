@@ -1,32 +1,37 @@
 /**
  * Snapshot replay codec — pure, no framework, no network.
  *
- * Runs are recorded as body poses sampled at 20 Hz plus trick events, and
- * played back by interpolation. No physics runs during replay, so playback
- * is exact by construction and seeking is O(1).
+ * A run is recorded as body poses sampled at 20 Hz plus trick events, and
+ * played back by interpolating between snapshots. No physics runs during
+ * playback, so a replay is exact by construction and seeking is O(1).
  *
- * Two densities:
- *   - local (ghosts, crash loops): full precision, 20 Hz, kept in memory
- *     or localStorage.
- *   - share (URL): downsampled to 10 Hz, quantized (0.5 px, ~0.5 deg),
- *     delta-encoded, base64url. Capped so links stay short: if the encoded
- *     link would pass ~8 KB, only the last 30 seconds travel, flagged.
- *
- * Wire layout (all integers little-endian, zigzag for signed):
- *   u8 version (=2)
- *   u8 flags: bit0 inverted, bits1-2 interval (0=ALL,1=24H,2=7D),
- *             bit3 outcome (0=crash,1=finish), bit4 truncated
- *   u8 trackIdLen, trackIdLen bytes ASCII
- *   u8[8] trackHash prefix (first 8 bytes of sha256)
- *   varint beginStep, varint endStep, u16 progressHundredths,
+ * Wire format (body before deflate, all integers little-endian, zigzag signed):
+ *   u8  version (= 3)
+ *   u8  flags: bit0 inverted, bits1-2 interval (0=ALL,1=24H,2=7D),
+ *              bit3 outcome (0=crash,1=finish), bit4 truncated
+ *   u8  trackIdLen, trackIdLen ASCII bytes
+ *   u8[8] track hash prefix
+ *   varint beginStep+1, varint endStep, u16 progressHundredths,
  *   varint finalScore, varint finalTimeMs,
  *   varint frameCount, frames...,
  *   varint trickCount, tricks... ([stepDelta, code, points])
  *
- * Frame: varint stepDelta, 9 zigzag deltas (cx,cy,ca,rx,ry,ra,fx,fy,fa),
- * u8 bodyFlags (bit0 = ejected), optional 3 zigzag deltas (gx,gy,ga).
+ * Frame: varint stepDelta, 9 zigzag varint deltas (cx,cy,ca,rx,ry,ra,fx,fy,fa),
+ * u8 bodyFlags (bit0 = ejected), optional 3 zigzag varint ragdoll deltas.
+ *
+ * Positions are quantized to 0.5 px, angles to 1/256 rad. The body is deflated
+ * (fflate) and framed as u16-LE deflated length + deflated bytes + u16
+ * CRC16-CCITT over those bytes, then base64url-encoded for URLs. The explicit
+ * length matters: inflate silently ignores trailing junk, and a trailing zero
+ * byte is invisible to the checksum (CRC residue is 0), so without it a link
+ * could gain junk and still verify. 20 Hz recordings are downsampled to
+ * `SHARE_HZ` before encoding so a 60-second run stays well under 8 KB; local
+ * ghosts keep the full 20 Hz. Longer runs keep the tail, shaved in halves until
+ * the link fits `MAX_LINK_LENGTH`.
  */
-export const REPLAY_VERSION = 2;
+import { deflateSync, inflateSync } from 'fflate';
+
+export const REPLAY_VERSION = 3;
 
 /** Trick codes for the replay event list (fixed set, no free text). */
 export const TRICK_CODES = {
@@ -51,7 +56,7 @@ export interface BodyFrame {
   /** front hub x, y, angle */
   f: [number, number, number];
   ejected: boolean;
-  /** ragdoll x, y, angle (only when ejected) */
+  /** ragdoll (rider after a crash) x, y, angle, only when ejected */
   g?: [number, number, number];
 }
 
@@ -91,21 +96,31 @@ export interface GhostSnapshot {
   a: number;
 }
 
-const INTERVAL_BITS: Record<SharePayload['interval'], number> = { ALL: 0, '24H': 1, '7D': 2 };
+const INTERVAL_BITS: Record<RunMeta['interval'], number> = { ALL: 0, '24H': 1, '7D': 2 };
 const BITS_INTERVAL = ['ALL', '24H', '7D'] as const;
 
 /** Links stay short enough to paste anywhere; longer runs travel truncated. */
 export const MAX_LINK_LENGTH = 8192;
-/** Share density and cap (10 Hz, last 30 s). */
-export const SHARE_HZ = 10;
+/** Seconds of the run tail kept when a link would otherwise be too long. */
 export const SHARE_KEEP_SECONDS = 30;
+/** Snapshots are recorded at 60/3 = 20 Hz. */
+export const SNAPSHOT_HZ = 20;
+/** Share links carry every Nth snapshot (1 = full 20 Hz, 2 = 10 Hz). */
+export const SHARE_DOWNSAMPLE = 2;
+
+/** Quantization steps: 0.5 px positions, 1/256 rad angles. */
+export const POSITION_QUANT = 2;
+export const ANGLE_QUANT = 256;
+
+export const MAX_TRACK_ID_LEN = 80;
+export const MAX_FRAMES = 200_000;
+export const MAX_END_STEP = 1_000_000;
 
 function writeVarint(out: number[], value: number): void {
   let v = Math.floor(value);
   if (v < 0) throw new Error(`varint cannot be negative: ${value}`);
   do {
     let b = v & 0x7f;
-    v >>>= 0;
     v = Math.floor(v / 128);
     if (v > 0) b |= 0x80;
     out.push(b);
@@ -123,6 +138,11 @@ function readVarint(bytes: Uint8Array, pos: { i: number }): number {
     if ((b & 0x80) === 0) return result;
   }
   throw new Error('varint too long');
+}
+
+function readByte(bytes: Uint8Array, pos: { i: number }): number {
+  if (pos.i >= bytes.length) throw new Error('truncated payload');
+  return bytes[pos.i++];
 }
 
 const zigzagEncode = (n: number): number => (n < 0 ? (-n - 1) * 2 + 1 : n * 2);
@@ -162,12 +182,8 @@ export function base64UrlDecode(text: string): Uint8Array {
   return new Uint8Array(out);
 }
 
-export const MAX_TRACK_ID_LEN = 80;
-export const MAX_FRAMES = 200_000;
-export const MAX_END_STEP = 1_000_000;
-
-/** CRC16-CCITT: every flipped character changes the payload, so tampered
- *  links fail loudly instead of decoding to a wrong-but-valid run. */
+/** CRC16-CCITT: a flipped character changes the checksum, so tampered links
+ *  fail loudly instead of decoding to a wrong-but-valid run. */
 export function crc16(bytes: Uint8Array): number {
   let crc = 0xffff;
   for (const b of bytes) {
@@ -179,25 +195,26 @@ export function crc16(bytes: Uint8Array): number {
   return crc;
 }
 
-function encodeFrames(frames: BodyFrame[], quantize: number, angleQuantize: number): number[] {
+function encodeFrames(frames: BodyFrame[]): number[] {
   const out: number[] = [];
   let prevStep = 0;
   let first = true;
   const prev = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   let prevRagdoll = [0, 0, 0];
   for (const frame of frames) {
+    if (!Number.isInteger(frame.step) || frame.step < prevStep) throw new Error('frame steps must be non-decreasing');
     writeVarint(out, frame.step - prevStep);
     prevStep = frame.step;
     const q = [
-      Math.round(frame.c[0] * quantize),
-      Math.round(frame.c[1] * quantize),
-      Math.round(frame.c[2] * angleQuantize),
-      Math.round(frame.r[0] * quantize),
-      Math.round(frame.r[1] * quantize),
-      Math.round(frame.r[2] * angleQuantize),
-      Math.round(frame.f[0] * quantize),
-      Math.round(frame.f[1] * quantize),
-      Math.round(frame.f[2] * angleQuantize),
+      Math.round(frame.c[0] * POSITION_QUANT),
+      Math.round(frame.c[1] * POSITION_QUANT),
+      Math.round(frame.c[2] * ANGLE_QUANT),
+      Math.round(frame.r[0] * POSITION_QUANT),
+      Math.round(frame.r[1] * POSITION_QUANT),
+      Math.round(frame.r[2] * ANGLE_QUANT),
+      Math.round(frame.f[0] * POSITION_QUANT),
+      Math.round(frame.f[1] * POSITION_QUANT),
+      Math.round(frame.f[2] * ANGLE_QUANT),
     ];
     for (let i = 0; i < 9; i++) {
       writeVarint(out, zigzagEncode(first ? q[i] : q[i] - prev[i]));
@@ -207,25 +224,22 @@ function encodeFrames(frames: BodyFrame[], quantize: number, angleQuantize: numb
     out.push(frame.ejected ? 1 : 0);
     if (frame.ejected && frame.g) {
       const g = [
-        Math.round(frame.g[0] * quantize),
-        Math.round(frame.g[1] * quantize),
-        Math.round(frame.g[2] * angleQuantize),
+        Math.round(frame.g[0] * POSITION_QUANT),
+        Math.round(frame.g[1] * POSITION_QUANT),
+        Math.round(frame.g[2] * ANGLE_QUANT),
       ];
       for (let i = 0; i < 3; i++) {
         writeVarint(out, zigzagEncode(g[i] - prevRagdoll[i]));
         prevRagdoll[i] = g[i];
       }
     } else {
-      prevRagdoll = frame.ejected ? prevRagdoll : [0, 0, 0];
+      prevRagdoll = [0, 0, 0];
     }
   }
   return out;
 }
 
 function decodeFrames(bytes: Uint8Array, pos: { i: number }, count: number): BodyFrame[] {
-  // Share payloads are quantized (0.5 px, ~0.5 deg); see POSITION_QUANT etc.
-  const quantize = 2;
-  const angleQuantize = (180 / Math.PI) * 2;
   const frames: BodyFrame[] = [];
   let step = 0;
   const prev = [0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -234,12 +248,11 @@ function decodeFrames(bytes: Uint8Array, pos: { i: number }, count: number): Bod
     step += readVarint(bytes, pos);
     const q: number[] = [];
     for (let i = 0; i < 9; i++) {
-      const absolute = n === 0;
       const value = zigzagDecode(readVarint(bytes, pos));
-      prev[i] = absolute ? value : prev[i] + value;
+      prev[i] = n === 0 ? value : prev[i] + value;
       q.push(prev[i]);
     }
-    const ejected = readVar(bytes, pos) !== 0;
+    const ejected = readByte(bytes, pos) !== 0;
     let g: [number, number, number] | undefined;
     if (ejected) {
       const gv: number[] = [];
@@ -247,13 +260,15 @@ function decodeFrames(bytes: Uint8Array, pos: { i: number }, count: number): Bod
         prevRagdoll[i] += zigzagDecode(readVarint(bytes, pos));
         gv.push(prevRagdoll[i]);
       }
-      g = [gv[0] / quantize, gv[1] / quantize, gv[2] / angleQuantize];
+      g = [gv[0] / POSITION_QUANT, gv[1] / POSITION_QUANT, gv[2] / ANGLE_QUANT];
+    } else {
+      prevRagdoll = [0, 0, 0];
     }
     frames.push({
       step,
-      c: [q[0] / quantize, q[1] / quantize, q[2] / angleQuantize],
-      r: [q[3] / quantize, q[4] / quantize, q[5] / angleQuantize],
-      f: [q[6] / quantize, q[7] / quantize, q[8] / angleQuantize],
+      c: [q[0] / POSITION_QUANT, q[1] / POSITION_QUANT, q[2] / ANGLE_QUANT],
+      r: [q[3] / POSITION_QUANT, q[4] / POSITION_QUANT, q[5] / ANGLE_QUANT],
+      f: [q[6] / POSITION_QUANT, q[7] / POSITION_QUANT, q[8] / ANGLE_QUANT],
       ejected,
       g,
     });
@@ -261,19 +276,17 @@ function decodeFrames(bytes: Uint8Array, pos: { i: number }, count: number): Bod
   return frames;
 }
 
-function readVar(bytes: Uint8Array, pos: { i: number }): number {
-  if (pos.i >= bytes.length) throw new Error('truncated payload');
-  return bytes[pos.i++];
-}
-
-/** Quantization steps: 0.5 px positions, ~0.5 deg angles. */
-export const POSITION_QUANT = 2;
-export const ANGLE_QUANT = (180 / Math.PI) * 2;
-
-function buildPayload(meta: RunMeta, frames: BodyFrame[], tricks: TrickEvent[], truncated: boolean): number[] {
+function writeBody(meta: RunMeta, frames: BodyFrame[], tricks: TrickEvent[], truncated: boolean): Uint8Array {
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(meta.trackId)) throw new Error('bad track id');
   if (meta.trackId.length > MAX_TRACK_ID_LEN) throw new Error('track id too long');
   if (!/^[0-9a-f]{16}$/.test(meta.trackHashPrefix)) throw new Error('bad hash prefix');
+  if (!Number.isInteger(meta.beginStep) || meta.beginStep < -1) throw new Error('bad begin step');
+  if (!Number.isInteger(meta.endStep) || meta.endStep <= 0 || meta.endStep > MAX_END_STEP) {
+    throw new Error('bad end step');
+  }
+  if (frames.length === 0 || frames.length > MAX_FRAMES) throw new Error('bad frame count');
+  if (tricks.length > 10_000) throw new Error('too many tricks');
+
   const out: number[] = [REPLAY_VERSION];
   out.push(
     (meta.inverted ? 1 : 0) |
@@ -283,119 +296,74 @@ function buildPayload(meta: RunMeta, frames: BodyFrame[], tricks: TrickEvent[], 
   );
   const idBytes = [...meta.trackId].map((ch) => ch.charCodeAt(0));
   out.push(idBytes.length, ...idBytes);
-  for (let i = 0; i < 16; i += 2) {
-    out.push(parseInt(meta.trackHashPrefix.slice(i, i + 2), 16));
-  }
-  if (!Number.isInteger(meta.beginStep) || meta.beginStep < -1) throw new Error('bad begin step');
+  for (let i = 0; i < 16; i += 2) out.push(parseInt(meta.trackHashPrefix.slice(i, i + 2), 16));
   writeVarint(out, meta.beginStep + 1);
-  if (!Number.isInteger(meta.endStep) || meta.endStep <= 0 || meta.endStep > MAX_END_STEP) {
-    throw new Error('bad end step');
-  }
   writeVarint(out, meta.endStep);
   const progress = Math.min(1, Math.max(0, meta.progress));
-  out.push((progress * 65535) & 0xff, ((progress * 65535) >> 8) & 0xff);
+  const progressRaw = Math.round(progress * 65535);
+  out.push(progressRaw & 0xff, (progressRaw >> 8) & 0xff);
   writeVarint(out, Math.max(0, Math.floor(meta.finalScore)));
   writeVarint(out, Math.max(0, Math.floor(meta.finalTimeMs)));
-  if (frames.length === 0 || frames.length > MAX_FRAMES) throw new Error('bad frame count');
   writeVarint(out, frames.length);
-  out.push(...encodeFrames(frames, POSITION_QUANT, ANGLE_QUANT));
-  if (tricks.length > 10_000) throw new Error('too many tricks');
+  out.push(...encodeFrames(frames));
   writeVarint(out, tricks.length);
   let prevTrickStep = 0;
   for (const trick of tricks) {
+    if (trick.step < prevTrickStep) throw new Error('trick steps must be non-decreasing');
     writeVarint(out, trick.step - prevTrickStep);
     prevTrickStep = trick.step;
     if (!Number.isInteger(trick.code) || trick.code < 1 || trick.code > 127) throw new Error('bad trick code');
     out.push(trick.code);
     writeVarint(out, Math.max(0, Math.floor(trick.points)));
   }
-  return out;
+  return new Uint8Array(out);
 }
 
-/**
- * Encode a share link. Long runs travel downsampled to 10 Hz, and past ~8 KB
- * only the last 30 seconds travel (flagged, so the UI says so).
- */
-export function encodeShareLink(meta: RunMeta, frames: BodyFrame[], tricks: TrickEvent[]): string {
-  if (frames.length === 0) throw new Error('no frames to share');
-  const downsampled = frames.filter((_, i) => i % 2 === 0);
-  const use = downsampled.length > 0 ? downsampled : frames;
-  const pack = (list: BodyFrame[], flag: boolean): string => {
-    const body = buildPayload(meta, list, tricksIn(list, tricks), flag);
-    const check = crc16(new Uint8Array(body));
-    body.push((check >> 8) & 0xff, check & 0xff);
-    return base64UrlEncode(new Uint8Array(body));
-  };
-  let link = pack(use, false);
-  if (link.length > MAX_LINK_LENGTH) {
-    const keep = use.slice(-SHARE_HZ * SHARE_KEEP_SECONDS);
-    if (keep.length === 0) throw new Error('run too short to share');
-    link = pack(keep, true);
-  }
-  return link;
-}
-
-function tricksIn(frames: BodyFrame[], tricks: TrickEvent[]): TrickEvent[] {
-  if (frames.length === 0) return [];
-  const from = frames[0].step;
-  return tricks.filter((t) => t.step >= from);
-}
-
-export interface DecodedShareLink {
+export interface DecodedReplay {
   meta: RunMeta;
   truncated: boolean;
   frames: BodyFrame[];
   tricks: TrickEvent[];
-  encodedLength: number;
 }
 
-export function decodeShareLink(link: string): DecodedShareLink {
-  if (link.length === 0 || link.length > MAX_LINK_LENGTH * 2) throw new Error('bad link length');
-  const bytes = base64UrlDecode(link);
+function readBody(body: Uint8Array): DecodedReplay {
+  if (body.length < 4) throw new Error('replay too short');
   const pos = { i: 0 };
-  const need = (n: number): Uint8Array => {
-    if (pos.i + n > bytes.length) throw new Error('truncated payload');
-    return bytes.slice(pos.i, (pos.i += n));
-  };
-  if (need(1)[0] !== REPLAY_VERSION) throw new Error('unsupported replay version');
-  const flags = need(1)[0];
+  if (readByte(body, pos) !== REPLAY_VERSION) throw new Error('unsupported replay version');
+  const flags = readByte(body, pos);
   const inverted = (flags & 1) !== 0;
   const interval = BITS_INTERVAL[(flags >> 1) & 3];
   if (!interval) throw new Error('bad interval bits');
   const outcome = (flags & 8) !== 0 ? 'finish' : 'crash';
   const truncated = (flags & 16) !== 0;
-  const idLen = need(1)[0];
+  const idLen = readByte(body, pos);
   if (idLen === 0 || idLen > MAX_TRACK_ID_LEN) throw new Error('bad track id');
-  const trackId = String.fromCharCode(...need(idLen));
+  let trackId = '';
+  for (let i = 0; i < idLen; i++) trackId += String.fromCharCode(readByte(body, pos));
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(trackId)) throw new Error('bad track id');
-  const trackHashPrefix = [...need(8)].map((b) => b.toString(16).padStart(2, '0')).join('');
-  const beginStep = readVarint(bytes, pos) - 1;
+  let trackHashPrefix = '';
+  for (let i = 0; i < 8; i++) trackHashPrefix += readByte(body, pos).toString(16).padStart(2, '0');
+  const beginStep = readVarint(body, pos) - 1;
   if (beginStep < -1) throw new Error('bad begin step');
-  const endStep = readVarint(bytes, pos);
+  const endStep = readVarint(body, pos);
   if (endStep <= 0 || endStep > MAX_END_STEP) throw new Error('bad end step');
-  const progressRaw = need(1)[0] | (need(1)[0] << 8);
-  const finalScore = readVarint(bytes, pos);
-  const finalTimeMs = readVarint(bytes, pos);
-  const frameCount = readVarint(bytes, pos);
+  const progressRaw = readByte(body, pos) | (readByte(body, pos) << 8);
+  const finalScore = readVarint(body, pos);
+  const finalTimeMs = readVarint(body, pos);
+  const frameCount = readVarint(body, pos);
   if (frameCount === 0 || frameCount > MAX_FRAMES) throw new Error('bad frame count');
-  const frames = decodeFrames(bytes, pos, frameCount);
-  const trickCount = readVarint(bytes, pos);
+  const frames = decodeFrames(body, pos, frameCount);
+  const trickCount = readVarint(body, pos);
   if (trickCount > 10_000) throw new Error('bad trick count');
   const tricks: TrickEvent[] = [];
   let trickStep = 0;
   for (let n = 0; n < trickCount; n++) {
-    trickStep += readVarint(bytes, pos);
-    const code = readVar(bytes, pos);
+    trickStep += readVarint(body, pos);
+    const code = readByte(body, pos);
     if (code < 1 || code > 127) throw new Error('bad trick code');
-    tricks.push({ step: trickStep, code, points: readVarint(bytes, pos) });
+    tricks.push({ step: trickStep, code, points: readVarint(body, pos) });
   }
-  if (pos.i !== bytes.length - 2) throw new Error('trailing bytes');
-  const checkHi = bytes[pos.i++];
-  const checkLo = bytes[pos.i++];
-  const actual = crc16(bytes.slice(0, bytes.length - 2));
-  if (((actual >> 8) & 0xff) !== checkHi || (actual & 0xff) !== checkLo) {
-    throw new Error('checksum mismatch: link is corrupt or tampered');
-  }
+  if (pos.i !== body.length) throw new Error('trailing bytes');
   return {
     meta: {
       trackId,
@@ -412,23 +380,101 @@ export function decodeShareLink(link: string): DecodedShareLink {
     truncated,
     frames,
     tricks,
-    encodedLength: link.length,
   };
 }
 
-/** Interpolated full-body pose at a step (holds ends outside the range). */
+function downsample(frames: BodyFrame[], every: number): BodyFrame[] {
+  if (every <= 1) return frames;
+  const out = frames.filter((_, i) => i % every === 0);
+  return out.length > 0 ? out : frames;
+}
+
+/**
+ * Encode a compact share link: snapshots downsampled, deflated, base64url.
+ * Past ~8 KB only the run tail travels, flagged so the UI says so.
+ */
+export function encodeShareLink(meta: RunMeta, frames: BodyFrame[], tricks: TrickEvent[]): string {
+  if (frames.length === 0) throw new Error('no frames to share');
+  const pack = (list: BodyFrame[], flag: boolean): string => {
+    const from = list[0].step;
+    const body = writeBody(
+      meta,
+      list,
+      tricks.filter((t) => t.step >= from),
+      flag,
+    );
+    const deflated = deflateSync(body);
+    const check = crc16(deflated);
+    const bytes = new Uint8Array(deflated.length + 4);
+    bytes[0] = deflated.length & 0xff;
+    bytes[1] = (deflated.length >> 8) & 0xff;
+    bytes.set(deflated, 2);
+    bytes[deflated.length + 2] = (check >> 8) & 0xff;
+    bytes[deflated.length + 3] = check & 0xff;
+    return base64UrlEncode(bytes);
+  };
+  const dense = downsample(frames, SHARE_DOWNSAMPLE);
+  const full = pack(dense, false);
+  if (full.length <= MAX_LINK_LENGTH) return full;
+  // Over the cap: keep roughly the last SHARE_KEEP_SECONDS of run time, shaving
+  // the head in halves until the link fits.
+  let keep = dense.slice(-Math.max(2, Math.floor((SHARE_KEEP_SECONDS * SNAPSHOT_HZ) / SHARE_DOWNSAMPLE)));
+  let link = pack(keep, true);
+  while (link.length > MAX_LINK_LENGTH && keep.length > 16) {
+    keep = keep.slice(Math.ceil(keep.length / 2));
+    link = pack(keep, true);
+  }
+  if (link.length > MAX_LINK_LENGTH) throw new Error('run too long to share');
+  return link;
+}
+
+export interface DecodedShareLink extends DecodedReplay {
+  encodedLength: number;
+}
+
+export function decodeShareLink(link: string): DecodedShareLink {
+  if (link.length === 0 || link.length > MAX_LINK_LENGTH * 2) throw new Error('bad link length');
+  const bytes = base64UrlDecode(link);
+  if (bytes.length < 5) throw new Error('replay too short');
+  const length = bytes[0] | (bytes[1] << 8);
+  if (bytes.length !== length + 4) throw new Error('bad link length: corrupt or tampered');
+  const deflated = bytes.subarray(2, 2 + length);
+  const check = (bytes[length + 2] << 8) | bytes[length + 3];
+  if (crc16(deflated) !== check) throw new Error('checksum mismatch: link is corrupt or tampered');
+  return { ...readBody(inflateSync(deflated)), encodedLength: link.length };
+}
+
+/** Interpolated full-body pose at a step (holds the ends outside the range). */
 export function poseAtStep(
   frames: BodyFrame[],
   step: number,
-): { c: [number, number, number]; r: [number, number, number]; f: [number, number, number]; ejected: boolean; g: [number, number, number] | null } | null {
+): {
+  c: [number, number, number];
+  r: [number, number, number];
+  f: [number, number, number];
+  ejected: boolean;
+  g: [number, number, number] | null;
+} | null {
   if (frames.length === 0) return null;
-  if (step <= frames[0].step) {
-    const f = frames[0];
-    return { c: [...f.c] as [number, number, number], r: [...f.r] as [number, number, number], f: [...f.f] as [number, number, number], ejected: f.ejected, g: f.g ? ([...f.g] as [number, number, number]) : null };
+  const first = frames[0];
+  if (step <= first.step) {
+    return {
+      c: [...first.c] as [number, number, number],
+      r: [...first.r] as [number, number, number],
+      f: [...first.f] as [number, number, number],
+      ejected: first.ejected,
+      g: first.g ? ([...first.g] as [number, number, number]) : null,
+    };
   }
   const last = frames[frames.length - 1];
   if (step >= last.step) {
-    return { c: [...last.c] as [number, number, number], r: [...last.r] as [number, number, number], f: [...last.f] as [number, number, number], ejected: last.ejected, g: last.g ? ([...last.g] as [number, number, number]) : null };
+    return {
+      c: [...last.c] as [number, number, number],
+      r: [...last.r] as [number, number, number],
+      f: [...last.f] as [number, number, number],
+      ejected: last.ejected,
+      g: last.g ? ([...last.g] as [number, number, number]) : null,
+    };
   }
   let lo = 0;
   let hi = frames.length - 1;
