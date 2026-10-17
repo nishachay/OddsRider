@@ -29,12 +29,6 @@ class AudioEngine {
   private gain: GainNode | null = null;
   private muted = loadMuted();
   private offs: Array<() => void> = [];
-  /** While a replay drives the scene, the game stays silent. */
-  private replaying = false;
-
-  setReplaying(replaying: boolean): void {
-    this.replaying = replaying;
-  }
 
   start(): void {
     if (this.ctx) return;
@@ -75,14 +69,14 @@ class AudioEngine {
   }
 
   private onSpeed(s: number): void {
-    if (!this.ctx || !this.osc || !this.gain || this.muted || this.replaying) return;
+    if (!this.ctx || !this.osc || !this.gain || this.muted) return;
     const t = this.ctx.currentTime;
     this.osc.frequency.setTargetAtTime(52 + Math.min(Math.abs(s) / 9, 95), t, 0.08);
     this.gain.gain.setTargetAtTime(0.02 + Math.min(Math.abs(s) / 40000, 0.025), t, 0.1);
   }
 
   private thud(peak: number, fromHz: number, toHz: number): void {
-    if (!this.ctx || this.muted || this.replaying) return;
+    if (!this.ctx || this.muted) return;
     const ctx = this.ctx;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
