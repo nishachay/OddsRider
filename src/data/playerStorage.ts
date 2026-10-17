@@ -91,3 +91,60 @@ export function getMarketBest(marketId: string): MarketBest {
   return stats.runsByMarket?.[marketId] ?? { plays: 0, best: 0, wins: 0, runs: [] };
 }
 
+const GHOST_KEY = 'oddsrider_ghosts_v1';
+const GHOST_TOGGLE_KEY = 'oddsrider_ghost_on';
+
+/** A saved best run: full-fidelity snapshots for instant ghosts. */
+export interface GhostRun {
+  trackId: string;
+  score: number;
+  timeMs: number;
+  finished: boolean;
+  savedAt: number;
+  snapshots: Array<{ t: number; x: number; y: number; a: number }>;
+}
+
+function readGhosts(): Record<string, GhostRun> {
+  try {
+    const raw = localStorage.getItem(GHOST_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, GhostRun>;
+  } catch {
+    // Ignore storage parse error
+  }
+  return {};
+}
+
+/** Save a ghost only when it beats the stored best (or none exists). */
+export function saveGhostRun(run: Omit<GhostRun, 'savedAt'>): boolean {
+  const ghosts = readGhosts();
+  const prev = ghosts[run.trackId];
+  if (prev && prev.score >= run.score) return false;
+  ghosts[run.trackId] = { ...run, savedAt: Date.now() };
+  try {
+    localStorage.setItem(GHOST_KEY, JSON.stringify(ghosts));
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+export function getGhostRun(trackId: string): GhostRun | null {
+  return readGhosts()[trackId] ?? null;
+}
+
+export function ghostsEnabled(): boolean {
+  try {
+    return localStorage.getItem(GHOST_TOGGLE_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function setGhostsEnabled(on: boolean): void {
+  try {
+    localStorage.setItem(GHOST_TOGGLE_KEY, on ? '1' : '0');
+  } catch {
+    // Ignore quota errors
+  }
+}
+

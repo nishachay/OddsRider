@@ -10,6 +10,19 @@ export class BikeRenderer {
   private wheelFrontSprite: Phaser.GameObjects.Image;
   private riderSprite: Phaser.GameObjects.Image;
   private ragdollSprite: Phaser.GameObjects.Image;
+  private hidden = false;
+
+  /** Hide the live bike while a replay renders recorded poses instead. */
+  setHidden(hidden: boolean): void {
+    this.hidden = hidden;
+    if (hidden) {
+      this.bikeSprite.setVisible(false);
+      this.wheelBackSprite.setVisible(false);
+      this.wheelFrontSprite.setVisible(false);
+      this.riderSprite.setVisible(false);
+      this.ragdollSprite.setVisible(false);
+    }
+  }
   public cyberEffects: CyberEffects;
 
   constructor(scene: Phaser.Scene) {
@@ -45,6 +58,10 @@ export class BikeRenderer {
   }
 
   render(bike: Bike): void {
+    if (this.hidden) return;
+    this.bikeSprite.setVisible(true);
+    this.wheelBackSprite.setVisible(true);
+    this.wheelFrontSprite.setVisible(true);
     const rearWheel = bike.rearWheel;
     const frontWheel = bike.frontWheel;
     const chassis = bike.chassis;
