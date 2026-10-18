@@ -5,6 +5,7 @@ import TitleScreen from './pages/TitleScreen';
 import TracksPage from './pages/TracksPage';
 import DailyPage from './pages/DailyPage';
 import RidePage from './pages/RidePage';
+import ReplayPage from './pages/ReplayPage';
 import AboutPage from './pages/AboutPage';
 
 function ScrollToTop() {
@@ -26,6 +27,7 @@ export default function App() {
             <Route path="/tracks" element={<TracksPage />} />
             <Route path="/daily" element={<DailyPage />} />
             <Route path="/ride/:marketId" element={<RidePage />} />
+            <Route path="/r/:payload" element={<ReplayPage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

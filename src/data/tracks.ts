@@ -173,17 +173,36 @@ export function rideIntervalFromParam(tf: string | null): RideInterval {
   return 'ALL';
 }
 
+/** Date label ("14 MAR") for a course progress fraction, read from the
+ *  frozen track's own timestamps — never invented. */
+export async function crashDateLabel(trackId: string, progress: number): Promise<string | null> {
+  let track: TrackV1;
+  try {
+    track = await fetchTrack(trackId);
+  } catch {
+    return null;
+  }
+  if (track.series.length === 0) return null;
+  const clamped = Math.min(1, Math.max(0, progress));
+  const point = track.series[Math.min(track.series.length - 1, Math.floor(clamped * track.series.length))];
+  const d = new Date(point.t * 1000);
+  if (Number.isNaN(d.getTime())) return null;
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  return `${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
+}
+
 /**
- * The authentic ride for a frozen track. The window is a trailing slice of
+/**
+ * The authentic ride for a frozen track id. The window is a trailing slice of
  * the frozen series — no data is invented by picking 24H or 7D.
  * Throws NO_HISTORY when the frozen series cannot make a track.
  */
-export async function fetchRideForTrack(
-  market: RideableMarket,
+export async function fetchRideFromTrackId(
+  trackId: string,
   inverted = false,
   interval: RideInterval = 'ALL',
 ): Promise<Ride> {
-  const track = await fetchTrack(market.id);
+  const track = await fetchTrack(trackId);
   let series = sliceSeries(track.series, interval);
   if (series.length < 2) {
     throw new Error(`NO_HISTORY: no rideable series in track "${track.slug}"`);
@@ -200,13 +219,28 @@ export async function fetchRideForTrack(
       currentProb: track.probability,
       probDelta: track.change24h,
       difficulty: track.difficulty,
+      id: track.id,
+      trackHash: track.hash,
     },
     series,
     inverted,
+    interval,
   };
 
   activeRideStore.current = ride;
   return ride;
+}
+
+/**
+ * The authentic ride for a frozen track view-model. Same as
+ * fetchRideFromTrackId — the view-model only carries the id.
+ */
+export async function fetchRideForTrack(
+  market: RideableMarket,
+  inverted = false,
+  interval: RideInterval = 'ALL',
+): Promise<Ride> {
+  return fetchRideFromTrackId(market.id, inverted, interval);
 }
 
 /** Default ride for the engine: first live track, else first track. Never fake. */
