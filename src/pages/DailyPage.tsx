@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import MiniTrack from '../components/MiniTrack';
+import { EmptyTracksState, FeedErrorState } from '../components/LoadStates';
 import { useMarkets } from '../data/marketsContext';
 import { getDailyChallenge, momentumUp, type RideableMarket } from '../data/tracks';
 import { getMarketBest as getBest } from '../data/playerStorage';
@@ -67,14 +68,8 @@ export default function DailyPage() {
             <span className="font-mono text-[11px] tracking-[0.3em] text-dim uppercase">Loading daily…</span>
           </div>
         ) : feedError && !pick ? (
-          <div className="border border-amber-400/40 border-l-4 border-l-amber-400 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-400 flex flex-wrap items-center justify-between gap-2">
-            <span>TRACK INDEX UNREACHABLE — CHECK YOUR CONNECTION AND RETRY.</span>
-            <button
-              onClick={reload}
-              className="shrink-0 font-bold tracking-widest hover:bg-amber-400 hover:text-bg px-2 py-1 transition-colors cursor-pointer uppercase"
-            >
-              Retry →
-            </button>
+          <div className="py-16">
+            <FeedErrorState code={feedError} onRetry={reload} />
           </div>
         ) : pick ? (
           <section className="border border-[#3a2f12] bg-[#12100a] border-l-4 border-l-amber-400 px-5 sm:px-8 py-6 flex flex-col gap-5">
@@ -111,9 +106,9 @@ export default function DailyPage() {
             </div>
           </section>
         ) : (
-          <p className="font-mono text-xs text-dim uppercase tracking-[0.18em] py-16 text-center">
-            No tracks published yet.
-          </p>
+          <div className="py-16 flex justify-center">
+            <EmptyTracksState onRetry={reload} />
+          </div>
         )}
 
         <Link

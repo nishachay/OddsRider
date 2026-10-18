@@ -1,11 +1,11 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
+import GameStage from '../components/GameStage';
+import { EmptyTracksState, FeedErrorState } from '../components/LoadStates';
 import { activeRideStore, bus, EV } from '../game/bus';
 import { useMarkets } from '../data/marketsContext';
 import { fetchRideForTrack, getTitleFeature, momentumUp, type RideableMarket } from '../data/tracks';
-
-const PhaserGame = lazy(() => import('../game/PhaserGame'));
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -16,7 +16,7 @@ function todayStr(): string {
 // itself via a held synthetic gas key — the game side is untouched.
 export default function TitleScreen() {
   const navigate = useNavigate();
-  const { markets, loading, reload } = useMarkets();
+  const { markets, loading, feedError, reload } = useMarkets();
   const featured: RideableMarket | null = useMemo(
     () => getTitleFeature(markets, todayStr()),
     [markets],
@@ -141,18 +141,7 @@ export default function TitleScreen() {
       }}
     >
       <div className="absolute inset-0">
-        <Suspense
-          fallback={
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#0a0a0b]">
-              <div className="shimmer h-[3px] w-56" />
-              <span className="font-mono text-[11px] tracking-[0.3em] text-dim uppercase">
-                Rolling out track…
-              </span>
-            </div>
-          }
-        >
-          <PhaserGame />
-        </Suspense>
+        <GameStage label="Rolling out track" />
       </div>
 
       {/* Legibility scrims */}
@@ -207,18 +196,10 @@ export default function TitleScreen() {
                 </h1>
                 {loading ? (
                   <div className="shimmer h-[3px] w-56" />
+                ) : feedError ? (
+                  <FeedErrorState code={feedError} onRetry={reload} />
                 ) : (
-                  <>
-                    <p className="font-mono text-xs text-dim uppercase tracking-[0.18em]">
-                      No tracks published yet — check back soon.
-                    </p>
-                    <button
-                      onClick={reload}
-                      className="pointer-events-auto w-fit px-6 py-3 font-mono text-xs font-bold tracking-[0.16em] uppercase border border-toxic/40 text-toxic hover:bg-toxic hover:text-bg transition-all cursor-pointer"
-                    >
-                      Retry →
-                    </button>
-                  </>
+                  <EmptyTracksState onRetry={reload} />
                 )}
               </div>
             )}

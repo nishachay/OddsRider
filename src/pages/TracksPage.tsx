@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import MiniTrack from '../components/MiniTrack';
+import { EmptyTracksState, FeedErrorState } from '../components/LoadStates';
 import { useMarkets } from '../data/marketsContext';
 import { getHomePageData, momentumUp, type RideableMarket } from '../data/tracks';
 
@@ -160,23 +161,13 @@ export default function TracksPage() {
             <span className="font-mono text-[11px] tracking-[0.3em] text-dim uppercase">Loading tracks…</span>
           </div>
         ) : feedError ? (
-          <div className="border border-amber-400/40 border-l-4 border-l-amber-400 bg-amber-400/5 px-4 py-3 font-mono text-[11px] text-amber-400 flex flex-wrap items-center justify-between gap-2">
-            <span>
-              {feedError === 'TRACKS_EMPTY'
-                ? 'NO TRACKS PUBLISHED YET — THE NEXT INGEST WILL FILL THE CARD.'
-                : 'TRACK INDEX UNREACHABLE — CHECK YOUR CONNECTION AND RETRY.'}
-            </span>
-            <button
-              onClick={reload}
-              className="shrink-0 font-bold tracking-widest hover:bg-amber-400 hover:text-bg px-2 py-1 transition-colors cursor-pointer uppercase"
-            >
-              Retry →
-            </button>
+          <div className="py-16">
+            <FeedErrorState code={feedError} onRetry={reload} />
           </div>
         ) : markets.length === 0 ? (
-          <p className="font-mono text-xs text-dim uppercase tracking-[0.18em] py-16 text-center">
-            Nothing on the card yet.
-          </p>
+          <div className="py-16 flex justify-center">
+            <EmptyTracksState onRetry={reload} />
+          </div>
         ) : (
           <>
             <Group title="Live" note="Still moving" items={data.trending} startIndex={0} />

@@ -1,16 +1,15 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import HudOverlay from '../components/HudOverlay';
 import CountdownGate from '../components/CountdownGate';
+import GameStage from '../components/GameStage';
+import { TrackStateBlock } from '../components/LoadStates';
 import { audio } from '../game/audio';
 import { bus, EV } from '../game/bus';
 import { fetchRideForTrack, rideIntervalFromParam, type RideInterval } from '../data/tracks';
 import { recordRun, saveGhostRun } from '../data/playerStorage';
 import type { RunResult } from '../game/replay';
 import { useMarket } from '../data/marketsContext';
-
-// Phaser (1.5MB) loads only here, never on home/preview.
-const PhaserGame = lazy(() => import('../game/PhaserGame'));
 
 export default function RidePage() {
   const navigate = useNavigate();
@@ -139,20 +138,21 @@ export default function RidePage() {
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-bg z-40">
-      <Suspense
-        fallback={
-          <div className="absolute inset-0 flex items-center justify-center">
-            <p className="font-mono text-xs text-dim animate-pulse">SPINNING UP PHYSICS...</p>
-          </div>
-        }
-      >
-        <PhaserGame />
-      </Suspense>
+      <GameStage label="Loading track" />
       <HudOverlay onOpenLobby={() => navigate('/')} rideUrl={rideUrl} marketId={market.id} />
       {!gateOpen && <CountdownGate onDone={openGate} short={quick} />}
       {loadError && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 font-mono text-[11px] text-crimson border border-crimson/50 bg-[#0a0a0b]/90 px-4 py-2">
-          FAILED TO LOAD TRACK DATA
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-bg/95 px-4">
+          <TrackStateBlock
+            tone="error"
+            eyebrow="Track feed"
+            headline="Track data did not load"
+            body="The frozen price series for this market could not be read, so there is no terrain to ride. Retry, or head back to the card."
+            onRetry={() => {
+              setLoadError(false);
+              setRetry((r) => r + 1);
+            }}
+          />
         </div>
       )}
     </div>

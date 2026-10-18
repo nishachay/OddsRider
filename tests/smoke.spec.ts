@@ -152,9 +152,11 @@ test('shows a clear error state when the track index is missing', async ({ page 
   );
   await page.goto('/');
 
-  // The title says plainly that nothing is published, and offers a retry.
-  await expect(page.getByText(/no tracks published yet/i)).toBeVisible();
+  // A failed load is an outage, not an empty card: the title says the feed did
+  // not load and offers a retry.
+  await expect(page.getByText(/track feed unreachable/i)).toBeVisible();
   await expect(page.getByRole('button', { name: /retry/i })).toBeVisible();
+  await expect(page.getByText(/no tracks published yet/i)).toHaveCount(0);
   // ...and no phantom race is offered anywhere.
   await expect(page.getByRole('button', { name: /enter race/i })).toHaveCount(0);
 
@@ -178,6 +180,9 @@ test('says plainly when no tracks have been published yet', async ({ page }) => 
   await page.goto('/');
 
   await expect(page.getByText(/no tracks published yet/i)).toBeVisible();
+  // The empty card must not be dressed up as a failure.
+  await expect(page.getByText(/track feed unreachable/i)).toHaveCount(0);
+  await expect(page.getByText(/you're offline/i)).toHaveCount(0);
   await expect(page.getByRole('button', { name: /enter race/i })).toHaveCount(0);
 
   assertClean(consoleErrors, pageErrors, external);
