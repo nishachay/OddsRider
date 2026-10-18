@@ -216,6 +216,11 @@ export function takePendingGhost(): GhostSnapshot[] | null {
   return snapshots;
 }
 
+/** Drop an armed ghost ("Ride this track" means a clean run, no ghost). */
+export function clearPendingGhost(): void {
+  pendingGhost = null;
+}
+
 export interface ReplayStartOptions {
   fromStep?: number;
   /** Slow motion factor (1 = normal speed). */

@@ -7,12 +7,14 @@
  * and the page is honest when that file has been pruned.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import ReplayPlayer from '../components/ReplayPlayer';
 import { fetchTrack } from '../data/tracks';
+import { getGhostRun } from '../data/playerStorage';
+import { clearPendingGhost, setPendingGhost } from '../game/replay';
 import { crashPercent, decodeRunShare, formatRunTime } from '../utils/shareRun';
-import type { SharePayload } from '@oddsrider/core';
+import { framesToGhost, type SharePayload } from '@oddsrider/core';
 
 function BrokenLink() {
   return (
@@ -41,6 +43,7 @@ function BrokenLink() {
 
 export default function ReplayPage() {
   const { payload } = useParams<{ payload: string }>();
+  const navigate = useNavigate();
   const decoded = useMemo(() => {
     try {
       return decodeRunShare(payload ?? '');
@@ -51,6 +54,9 @@ export default function ReplayPage() {
 
   const [question, setQuestion] = useState<string | null>(null);
   const [trackMissing, setTrackMissing] = useState(false);
+  // Your own best run on this exact terrain, when there is one. Read-only:
+  // nothing is invented for a terrain you have never ridden.
+  const [bestGhost, setBestGhost] = useState(false);
 
   useEffect(() => {
     if (!decoded) return;
@@ -70,6 +76,12 @@ export default function ReplayPage() {
     };
   }, [decoded]);
 
+  useEffect(() => {
+    if (!decoded) return;
+    const { trackId, inverted, interval } = decoded.meta;
+    setBestGhost(Boolean(getGhostRun(trackId, inverted, interval)));
+  }, [decoded]);
+
   if (!decoded) return <BrokenLink />;
 
   const meta = decoded.meta;
@@ -81,6 +93,18 @@ export default function ReplayPage() {
   };
   const crashed = meta.outcome !== 'finish';
   const rideTo = `/ride/${meta.trackId}?tf=${meta.interval}${meta.inverted ? '&side=no' : ''}`;
+
+  // Arm a ghost, then ride it: the scene reads the handoff before it builds
+  // the terrain, so the ghost shows up on the first frame with no bus race.
+  const raceThisRun = () => {
+    setPendingGhost(framesToGhost(decoded.frames, meta.beginStep));
+    navigate(rideTo);
+  };
+  const raceYourBest = () => {
+    const best = getGhostRun(meta.trackId, meta.inverted, meta.interval);
+    if (best) setPendingGhost(best.snapshots);
+    navigate(rideTo);
+  };
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-bg text-ink">
@@ -149,12 +173,29 @@ export default function ReplayPage() {
               Browse tracks
             </Link>
           ) : (
-            <Link
-              to={rideTo}
-              className="min-h-[52px] flex-1 border border-toxic bg-toxic px-6 py-3.5 text-center font-mono text-xs font-bold tracking-[0.16em] text-bg uppercase transition-all hover:bg-toxic/90 active:scale-[0.99]"
-            >
-              Ride this track
-            </Link>
+            <>
+              <button
+                onClick={raceThisRun}
+                className="min-h-[52px] flex-1 cursor-pointer border border-toxic bg-toxic px-6 py-3.5 font-mono text-xs font-bold tracking-[0.16em] text-bg uppercase transition-all hover:bg-toxic/90 active:scale-[0.99]"
+              >
+                Race this run
+              </button>
+              {bestGhost && (
+                <button
+                  onClick={raceYourBest}
+                  className="min-h-[52px] cursor-pointer border border-toxic/40 bg-toxic/10 px-6 py-3.5 font-mono text-xs font-bold tracking-[0.16em] text-toxic uppercase transition-all hover:bg-toxic hover:text-bg active:scale-[0.99]"
+                >
+                  Race your best
+                </button>
+              )}
+              <Link
+                to={rideTo}
+                onClick={clearPendingGhost}
+                className="min-h-[52px] px-6 py-3.5 text-center font-mono text-xs font-bold tracking-[0.16em] text-dim uppercase transition-all hover:text-ink active:scale-[0.99]"
+              >
+                Ride this track
+              </Link>
+            </>
           )}
         </div>
       </main>

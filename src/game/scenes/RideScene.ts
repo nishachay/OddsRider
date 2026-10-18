@@ -14,15 +14,11 @@ import { TrackRenderer } from '../track/TrackRenderer';
 import { RideScore } from '../score';
 import { FinishCelebration } from '../finish';
 import { GhostRenderer } from '../ghost';
-import { RunRecorder, type RecordedPose, type RunResult } from '../replay';
-import type { GhostSnapshot, SharePayload } from '@oddsrider/core';
+import { RunRecorder, SNAPSHOT_EVERY_STEPS, takePendingGhost, trickCodeFor, type RecordedPose, type RunResult } from '../replay';
+import type { GhostSnapshot } from '@oddsrider/core';
 
 const MONO = 'Geist Mono, monospace';
 const SEGMENT_THICKNESS = 26;
-/** Ghost keyframe cadence (ms of score time): 20 Hz, like the recorder. */
-const GHOST_SAMPLE_MS = 50;
-/** Physics steps per second of score time. */
-const STEPS_PER_SECOND = 1000 / STEP_MS;
 
 interface Gate {
   img: Phaser.GameObjects.Image;
@@ -70,12 +66,15 @@ export class RideScene extends Phaser.Scene {
   // physics, tuning or stepping is touched — recording only reads poses.
   private ghost: GhostRenderer | null = null;
   private recorder: RunRecorder | null = null;
-  private lastGhostSampleMs = -1;
+  /** Physics steps since the last full reset — the recorder's clock. */
+  private stepCount = 0;
   private rideMeta: {
     trackId: string;
     trackHash: string;
     inverted: boolean;
     interval: 'ALL' | '24H' | '7D';
+    /** The home-stage backdrop never records or races a ghost. */
+    attract: boolean;
   } | null = null;
 
   // Trick detection state (angle in radians, positive = nose down)
@@ -128,6 +127,7 @@ export class RideScene extends Phaser.Scene {
       offGhost();
       this.ghost?.destroy();
       this.ghost = null;
+      this.recorder = null;
     };
     this.events.once('shutdown', detach);
     this.events.once('destroy', detach);
@@ -172,15 +172,30 @@ export class RideScene extends Phaser.Scene {
       currentProb: ride.market.currentProb,
       probDelta: ride.market.probDelta,
     });
-    this.rideMeta = {
+    const attract = ride.attract === true;
+    const next = {
       trackId: ride.market.id,
       trackHash: ride.market.trackHash,
       inverted: ride.inverted === true,
       interval: ride.interval ?? 'ALL',
+      attract,
     };
-    this.recorder = null;
-    this.lastGhostSampleMs = -1;
+    // The feed re-emits the same ride on its poll; that is not a new terrain.
+    // Only a genuinely different ride re-arms the ghost, so a duplicate
+    // LOAD_MARKET cannot steal the ghost the rider asked to race.
+    const newTerrain =
+      !this.rideMeta ||
+      this.rideMeta.trackId !== next.trackId ||
+      this.rideMeta.inverted !== next.inverted ||
+      this.rideMeta.interval !== next.interval;
+    this.rideMeta = next;
     this.doReset(true);
+    if (newTerrain) {
+      // A run armed from a shared link ("Race this run" / "Race your best") is
+      // handed over through replay.ts before navigation — no bus timing to
+      // lose. No armed ghost means no ghost: nothing is drawn unasked for.
+      this.ghost?.setSnapshots(attract ? null : takePendingGhost());
+    }
     this.matter.world.resume();
   }
 
@@ -350,6 +365,7 @@ export class RideScene extends Phaser.Scene {
       this.bike.step(drive);
       this.acc -= STEP_MS;
       steps++;
+      this.sampleStep();
     }
     if (steps === MAX_STEPS_PER_FRAME && this.acc > STEP_MS) this.acc = 0;
     // Only tick score while alive — stops timer after crash
@@ -361,6 +377,9 @@ export class RideScene extends Phaser.Scene {
 
     this.trackRenderer.update();
     this.bikeRenderer.render(this.bike);
+    // Ghost (additive, render-only): posed on the run clock so it never
+    // drifts ahead of or behind the rider's own timer.
+    this.ghost?.update(this.score.timeMs);
 
     if (this.bike.crashed && !this.crashHandled) {
       this.crashHandled = true;
@@ -377,6 +396,7 @@ export class RideScene extends Phaser.Scene {
           timeMs: this.score.timeMs,
           difficulty: this.rideDifficulty,
         });
+        this.emitRunResult(false);
       });
     }
 
@@ -391,6 +411,7 @@ export class RideScene extends Phaser.Scene {
           timeMs: this.score.timeMs,
           difficulty: this.rideDifficulty,
         });
+        this.emitRunResult(true);
       });
     }
 
@@ -522,6 +543,61 @@ export class RideScene extends Phaser.Scene {
     this.popupId += 1;
     bus.emit(EV.POPUP, { id: this.popupId, text, points });
     bus.emit(EV.COMBO, this.score.combo);
+    // Trick events ride along with the recording (read-only, no physics).
+    this.recorder?.recordTrick(this.stepCount, trickCodeFor(text), points);
+  }
+
+  /**
+   * One frame of read-only pose sampling. Recording starts with the run and
+   * samples every third physics step (20 Hz); it never touches the bodies.
+   */
+  private sampleStep(): void {
+    const recorder = this.recorder;
+    this.stepCount += 1;
+    if (!recorder || !this.score.started) return;
+    if (this.stepCount % SNAPSHOT_EVERY_STEPS !== 0) return;
+    const pose: RecordedPose = {
+      chassis: { x: this.bike.chassis.position.x, y: this.bike.chassis.position.y, angle: this.bike.chassis.angle },
+      rear: { x: this.bike.rearWheel.position.x, y: this.bike.rearWheel.position.y, angle: this.bike.rearWheel.angle },
+      front: { x: this.bike.frontWheel.position.x, y: this.bike.frontWheel.position.y, angle: this.bike.frontWheel.angle },
+      ejected: this.bike.ejected,
+      ragdoll: this.bike.ragdollBody
+        ? { x: this.bike.ragdollBody.position.x, y: this.bike.ragdollBody.position.y, angle: this.bike.ragdollBody.angle }
+        : null,
+    };
+    recorder.markBegin(this.stepCount);
+    recorder.record(this.stepCount, pose);
+  }
+
+  /**
+   * Publish the enriched run result (additive): the recording, the ghost
+   * poses and where the run ended. The React chrome saves the best ghost
+   * from this event — the scene never writes storage itself.
+   */
+  private emitRunResult(finished: boolean): void {
+    const recorder = this.recorder;
+    if (!recorder || recorder.frameCount === 0) return;
+    const span = WORLD.finishX - this.rideSpawnX;
+    const progress = finished || span <= 0 ? 1 : Math.min(1, Math.max(0, (this.crashCamX - this.rideSpawnX) / span));
+    const result: RunResult = {
+      finished,
+      score: this.score.total,
+      timeMs: this.score.timeMs,
+      difficulty: this.rideDifficulty,
+      progress,
+      recording: recorder.toSharePayload({
+        endStep: this.stepCount,
+        outcome: finished ? 'finish' : 'crash',
+        progress,
+        finalScore: this.score.total,
+        finalTimeMs: this.score.timeMs,
+      }),
+      snapshots: recorder.toGhostSnapshots(),
+    };
+    bus.emit(EV.RUN_RESULT, result);
+    // The run is closed: stop sampling so the recording cannot keep growing
+    // while the result sits on screen. The next reset starts a new one.
+    this.recorder = null;
   }
 
   private doReset(full: boolean): void {
@@ -530,6 +606,14 @@ export class RideScene extends Phaser.Scene {
       this.resultTimer = null;
     }
     this.crashHandled = false;
+    // A full reset is a new run: a fresh recording and step clock. The
+    // attract backdrop never records — it would grow without a result.
+    if (full) {
+      this.stepCount = 0;
+      this.recorder = this.rideMeta && !this.rideMeta.attract
+        ? new RunRecorder(this.rideMeta.trackId, this.rideMeta.trackHash, this.rideMeta.inverted, this.rideMeta.interval)
+        : null;
+    }
     this.parked = false;
     this.trickAirMs = 0;
     this.wheelieMs = 0;

@@ -5,7 +5,8 @@ import CountdownGate from '../components/CountdownGate';
 import { audio } from '../game/audio';
 import { bus, EV } from '../game/bus';
 import { fetchRideForTrack, rideIntervalFromParam, type RideInterval } from '../data/tracks';
-import { recordRun } from '../data/playerStorage';
+import { recordRun, saveGhostRun } from '../data/playerStorage';
+import type { RunResult } from '../game/replay';
 import { useMarket } from '../data/marketsContext';
 
 // Phaser (1.5MB) loads only here, never on home/preview.
@@ -62,13 +63,28 @@ export default function RidePage() {
         if (res) recordRun(id, res.score, res.finished, res.timeMs);
       },
     );
+    // The scene publishes the recorded run; the best one per terrain keeps
+    // its full-fidelity snapshots so it can be raced as a ghost later.
+    const offRunResult = bus.on<RunResult | null>(EV.RUN_RESULT, (res) => {
+      if (!res || res.snapshots.length === 0) return;
+      saveGhostRun({
+        trackId: id,
+        inverted,
+        interval,
+        score: res.score,
+        timeMs: res.timeMs,
+        finished: res.finished,
+        snapshots: res.snapshots,
+      });
+    });
     const offFirst = bus.on<void>(EV.INPUT_FIRST, () => audio.start());
     return () => {
       offResult();
+      offRunResult();
       offFirst();
       audio.destroy();
     };
-  }, [market]);
+  }, [market, inverted, interval]);
 
   const openGate = useCallback(() => setGateOpen(true), []);
 
