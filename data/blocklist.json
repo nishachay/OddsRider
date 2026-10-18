@@ -1,0 +1,12 @@
+{
+  "note": "Manual exclusions for the sensitive-markets filter (docs/LAUNCH_TASKS.md task 1, docs/ODDSRIDER_V2_PLAN.md section 12). A market is excluded when its sourceId, slug or a case-insensitive question substring matches an entry below, or when its question/tags trip BLOCKED_KEYWORDS in packages/core/src/banned.ts. Ingest applies this to new candidates and to frozen tracks already in public/tracks/: a match is pruned from the manifest and its files are deleted on the next `pnpm ingest`.",
+  "markets": [
+    {
+      "sourceId": "4641065",
+      "slug": "us-x-iran-ceasefire-continues-through-october-31-20260917",
+      "question": "iran ceasefire",
+      "reason": "Armed-conflict market (US/Iran); section 12 excludes wars and attacks from every ride and sponsored slot."
+    }
+  ],
+  "keywords": []
+}

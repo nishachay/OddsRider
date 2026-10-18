@@ -158,3 +158,42 @@ describe('planIngest', () => {
     expect(plan.index.generatedAt).toBe('2026-10-01T00:00:00.000Z');
   });
 });
+
+describe('planIngest with the sensitive-markets filter', () => {
+  it('prunes a frozen track that the blocklist now names', async () => {
+    const blocked = await track('4641065', { createdAt: '2026-10-15T00:00:00.000Z' });
+    const kept = await track('2', { createdAt: '2026-10-14T00:00:00.000Z' });
+
+    const plan = planIngest([blocked, kept], [], { isBlocked: (t) => t.sourceId === '4641065' });
+
+    expect(plan.prune).toEqual([blocked.id]);
+    expect(plan.tracks.map((t) => t.sourceId)).toEqual(['2']);
+    expect(plan.index.tracks.map((t) => t.sourceId)).toEqual(['2']);
+  });
+
+  it('never writes a blocked incoming track, even when it is new', async () => {
+    const plan = planIngest([], [await track('blocked'), await track('ok')], {
+      isBlocked: (t) => t.sourceId === 'blocked',
+    });
+
+    expect(plan.write.map((t) => t.sourceId)).toEqual(['ok']);
+    expect(plan.tracks.map((t) => t.sourceId)).toEqual(['ok']);
+  });
+
+  it('is idempotent once the blocked track is gone', async () => {
+    const blocked = await track('blocked');
+    const filter = (t: TrackV1) => t.sourceId === 'blocked';
+    const first = planIngest([blocked], [], { isBlocked: filter });
+    const second = planIngest(first.tracks, [], { isBlocked: filter });
+
+    expect(first.prune).toEqual([blocked.id]);
+    expect(second.prune).toEqual([]);
+    expect(second.index).toEqual(first.index);
+  });
+
+  it('leaves tracks alone when no filter is supplied', async () => {
+    const plan = planIngest([await track('4641065')], []);
+    expect(plan.prune).toEqual([]);
+    expect(plan.index.tracks.map((t) => t.sourceId)).toEqual(['4641065']);
+  });
+});

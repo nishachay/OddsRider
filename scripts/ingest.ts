@@ -17,30 +17,37 @@
  *   pnpm ingest -- --out <dir>           output directory (default public/tracks)
  *   pnpm ingest -- --limit <n>           live markets to freeze (default 12)
  *   pnpm ingest -- --keep <n>            snapshots kept per market (default 2)
+ *   pnpm ingest -- --blocklist <file>    manual sensitive-market blocklist
+ *                                        (default data/blocklist.json)
  *
  * Nothing here invents data. A market that fails validation, is blocked by the
  * sensitive-markets filter, is still open when a closed track was wanted, or
  * has too little history is skipped with a warning; if nothing usable remains
- * the run fails loudly instead of writing fakes.
+ * the run fails loudly instead of writing fakes. A frozen track that matches
+ * the blocklist is pruned, so tightening the filter removes old tracks too.
  */
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  blockedReason,
   buildTrack,
   chunkRange,
   clampProbability,
   createPolymarketSource,
-  filterBlocked,
+  EMPTY_BLOCKLIST,
   filterSportsMarkets,
+  isBlockedMarket,
   isRideableMarket,
   MIN_HISTORY_POINTS,
   MIN_TRACK_RANGE,
   normalizeSeries,
+  parseBlocklist,
   parseTrack,
   planIngest,
   resolutionFromClose,
   selectClosedTarget,
+  type Blocklist,
   type FetchImpl,
   type SourceMarket,
   type TrackInput,
@@ -59,6 +66,7 @@ interface Options {
   closedOnly: boolean;
   fixtures: string | null;
   dump: string | null;
+  blocklist: string;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -70,6 +78,7 @@ function parseArgs(argv: string[]): Options {
     closedOnly: false,
     fixtures: null,
     dump: null,
+    blocklist: join(ROOT, 'data', 'blocklist.json'),
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -80,6 +89,7 @@ function parseArgs(argv: string[]): Options {
     else if (arg === '--closed-only') options.closedOnly = true;
     else if (arg === '--fixtures') options.fixtures = resolve(ROOT, argv[++i]);
     else if (arg === '--dump') options.dump = resolve(ROOT, argv[++i]);
+    else if (arg === '--blocklist') options.blocklist = resolve(ROOT, argv[++i]);
     else throw new Error(`unknown argument: ${arg}`);
   }
   if (!Number.isFinite(options.limit) || options.limit < 1) throw new Error('--limit must be >= 1');
@@ -89,6 +99,26 @@ function parseArgs(argv: string[]): Options {
 
 function warn(message: string): void {
   console.warn(`ingest: warning: ${message}`);
+}
+
+/**
+ * The manual sensitive-markets blocklist. A missing file is not fatal (the
+ * keyword filter still runs) but a malformed one is: a typo must not quietly
+ * let a sensitive market through.
+ */
+async function loadBlocklist(path: string): Promise<Blocklist> {
+  let raw: string;
+  try {
+    raw = await readFile(path, 'utf8');
+  } catch {
+    warn(`no blocklist at ${path}: keyword filter only`);
+    return EMPTY_BLOCKLIST;
+  }
+  try {
+    return parseBlocklist(JSON.parse(raw));
+  } catch (error) {
+    throw new Error(`blocklist ${path} is invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 async function readExistingTracks(out: string): Promise<TrackV1[]> {
@@ -140,12 +170,15 @@ async function buildLiveTracks(
   markets: SourceMarket[],
   options: Options,
   now: string,
+  blocklist: Blocklist,
 ): Promise<TrackV1[]> {
+  const rideable = markets.filter((market) => isRideableMarket(market));
+  for (const market of rideable) {
+    const reason = blockedReason(market, blocklist);
+    if (reason) warn(`skipping "${market.slug}": ${reason}`);
+  }
   const candidates = filterSportsMarkets(
-    filterBlocked(
-      markets.filter((market) => isRideableMarket(market)),
-      (market) => market.tags,
-    ),
+    rideable.filter((market) => !isBlockedMarket(market, blocklist)),
   ).slice(0, options.limit);
 
   const tracks: TrackV1[] = [];
@@ -185,7 +218,11 @@ async function buildLiveTracks(
   return tracks;
 }
 
-async function buildClosedTracks(upstream: Upstream, now: string): Promise<TrackV1[]> {
+async function buildClosedTracks(
+  upstream: Upstream,
+  now: string,
+  blocklist: Blocklist,
+): Promise<TrackV1[]> {
   const tracks: TrackV1[] = [];
   for (const spec of CLOSED_MARKETS) {
     let candidates: SourceMarket[] = [];
@@ -198,6 +235,11 @@ async function buildClosedTracks(upstream: Upstream, now: string): Promise<Track
     const market = selectClosedTarget(candidates, spec.pick);
     if (!market) {
       warn(`skipping "${spec.slug}": slug resolved nowhere`);
+      continue;
+    }
+    const blocked = blockedReason(market, blocklist);
+    if (blocked) {
+      warn(`skipping "${market.slug}": ${blocked}`);
       continue;
     }
     if (market.yesTokenId === null) {
@@ -318,11 +360,12 @@ async function main(): Promise<void> {
 
   const existing = await readExistingTracks(options.out);
   const incoming: TrackV1[] = [];
+  const blocklist = await loadBlocklist(options.blocklist);
 
   if (!options.closedOnly) {
     try {
       const trending = await upstream.source.listTrending(Math.max(options.limit * 2, options.limit));
-      incoming.push(...(await buildLiveTracks(upstream, trending, options, now)));
+      incoming.push(...(await buildLiveTracks(upstream, trending, options, now, blocklist)));
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       throw new Error(
@@ -331,13 +374,16 @@ async function main(): Promise<void> {
     }
   }
   if (!options.liveOnly) {
-    incoming.push(...(await buildClosedTracks(upstream, now)));
+    incoming.push(...(await buildClosedTracks(upstream, now, blocklist)));
   }
   if (incoming.length === 0 && existing.length === 0) {
     throw new Error('no usable tracks: every market failed validation or was filtered out');
   }
 
-  const plan = planIngest(existing, incoming, { keepPerSource: options.keep });
+  const plan = planIngest(existing, incoming, {
+    keepPerSource: options.keep,
+    isBlocked: (track) => isBlockedMarket(track, blocklist),
+  });
 
   await mkdir(options.out, { recursive: true });
   for (const track of plan.write) {
@@ -350,6 +396,9 @@ async function main(): Promise<void> {
 
   console.log(
     `ingest: ${plan.tracks.length} tracks (${plan.write.length} new, ${plan.prune.length} pruned) -> ${options.out}`,
+  );
+  console.log(
+    `ingest: sensitive filter — ${blocklist.markets.length} blocked markets, ${blocklist.keywords.length} extra keywords`,
   );
 }
 

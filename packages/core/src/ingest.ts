@@ -10,7 +10,10 @@
  *   - only the newest `keepPerSource` snapshots per market are kept, which
  *     bounds repo growth while keeping shared links alive for a while;
  *   - the index lists each market once (newest snapshot) and only changes
- *     when the set does — it is what Home renders.
+ *     when the set does — it is what Home renders;
+ *   - a track the sensitive-markets filter blocks is never retained, and one
+ *     already on disk is pruned, so adding a blocklist entry removes old
+ *     frozen tracks instead of leaving them in the manifest.
  */
 import type { TrackIndex, TrackSummary, TrackV1 } from './types.ts';
 
@@ -59,28 +62,51 @@ export function dedupeNewest(summaries: TrackSummary[]): TrackSummary[] {
 export interface IngestPlan {
   /** Tracks not seen before, ready to write. */
   write: TrackV1[];
-  /** Ids of snapshots that fell out of the retention window. */
+  /** Ids of snapshots that fell out of the retention window, plus blocked ones. */
   prune: string[];
-  /** The complete retained set, newest first. */
+  /** The complete retained set, newest first. Blocked tracks are never in it. */
   tracks: TrackV1[];
   index: TrackIndex;
+}
+
+export interface PlanOptions {
+  keepPerSource?: number;
+  /**
+   * Sensitive-markets filter. A blocked track is never written or retained, and
+   * a blocked track already on disk is pruned, so tightening the filter removes
+   * old frozen tracks instead of leaving them in the manifest forever.
+   */
+  isBlocked?: (track: TrackV1) => boolean;
 }
 
 export function planIngest(
   existing: TrackV1[],
   incoming: TrackV1[],
-  options: { keepPerSource?: number } = {},
+  options: PlanOptions = {},
 ): IngestPlan {
   const keepPerSource = options.keepPerSource ?? KEEP_PER_SOURCE;
+  const isBlocked = options.isBlocked ?? (() => false);
+
+  // Blocked ids are collected before de-duplication so a blocked snapshot that
+  // is also a retention victim still lands in `prune` exactly once.
+  const blockedIds = new Set<string>();
+  for (const track of [...existing, ...incoming]) {
+    if (isBlocked(track)) blockedIds.add(track.id);
+  }
 
   const byId = new Map<string, TrackV1>();
-  for (const track of existing) byId.set(track.id, track);
-  for (const track of incoming) if (!byId.has(track.id)) byId.set(track.id, track);
+  for (const track of existing) {
+    if (!blockedIds.has(track.id)) byId.set(track.id, track);
+  }
+  for (const track of incoming) {
+    if (blockedIds.has(track.id) || byId.has(track.id)) continue;
+    byId.set(track.id, track);
+  }
 
   const write: TrackV1[] = [];
   const known = new Set(existing.map((track) => track.id));
   for (const track of incoming) {
-    if (known.has(track.id)) continue;
+    if (known.has(track.id) || blockedIds.has(track.id)) continue;
     write.push(track);
   }
 
@@ -96,7 +122,9 @@ export function planIngest(
     for (const summary of list.slice(0, keepPerSource)) kept.add(summary.id);
   }
 
-  const prune = [...byId.keys()].filter((id) => !kept.has(id)).sort();
+  const pruneCandidates = [...byId.keys()].filter((id) => !kept.has(id));
+  for (const id of blockedIds) pruneCandidates.push(id);
+  const prune = [...new Set(pruneCandidates)].sort();
   const tracks = [...byId.values()]
     .filter((track) => kept.has(track.id))
     .sort((a, b) => byNewest(summarize(a), summarize(b)));
