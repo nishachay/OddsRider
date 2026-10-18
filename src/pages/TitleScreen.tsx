@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import GameStage from '../components/GameStage';
+import MomentumCue from '../components/MomentumCue';
 import { EmptyTracksState, FeedErrorState } from '../components/LoadStates';
 import { activeRideStore, bus, EV } from '../game/bus';
 import { useMarkets } from '../data/marketsContext';
@@ -174,7 +175,10 @@ export default function TitleScreen() {
                   {featured.question}
                 </p>
                 <p className="font-mono text-xs text-dim tabular-nums">
-                  <span className={`text-2xl font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>{pct}%</span>{' '}
+                  <span className={`text-2xl font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>
+                    <MomentumCue delta={delta} />
+                    {pct}%
+                  </span>{' '}
                   YES · {deltaLabel} 24H
                 </p>
                 <div className="pt-2 flex flex-col gap-3">

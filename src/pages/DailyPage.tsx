@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import MiniTrack from '../components/MiniTrack';
+import MomentumCue from '../components/MomentumCue';
 import { EmptyTracksState, FeedErrorState } from '../components/LoadStates';
 import { useMarkets } from '../data/marketsContext';
 import { getDailyChallenge, momentumUp, type RideableMarket } from '../data/tracks';
@@ -82,7 +83,10 @@ export default function DailyPage() {
                   {pick.question}
                 </p>
                 <span className="font-mono text-[11px] text-dim tabular-nums">
-                  <span className={`text-base font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>{pct}%</span>{' '}
+                  <span className={`text-base font-bold ${up ? 'text-toxic' : 'text-crimson'}`}>
+                    <MomentumCue delta={pick.probDelta} />
+                    {pct}%
+                  </span>{' '}
                   YES ·{' '}
                   {best && best.plays > 0 ? (
                     <>YOUR BEST {best.best.toLocaleString()} · {best.plays} RIDE{best.plays === 1 ? '' : 'S'}</>

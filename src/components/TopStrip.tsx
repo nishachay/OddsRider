@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import MotionToggle from './MotionToggle';
 
 function useUtcClock(): string {
   const [now, setNow] = useState(() => new Date());
@@ -37,6 +38,7 @@ export default function TopStrip({ hideWordmark = false }: { hideWordmark?: bool
           <Link to="/about" className={link}>
             How to play
           </Link>
+          <MotionToggle />
           <span className="hidden sm:inline font-mono text-[10px] text-dim tabular-nums">{clock}</span>
         </nav>
       </div>

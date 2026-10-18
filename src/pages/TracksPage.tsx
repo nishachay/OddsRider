@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import TopStrip from '../components/TopStrip';
 import MiniTrack from '../components/MiniTrack';
+import MomentumCue from '../components/MomentumCue';
 import { EmptyTracksState, FeedErrorState } from '../components/LoadStates';
 import { useMarkets } from '../data/marketsContext';
 import { getHomePageData, momentumUp, type RideableMarket } from '../data/tracks';
@@ -71,6 +72,7 @@ function TrackRow({
 
       <div className="flex lg:flex-col items-baseline lg:items-end gap-x-2 shrink-0 lg:w-24">
         <span className={`font-poster text-4xl leading-none tabular-nums ${momentum}`}>
+          <MomentumCue delta={market.probDelta} />
           {probPct}
           <span className="text-lg text-dim">%</span>
         </span>

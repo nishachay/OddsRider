@@ -107,3 +107,22 @@ body {
     animation: none;
   }
 }
+
+/* The toggle's stored preference behaves exactly like the OS setting: the same
+   motion goes away without a media query. Unlayered, so it wins over Tailwind's
+   layered utilities. */
+html[data-reduced-motion="true"] .prompt-pulse,
+html[data-reduced-motion="true"] .rise,
+html[data-reduced-motion="true"] .shimmer,
+html[data-reduced-motion="true"] .animate-pulse {
+  animation: none;
+}
+
+/* Keyboard focus: one ring on every control, not just the row button that
+   happened to carry the utility. Chromium paints the focus ring in its own
+   colour, so the toxic value is for engines that honour outline-color; width
+   and offset apply everywhere. :where() keeps specificity at zero. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-toxic);
+  outline-offset: 2px;
+}

@@ -10,6 +10,7 @@ import {
   getHomePageData,
   getTitleFeature,
   isLiveList,
+  momentumGlyph,
   momentumUp,
   rideIntervalFromParam,
   sameFeed,
@@ -112,6 +113,19 @@ describe('momentumUp', () => {
 
   it('defaults unknown deltas to rising, like the terrain renderer', () => {
     expect(momentumUp(null)).toBe(true);
+  });
+});
+
+describe('momentumGlyph', () => {
+  it('gives the colour cue a direction arrow', () => {
+    expect(momentumGlyph(0.02)).toBe('↑');
+    expect(momentumGlyph(0)).toBe('↑');
+    expect(momentumGlyph(-0.3)).toBe('↓');
+  });
+
+  it('shows no arrow when the 24h change is unknown — never invents a direction', () => {
+    expect(momentumGlyph(null)).toBe('');
+    expect(momentumGlyph(undefined)).toBe('');
   });
 });
 

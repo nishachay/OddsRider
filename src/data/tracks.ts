@@ -270,6 +270,15 @@ export function momentumUp(probDelta: number | null): boolean {
   return (probDelta ?? 0) >= 0;
 }
 
+// The colour-blind-safe half of the same cue: a ↑/↓ glyph beside the green /
+// crimson number. Both arrows are in Anton's self-hosted unicode-range. An
+// unknown delta has no direction to show, so it gets no glyph (the UI already
+// prints "—" for it; never invent a direction).
+export function momentumGlyph(probDelta: number | null | undefined): '' | '↑' | '↓' {
+  if (probDelta === null || probDelta === undefined) return '';
+  return probDelta >= 0 ? '↑' : '↓';
+}
+
 // Biggest 24h movers: live tracks with a known delta, ranked by absolute
 // swing. Unknown deltas never qualify — no guessing.
 export function getBiggestMovers(markets: RideableMarket[], n = 4): RideableMarket[] {
