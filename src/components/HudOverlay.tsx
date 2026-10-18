@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bus, EV } from "../game/bus";
 import ResultModal from "./ResultModal";
+import ResultScreen, { type ResultScreenData } from "./ResultScreen";
 import TouchControls from "./TouchControls";
 import { loadMuted } from "../game/audio";
-import { momentumUp } from "../data/tracks";
+import { crashDateLabel, momentumUp } from "../data/tracks";
 import type { Difficulty } from "../data/tracks";
+import { getMarketBest, type MarketBest } from "../data/playerStorage";
+import type { RunResult } from "../game/replay";
 
 const TOXIC = "#b6ff00";
 const CRIMSON = "#ff3355";
@@ -119,9 +122,11 @@ interface ResultPayload { finished: boolean; score: number; timeMs: number; diff
 interface HudOverlayProps {
   onOpenLobby?: () => void;
   rideUrl?: string;
+  /** The frozen track being ridden — the key for best-run and crash-date reads. */
+  marketId?: string;
 }
 
-export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
+export default function HudOverlay({ onOpenLobby, rideUrl, marketId }: HudOverlayProps) {
   const [speed, setSpeed] = useState(0);
   const [muted, setMuted] = useState(loadMuted);
   const [nitro, setNitro] = useState(1);
@@ -137,6 +142,11 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
   const [airborne, setAirborne] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
   const [hasStarted, setHasStarted] = useState(false);
+  // Phase 3 run result (the scene's enriched RUN_RESULT) and the heading date
+  // read from the frozen track's own timestamps. The result screen is built
+  // from these alone, so it only ever shows what the run recorded.
+  const [runResult, setRunResult] = useState<{ run: RunResult; best: MarketBest; isNewBest: boolean } | null>(null);
+  const [crashDate, setCrashDate] = useState<string | null>(null);
 
   useEffect(() => {
     const offs = [
@@ -186,6 +196,32 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
     };
   }, []);
 
+  // The scene publishes the recorded run when it ends. RidePage records the run
+  // into the player's stats from EV.RESULT first, so this read is the best
+  // *after* this run: only a score that beats every earlier run is a new best.
+  useEffect(() => {
+    return bus.on<RunResult | null>(EV.RUN_RESULT, (run) => {
+      if (!run || run.recording.frames.length === 0) return;
+      const best = marketId ? getMarketBest(marketId) : { plays: 0, best: 0, wins: 0, runs: [] };
+      const previous = best.runs.slice(1).reduce((top, r) => Math.max(top, r.score), 0);
+      setRunResult({ run, best, isNewBest: run.score > 0 && run.score >= best.best && run.score > previous });
+    });
+  }, [marketId]);
+
+  useEffect(() => {
+    if (!runResult || runResult.run.finished) {
+      setCrashDate(null);
+      return;
+    }
+    let cancelled = false;
+    void crashDateLabel(runResult.run.recording.trackId, runResult.run.progress).then((label) => {
+      if (!cancelled) setCrashDate(label);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [runResult]);
+
   const deltaUp = (market?.probDelta ?? 0) >= 0;
   const deltaKnown = market?.probDelta != null;
   const deltaColor = !deltaKnown ? DIM : deltaUp ? TOXIC : CRIMSON;
@@ -206,12 +242,35 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
 
   const rideAgain = useCallback(() => {
     setResult(null);
+    setRunResult(null);
+    setCrashDate(null);
     setHasStarted(false);
     bus.emit(EV.RESTART);
   }, []);
 
+  // The share row reports what the attempt actually did; the screen only wants
+  // to know that a share was tried.
+  const noteShare = useCallback(() => {}, []);
+
   const timeObj = fmtTime(score.timeMs);
   const isNitroActive = activeKeys.has("ShiftLeft") || activeKeys.has("ShiftRight") || activeKeys.has("KeyN");
+  // The race-day result screen, fed by the run the scene actually recorded.
+  // Without a recording the legacy receipt still stands in (nothing to replay).
+  const resultScreen: ResultScreenData | null =
+    runResult && market
+      ? {
+          finished: runResult.run.finished,
+          score: runResult.run.score,
+          timeMs: runResult.run.timeMs,
+          difficulty: runResult.run.difficulty,
+          progress: runResult.run.progress,
+          question: market.question,
+          crashDate,
+          best: runResult.best,
+          isNewBest: runResult.isNewBest,
+          recording: runResult.run.recording,
+        }
+      : null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none font-sans p-6 sm:p-8 flex flex-col justify-between">
@@ -428,20 +487,29 @@ export default function HudOverlay({ onOpenLobby, rideUrl }: HudOverlayProps) {
         opacity: crashFlash ? 0.8 : 0,
       }} />
 
-      {/* Result Modal */}
+      {/* Result: the phase-3 screen when the run was recorded, else the receipt. */}
       <TouchControls />
-      <ResultModal
-        isOpen={Boolean(result)}
-        result={result ? {
-          finished: result.finished, score: result.score, timeMs: result.timeMs,
-          difficulty: result.difficulty,
-          marketQuestion: market?.question, finalProb: prob ?? undefined,
-          trackPts: track,
-        } : null}
-        onRetry={rideAgain}
-        onOpenLobby={onOpenLobby}
-        rideUrl={rideUrl}
-      />
+      {resultScreen ? (
+        <ResultScreen
+          result={resultScreen}
+          onRetry={rideAgain}
+          onShare={noteShare}
+          onNextTrack={null}
+        />
+      ) : (
+        <ResultModal
+          isOpen={Boolean(result)}
+          result={result ? {
+            finished: result.finished, score: result.score, timeMs: result.timeMs,
+            difficulty: result.difficulty,
+            marketQuestion: market?.question, finalProb: prob ?? undefined,
+            trackPts: track,
+          } : null}
+          onRetry={rideAgain}
+          onOpenLobby={onOpenLobby}
+          rideUrl={rideUrl}
+        />
+      )}
 
     </div>
   );

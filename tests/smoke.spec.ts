@@ -1,6 +1,12 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from 'playwright/test';
+import {
+  TRACKS,
+  assertClean,
+  listen,
+  mockThirdParties,
+  telemetry,
+  type DebugHandle,
+} from './support';
 
 // ---------------------------------------------------------------------------
 // Offline smoke test for the arcade flow.
@@ -16,104 +22,7 @@ import { expect, test, type Page } from 'playwright/test';
 // data. Gameplay physics are not asserted here.
 // ---------------------------------------------------------------------------
 
-interface TrackSummary {
-  id: string;
-  kind: string;
-  question: string;
-}
-
-function trackIndex(): TrackSummary[] {
-  let raw: string;
-  try {
-    const path = fileURLToPath(new URL('../public/tracks/index.json', import.meta.url));
-    raw = readFileSync(path, 'utf8');
-  } catch {
-    return [];
-  }
-  const index = JSON.parse(raw) as { tracks?: TrackSummary[] };
-  return Array.isArray(index.tracks) ? index.tracks : [];
-}
-
-const TRACKS = trackIndex();
 const IDS = new Set(TRACKS.map((t) => t.id));
-
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
-
-interface Telemetry {
-  x: number;
-  y: number;
-  angle: number;
-  speed: number;
-  grounded: boolean;
-  crashed: boolean;
-  score: number;
-  simMs: number;
-}
-
-type DebugHandle = Record<string, () => unknown>;
-
-async function telemetry(page: Page): Promise<Telemetry> {
-  return page.evaluate(() => {
-    const handle = (window as unknown as { __oddsrider?: DebugHandle }).__oddsrider;
-    if (!handle) throw new Error('window.__oddsrider is not installed');
-    return {
-      x: handle.x() as number,
-      y: handle.y() as number,
-      angle: handle.angle() as number,
-      speed: handle.speed() as number,
-      grounded: handle.grounded() as boolean,
-      crashed: handle.crashed() as boolean,
-      score: handle.score() as number,
-      simMs: handle.simMs() as number,
-    };
-  });
-}
-
-// Everything third-party is stubbed or forbidden. `external` collects anything
-// that is neither local nor stubbed, so a new outbound call — a Polymarket
-// request, an analytics pixel, anything — fails the test loudly.
-async function mockThirdParties(page: Page, external: string[]): Promise<void> {
-  await page.route('**/*', async (route) => {
-    const url = new URL(route.request().url());
-
-    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-      return route.fulfill({
-        status: 200,
-        contentType: 'text/css',
-        body: '/* stubbed: the smoke test runs offline */',
-      });
-    }
-    if (LOCAL_HOSTS.has(url.hostname)) {
-      return route.continue();
-    }
-
-    external.push(route.request().url());
-    return route.abort();
-  });
-}
-
-function listen(page: Page): { consoleErrors: string[]; pageErrors: string[]; external: string[] } {
-  const consoleErrors: string[] = [];
-  const pageErrors: string[] = [];
-  const external: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  return { consoleErrors, pageErrors, external };
-}
-
-function assertClean(
-  consoleErrors: string[],
-  pageErrors: string[],
-  external: string[],
-  ignoredConsole: RegExp[] = [],
-): void {
-  const relevant = consoleErrors.filter((message) => !ignoredConsole.some((re) => re.test(message)));
-  expect(pageErrors, `uncaught page errors:\n${pageErrors.join('\n')}`).toEqual([]);
-  expect(relevant, `console errors:\n${relevant.join('\n')}`).toEqual([]);
-  expect(external, `the smoke test must not reach the network, but saw:\n${external.join('\n')}`).toEqual([]);
-}
 
 // Wait out the 3-2-1-RIDE gate, then hold gas and watch the bike move.
 async function rideBriefly(page: Page): Promise<void> {

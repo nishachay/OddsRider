@@ -226,7 +226,19 @@ export class RideScene extends Phaser.Scene {
         chassisY: this.bike.chassis.position.y,
       }),
       reset: () => this.doReset(true),
+      // Test-only (Playwright smoke): the frozen tracks are too flat for a
+      // scripted ride to wreck itself, so the test lays the bike on its head
+      // and lets the scene's own crash rules fire from there. Poses only — no
+      // tuning, collider or step change, and nothing in the game calls it.
+      wreck: () => this.wreckForTest(),
     };
+  }
+
+  /** Test hook: tip the bike past its head-crash tilt and let physics land it. */
+  private wreckForTest(): void {
+    const B = this.matter.body;
+    B.setAngle(this.bike.chassis, Math.PI);
+    B.setVelocity(this.bike.chassis, { x: 0, y: 0 });
   }
 
   private async loadRide(): Promise<void> {

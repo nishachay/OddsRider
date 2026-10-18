@@ -148,7 +148,7 @@ export default function RidePage() {
       >
         <PhaserGame />
       </Suspense>
-      <HudOverlay onOpenLobby={() => navigate('/')} rideUrl={rideUrl} />
+      <HudOverlay onOpenLobby={() => navigate('/')} rideUrl={rideUrl} marketId={market.id} />
       {!gateOpen && <CountdownGate onDone={openGate} short={quick} />}
       {loadError && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 font-mono text-[11px] text-crimson border border-crimson/50 bg-[#0a0a0b]/90 px-4 py-2">
